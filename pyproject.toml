@@ -1,0 +1,75 @@
+[build-system]
+requires = ["maturin>=1.15,<2"]
+build-backend = "maturin"
+
+[project]
+name = "zodish"
+version = "0.3.0"
+description = "Composable Python 3.14+ schemas with a Rust validation core"
+authors = [
+  { name = "Aleksandr Pavlov", email = "ckidoz@gmail.com" },
+]
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+dependencies = []
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Typing :: Typed",
+  "Programming Language :: Rust",
+]
+
+[project.urls]
+Homepage = "https://github.com/kidoz/zodish"
+Repository = "https://github.com/kidoz/zodish"
+
+[dependency-groups]
+dev = [
+  "mypy>=2.4,<3",
+  "ruff>=0.17,<1",
+]
+benchmark = [
+  "pydantic==2.14.1",
+  "msgspec==0.22.0",
+  "marshmallow==4.3.1",
+  "pyperf==2.10.0",
+]
+
+[tool.maturin]
+python-source = "src"
+module-name = "zodish._native"
+include = [
+  { path = "examples/*.py", format = "sdist" },
+  { path = "tests/*.py", format = "sdist" },
+  { path = "benchmarks/*.py", format = "sdist" },
+  { path = "benchmarks/README.md", format = "sdist" },
+  { path = "benchmarks/requirements.lock", format = "sdist" },
+  { path = "benchmarks/results/*", format = "sdist" },
+  { path = ".github/workflows/*.yml", format = "sdist" },
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+lines-after-imports = 2
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+files = [
+  "src",
+  "benchmarks",
+  "scripts",
+  "examples/typing_checks.py",
+  "examples/verify_native.py",
+]
+mypy_path = "src"
