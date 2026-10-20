@@ -730,8 +730,11 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(non_finite.error.issues[0].code, "invalid_type")
 
         path_codec = z.codecs.path()
-        self.assertEqual(path_codec.decode("/tmp/x"), pathlib.Path("/tmp/x"))
-        self.assertEqual(path_codec.encode(pathlib.Path("/tmp/x")), "/tmp/x")
+        path = pathlib.Path("/tmp/x")
+        self.assertEqual(path_codec.decode("/tmp/x"), path)
+        self.assertEqual(path_codec.encode(path), str(path))
+        windows_path = pathlib.PureWindowsPath("/tmp/x")
+        self.assertEqual(path_codec.encode(windows_path), str(windows_path))
         self.assertIsInstance(path_codec.safe_decode(1), Failure)
 
         base64_codec = z.codecs.bytes_base64()
