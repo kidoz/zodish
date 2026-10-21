@@ -20,7 +20,10 @@ paths remain with the evaluator in `rust/lib.rs`.
 capability flags, Python-facing methods, and GC integration. Its parse entry
 points still call evaluator helpers in `rust/lib.rs` during extraction.
 Operation kinds are exposed from `rust/schema/kind.rs`, where operation names
-and constructor arity are checked. The evaluators share these definitions;
+and constructor arity are checked. `rust/schema/checks.rs` contains shared
+post-child operations and constraint checks, plus the error templates built
+during node construction. Sync evaluation and async continuations call the same
+implementation. The evaluators share these definitions;
 validation behavior and Python-visible class names are unchanged by this split.
 
 ## One evaluation boundary
