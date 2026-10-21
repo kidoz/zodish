@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-21
+
+### Changed
+
+- Async validation is stable as of 0.5.0. Composable async callbacks, JSON
+  parsing, codecs, dataclass codecs, and reverse encoding are no longer labeled
+  experimental. Synchronous validation remains the default and unchanged.
+- Lazy factories remain synchronous as a permanent API boundary. A lazy factory
+  may return a schema containing async operations, so recursive async schemas
+  are supported without async schema construction.
+- Official wheels remain GIL-enabled CPython 3.14+ `abi3` artifacts.
+  Free-threaded builds passed local macOS arm64 CPython 3.14t and 3.15t test
+  runs, but free-threaded wheels are not published in 0.5.0.
+
 ### Fixed
 
 - Async parsing now reports `required` for missing input at the root of object,
