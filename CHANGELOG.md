@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- String checks for ISO 8601 durations, HTTP/HTTPS URLs, hexadecimal strings,
+  and IPv4/IPv6 CIDR notation, plus `z.codecs.iso_duration()` for
+  ISO duration strings ↔ `timedelta`.
 - Parse entry points accept a keyword-only `error=` callable that rewrites issue
   messages when issue data is materialized. Successful parses, `validate()`,
   and issue codes, paths, and params are unchanged.

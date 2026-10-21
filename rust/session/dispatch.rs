@@ -488,6 +488,8 @@ impl AsyncSession {
             | Kind::EndsWith
             | Kind::Includes
             | Kind::Ipv6
+            | Kind::Cidrv4
+            | Kind::Cidrv6
             | Kind::Trim
             | Kind::Lower
             | Kind::Upper => {

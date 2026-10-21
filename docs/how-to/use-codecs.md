@@ -57,6 +57,7 @@ The `z.codecs` namespace provides codecs for common string boundaries:
 z.codecs.iso_date()       # "2026-10-20" <-> date
 z.codecs.iso_time()       # "12:30:00" <-> time
 z.codecs.iso_datetime()   # ISO datetime <-> datetime
+z.codecs.iso_duration()   # ISO 8601 duration <-> timedelta
 z.codecs.decimal()        # decimal string <-> Decimal
 z.codecs.json_text()      # JSON text <-> JSON-compatible values
 z.codecs.path()           # path string <-> pathlib.Path
@@ -67,6 +68,11 @@ z.codecs.bytes_base64(urlsafe=True)
 Each helper returns a `CodecSchema` and accepts an optional `message` where a
 syntax error is possible. Invalid JSON reports `invalid_format` with a
 `position`; decimal and base64 failures report their format name.
+
+`iso_duration()` accepts weeks (`P2W`), days and time components
+(`P1DT2H30M`), fractional seconds, and an optional sign. Calendar years and
+months are rejected because `timedelta` cannot represent them exactly. Encoding
+uses a canonical form such as `PT15M` or `P1DT2H3M4.5S`.
 
 ## Map objects to dataclasses
 

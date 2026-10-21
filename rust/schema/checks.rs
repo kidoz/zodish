@@ -1,6 +1,6 @@
 //! Post-child validation checks and reusable error templates shared by evaluators.
 
-use std::net::Ipv6Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 
 use pyo3::prelude::*;
@@ -83,6 +83,14 @@ impl NativeSchema {
                 .extract::<String>()
                 .ok()
                 .is_some_and(|text| text.parse::<Ipv6Addr>().is_ok()),
+            Kind::Cidrv4 => parsed
+                .extract::<String>()
+                .ok()
+                .is_some_and(|text| is_cidr_v4(&text)),
+            Kind::Cidrv6 => parsed
+                .extract::<String>()
+                .ok()
+                .is_some_and(|text| is_cidr_v6(&text)),
             _ => unreachable!(),
         };
         if valid {
@@ -221,6 +229,22 @@ impl NativeSchema {
                     params,
                 )
             }
+            Kind::Cidrv4 | Kind::Cidrv6 => {
+                let params = PyDict::new(py);
+                params.set_item(
+                    "format",
+                    if matches!(self.kind, Kind::Cidrv4) {
+                        "cidrv4"
+                    } else {
+                        "cidrv6"
+                    },
+                )?;
+                (
+                    "invalid_format",
+                    self.args[0].bind(py).extract::<String>()?,
+                    params,
+                )
+            }
             Kind::Positive => {
                 let params = PyDict::new(py);
                 params.set_item("minimum", 0)?;
@@ -254,6 +278,28 @@ impl NativeSchema {
         };
         ctx.fail_with(code, &message, path, params)
     }
+}
+
+fn cidr_address(text: &str, maximum: u8) -> Option<&str> {
+    let (address, prefix) = text.split_once('/')?;
+    let max_digits = if maximum > 99 { 3 } else { 2 };
+    if prefix.is_empty()
+        || prefix.len() > max_digits
+        || (prefix.len() > 1 && prefix.starts_with('0'))
+        || !prefix.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    let prefix = prefix.parse::<u8>().ok()?;
+    (prefix <= maximum).then_some(address)
+}
+
+fn is_cidr_v4(text: &str) -> bool {
+    cidr_address(text, 32).is_some_and(|address| address.parse::<Ipv4Addr>().is_ok())
+}
+
+fn is_cidr_v6(text: &str) -> bool {
+    cidr_address(text, 128).is_some_and(|address| address.parse::<Ipv6Addr>().is_ok())
 }
 
 pub(super) fn build_error_template(

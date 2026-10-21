@@ -34,15 +34,22 @@ formats.
 | --- | --- |
 | `.min(n)`, `.max(n)`, `.length(n)` | Length bounds |
 | `.regex(pattern)` | Python `re.search` match |
-| `.email()`, `.url()`, `.uuid()` | Format checks |
+| `.email()`, `.url()`, `.http_url()`, `.uuid()` | Format checks |
 | `.ulid()`, `.cuid()`, `.cuid2()`, `.nanoid()` | Identifier format checks |
-| `.jwt()`, `.e164()` | Token and phone-number format checks |
+| `.jwt()`, `.e164()`, `.hex()` | Token, phone-number, and hex syntax checks |
 | `.base64()`, `.base64url()` | Base64 syntax checks |
-| `.date()`, `.time()`, `.datetime()` | String date/time format checks |
-| `.ipv4()`, `.ipv6()`, `.hostname()` | Format checks |
+| `.date()`, `.time()`, `.datetime()`, `.duration()` | String date/time and ISO duration checks |
+| `.ipv4()`, `.ipv6()`, `.cidrv4()`, `.cidrv6()`, `.hostname()` | Address and format checks |
 | `.starts_with(s)`, `.ends_with(s)`, `.includes(s)` | Substring predicates |
 | `.trim()`, `.lower()`, `.upper()` | Value normalization |
 | `.stringbool(...)` | Coerce configured strings to `bool` |
+
+`.http_url()` accepts only `http` and `https` schemes. `.hex()` accepts one or
+more hexadecimal digits and does not require an even length. `.cidrv4()` and
+`.cidrv6()` validate address syntax and the prefix range; host bits may be set.
+`.duration()` accepts an optional sign, weeks, days, and time components.
+Calendar years and months are rejected because `timedelta` cannot represent
+them exactly.
 
 ## Number methods
 
@@ -192,6 +199,7 @@ complete status and limitations.
 | `z.codec(input_schema, output_schema, *, decode=fn, encode=fn)` | Build a bidirectional conversion |
 | `z.codec_async(input_schema, output_schema, *, decode=fn, encode=fn)` | Build a codec with awaitable conversion callbacks |
 | `z.codecs.iso_date()`, `iso_time()`, `iso_datetime()` | ISO strings ↔ `date`, `time`, `datetime` |
+| `z.codecs.iso_duration()` | ISO 8601 duration string ↔ `timedelta` |
 | `z.codecs.decimal()`, `json_text()` | String ↔ `Decimal` or JSON-compatible values |
 | `z.codecs.path()`, `bytes_base64(urlsafe=False)` | String ↔ `Path` or `bytes` |
 | `z.codecs.dataclass(Cls, fields=None)` | Encoded dictionary ↔ dataclass instance; infers annotations, `Annotated[T, schema]`, and aliases with ordinary type parameters and defaults; `fields=` overrides inference |

@@ -41,6 +41,16 @@ _SYNC_RESULT_TYPES = frozenset({
 _OBJECT_NEW = builtins.object.__new__
 
 _URL_PATTERN = r"^[a-zA-Z][a-zA-Z0-9+.-]*://[^\s]+$"
+_HTTP_URL_PATTERN = r"^[Hh][Tt][Tt][Pp][Ss]?://[^\s]+$"
+_HEX_PATTERN = r"^[0-9a-fA-F]+$"
+_DURATION_PATTERN = (
+    r"^[+-]?P(?:\d+W|(?=\d|T)(?:\d+D)?"
+    r"(?:T(?=\d)(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?)?)$"
+)
+_DURATION_PARTS = re.compile(
+    r"^[+-]?P(?:(\d+)W|(?:(\d+)D)?"
+    r"(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?)$"
+)
 _UUID_PATTERN = (
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"
     r"-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
@@ -87,7 +97,9 @@ _KNOWN_FORMATS = frozenset({
     "email", "uri", "uuid", "date", "time", "date-time", "ipv4", "ipv6",
     "hostname", "ulid", "cuid", "cuid2", "nanoid", "jwt", "e164",
 })
-_PATTERN_FORMATS = frozenset({"regex", "decimal", "base64", "base64url"})
+_PATTERN_FORMATS = frozenset({
+    "regex", "decimal", "base64", "base64url", "duration", "http_url", "hex",
+})
 
 
 class Missing(Enum):
@@ -431,6 +443,55 @@ def _parse_iso_datetime(value: str, message: str) -> _datetime.datetime:
         return _datetime.datetime.fromisoformat(value)
     except ValueError:
         raise _invalid_format(message, "date-time") from None
+
+
+def _parse_iso_duration(value: str, message: str) -> _datetime.timedelta:
+    if re.fullmatch(_DURATION_PATTERN, value) is None:
+        raise _invalid_format(message, "duration")
+    match = _DURATION_PARTS.fullmatch(value)
+    if match is None:
+        raise _invalid_format(message, "duration")
+    weeks, days, hours, minutes, seconds = match.groups()
+    sign = -1 if value.startswith("-") else 1
+    try:
+        if weeks is not None:
+            return _datetime.timedelta(weeks=sign * int(weeks))
+        return _datetime.timedelta(
+            days=sign * int(days or 0),
+            hours=sign * int(hours or 0),
+            minutes=sign * int(minutes or 0),
+            seconds=sign * float(seconds or 0),
+        )
+    except OverflowError:
+        raise _invalid_format(message, "duration") from None
+
+
+def _format_iso_duration(value: _datetime.timedelta) -> str:
+    total = (
+        value.days * 86_400_000_000
+        + value.seconds * 1_000_000
+        + value.microseconds
+    )
+    sign = "-" if total < 0 else ""
+    days, remainder = divmod(abs(total), 86_400_000_000)
+    hours, remainder = divmod(remainder, 3_600_000_000)
+    minutes, remainder = divmod(remainder, 60_000_000)
+    seconds, microseconds = divmod(remainder, 1_000_000)
+    time_part = ""
+    if hours:
+        time_part += f"{hours}H"
+    if minutes:
+        time_part += f"{minutes}M"
+    if seconds or microseconds:
+        if microseconds:
+            fraction = f"{microseconds:06d}".rstrip("0")
+            time_part += f"{seconds}.{fraction}S"
+        else:
+            time_part += f"{seconds}S"
+    if not time_part:
+        return f"{sign}P{days}D" if days else f"{sign}PT0S"
+    date_part = f"P{days}D" if days else "P"
+    return f"{sign}{date_part}T{time_part}"
 
 
 def _parse_decimal(value: str, message: str) -> _decimal.Decimal:
@@ -1244,6 +1305,9 @@ class StringSchema(Schema[str, str]):
     def url(self, *, message: str = "Invalid URL") -> Self:
         return self._regex(_URL_PATTERN, message, "uri")
 
+    def http_url(self, *, message: str = "Invalid HTTP URL") -> Self:
+        return self._regex(_HTTP_URL_PATTERN, message, "http_url")
+
     def uuid(self, *, message: str = "Invalid UUID") -> Self:
         return self._regex(_UUID_PATTERN, message, "uuid")
 
@@ -1261,6 +1325,18 @@ class StringSchema(Schema[str, str]):
 
     def ipv6(self, *, message: str = "Invalid IPv6 address") -> Self:
         return self._wrap("ipv6", _message(message, "Invalid IPv6 address"))
+
+    def cidrv4(self, *, message: str = "Invalid IPv4 CIDR") -> Self:
+        return self._wrap("cidrv4", _message(message, "Invalid IPv4 CIDR"))
+
+    def cidrv6(self, *, message: str = "Invalid IPv6 CIDR") -> Self:
+        return self._wrap("cidrv6", _message(message, "Invalid IPv6 CIDR"))
+
+    def hex(self, *, message: str = "Invalid hex string") -> Self:
+        return self._regex(_HEX_PATTERN, message, "hex")
+
+    def duration(self, *, message: str = "Invalid duration") -> Self:
+        return self._regex(_DURATION_PATTERN, message, "duration")
 
     def hostname(self, *, message: str = "Invalid hostname") -> Self:
         return self._regex(_HOSTNAME_PATTERN, message, "hostname")
@@ -2616,6 +2692,18 @@ class _Codecs:
         )
 
     @staticmethod
+    def iso_duration(
+        *, message: str = "Invalid duration",
+    ) -> CodecSchema[_datetime.timedelta, str]:
+        validated = _message(message, "Invalid duration")
+        return codec(
+            string().duration(message=validated),
+            timedelta(),
+            decode=lambda value: _parse_iso_duration(value, validated),
+            encode=_format_iso_duration,
+        )
+
+    @staticmethod
     def decimal(
         *, message: str = "Invalid decimal string",
     ) -> CodecSchema[_decimal.Decimal, str]:
@@ -2956,7 +3044,7 @@ codecs = _Codecs()
 _CONSTRAINT_KINDS = frozenset({
     "length_min", "length_max", "min", "max", "exclusive_min", "exclusive_max",
     "multiple_of", "positive", "integral", "regex", "starts_with", "ends_with",
-    "includes", "ipv6",
+    "includes", "ipv6", "cidrv4", "cidrv6",
 })
 
 _IDENTITY_ENCODE_KINDS = frozenset({
@@ -2964,7 +3052,7 @@ _IDENTITY_ENCODE_KINDS = frozenset({
     "exact_instance", "json", "native_enum", "literal", "enum", "instance",
     "length_min", "length_max", "min", "max", "exclusive_min", "exclusive_max",
     "multiple_of", "positive", "integral", "regex", "starts_with", "ends_with",
-    "includes", "ipv6", "trim", "lower", "upper",
+    "includes", "ipv6", "cidrv4", "cidrv6", "trim", "lower", "upper",
 })
 
 
@@ -3878,6 +3966,18 @@ def _apply_constraints(
                     unrepresentable,
                 )
             format_name = "ipv6"
+        elif kind in ("cidrv4", "cidrv6"):
+            if base_kind != "string":
+                return _unsupported(
+                    path, f"{kind} is only representable for strings",
+                    unrepresentable,
+                )
+            if format_name not in (None, kind):
+                return _unsupported(
+                    path, "multiple formats are not representable",
+                    unrepresentable,
+                )
+            format_name = kind
         else:
             return _unsupported(
                 path, f"{kind} is not representable", unrepresentable,

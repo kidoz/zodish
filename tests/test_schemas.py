@@ -706,6 +706,67 @@ class SchemaTests(unittest.TestCase):
         self.assertIsInstance(result, Failure)
         self.assertEqual(result.error.issues[0].message, "Must start with 'ab'")
 
+    def test_config_formats(self):
+        duration = z.string().duration()
+        for value in ("PT15M", "P1D", "P2W", "-PT0.5S", "P1DT2H3M4.5S"):
+            self.assertEqual(duration.parse(value), value)
+        for value in ("P", "P1Y", "P1M", "PT", "15M", "P1.5D", "P1WT1H"):
+            result = duration.safe_parse(value)
+            self.assertIsInstance(result, Failure)
+            self.assertEqual(result.error.issues[0].code, "invalid_format")
+            self.assertEqual(result.error.issues[0].params["format"], "duration")
+
+        http_url = z.string().http_url()
+        for value in ("http://example.com", "HTTPS://EXAMPLE.COM/x"):
+            self.assertEqual(http_url.parse(value), value)
+        for value in ("ftp://example.com", "http://", "example.com", "http://a b"):
+            result = http_url.safe_parse(value)
+            self.assertIsInstance(result, Failure)
+            self.assertEqual(result.error.issues[0].params["format"], "http_url")
+
+        hex_schema = z.string().hex()
+        for value in ("deadBEEF", "0", "abc"):
+            self.assertEqual(hex_schema.parse(value), value)
+        for value in ("", "xyz", "12 34", "0x12"):
+            result = hex_schema.safe_parse(value)
+            self.assertIsInstance(result, Failure)
+            self.assertEqual(result.error.issues[0].params["format"], "hex")
+
+        cidrv4 = z.string().cidrv4()
+        for value in ("10.0.0.0/8", "0.0.0.0/0", "192.168.1.1/32"):
+            self.assertEqual(cidrv4.parse(value), value)
+        for value in (
+            "10.0.0.0", "10.0.0.0/33", "10.0.0.01/8",
+            "10.0.0.0/08", "10.0.0.0/8/9",
+        ):
+            result = cidrv4.safe_parse(value)
+            self.assertIsInstance(result, Failure)
+            self.assertEqual(result.error.issues[0].code, "invalid_format")
+            self.assertEqual(result.error.issues[0].params["format"], "cidrv4")
+
+        cidrv6 = z.string().cidrv6()
+        for value in ("2001:db8::/32", "::/0", "::1/128", "::ffff:192.0.2.0/120"):
+            self.assertEqual(cidrv6.parse(value), value)
+        for value in ("2001:db8::", "::/129", "gg::/1", "::/0128"):
+            result = cidrv6.safe_parse(value)
+            self.assertIsInstance(result, Failure)
+            self.assertEqual(result.error.issues[0].params["format"], "cidrv6")
+
+        self.assertEqual(
+            z.string().cidrv4(message="Bad CIDR").safe_parse("x")
+            .error.issues[0].message,
+            "Bad CIDR",
+        )
+        self.assertEqual(cidrv4.encode("10.0.0.0/8"), "10.0.0.0/8")
+        self.assertEqual(
+            cidrv4.to_json_schema(), {"type": "string", "format": "cidrv4"},
+        )
+        self.assertEqual(
+            cidrv6.to_json_schema(), {"type": "string", "format": "cidrv6"},
+        )
+        for schema in (duration, http_url, hex_schema):
+            self.assertIn("pattern", schema.to_json_schema())
+
     def test_python_scalars(self):
         day = dt.date(2026, 10, 20)
         moment = dt.datetime(2026, 10, 20, 12, 30)
@@ -1157,6 +1218,44 @@ class SchemaTests(unittest.TestCase):
                 "payload": "aGVsbG8=",
             },
         )
+
+    def test_iso_duration_codec(self):
+        duration = z.codecs.iso_duration()
+        cases = {
+            "PT15M": dt.timedelta(minutes=15),
+            "P2W": dt.timedelta(weeks=2),
+            "-PT0.5S": dt.timedelta(seconds=-0.5),
+            "P1DT2H3M4.5S": dt.timedelta(
+                days=1, hours=2, minutes=3, seconds=4.5,
+            ),
+        }
+        for text, expected in cases.items():
+            with self.subTest(value=text):
+                self.assertEqual(duration.decode(text), expected)
+                encoded = duration.encode(expected)
+                self.assertEqual(duration.decode(encoded), expected)
+        self.assertEqual(duration.encode(dt.timedelta()), "PT0S")
+        self.assertEqual(duration.encode(dt.timedelta(days=1)), "P1D")
+
+        for bad in ("P1Y", "P1M", "P", "PT", "15M"):
+            with self.subTest(value=bad):
+                result = duration.safe_decode(bad)
+                self.assertIsInstance(result, Failure)
+                self.assertEqual(result.error.issues[0].code, "invalid_format")
+                self.assertEqual(
+                    result.error.issues[0].params["format"], "duration",
+                )
+        self.assertEqual(
+            z.codecs.iso_duration(message="Bad duration").safe_decode("x")
+            .error.issues[0].message,
+            "Bad duration",
+        )
+        self.assertEqual(
+            duration.to_json_schema(io="input"),
+            z.string().duration().to_json_schema(io="input"),
+        )
+        with self.assertRaises(UnrepresentableError):
+            duration.to_json_schema(io="output")
 
     def test_dataclass_codec(self):
         @dataclasses.dataclass(frozen=True)

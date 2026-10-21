@@ -74,6 +74,9 @@ as-is; use JSON-compatible values when serializing.
 - Multiple raw regex constraints on one string remain unrepresentable.
 - String formats are JSON Schema annotations; validators enforce them only when
   format assertion is enabled.
+- `.duration()`, `.http_url()`, and `.hex()` export as `pattern`.
+  `.cidrv4()` and `.cidrv6()` export as non-standard `format` annotations, which
+  validators ignore unless they support those names.
 - Python regex patterns are emitted as `pattern`, so Python-specific syntax may
   not be portable.
 
