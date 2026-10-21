@@ -606,7 +606,7 @@ cargo fmt --check
 cargo clippy --locked -- -D warnings
 ```
 
-Editable installation picks up Python edits. After changing `rust/lib.rs`, rebuild the native extension with `python -m pip install -e .` before running tests; an editable install does not automatically rebuild Rust code.
+Editable installation picks up Python edits. After changing any source under `rust/`, rebuild the native extension with `python -m pip install -e .` before running tests; an editable install does not automatically rebuild Rust code.
 
 If `just` is installed, run `just` to list the recipes. Use `PYTHON=python just install` to install dependencies, `just check` for static checks, `PYTHON=python just ci` to run static checks, tests, and examples, or `just bench` for synchronous benchmarks or `just bench-async` for the async harness. `PYTHON` selects the interpreter for recipes that run Python; its default is `python3.14`.
 

@@ -16,7 +16,7 @@ python examples/quickstart.py
 
 On Windows, activate with `.venv\Scripts\Activate.ps1` in PowerShell. There are
 no third-party Python runtime dependencies. An editable install picks up Python
-edits, but does **not** rebuild the Rust extension after `rust/lib.rs` changes.
+edits, but does **not** rebuild the Rust extension after sources under `rust/` change.
 
 ## Run the checks
 
@@ -51,7 +51,7 @@ just bench            # benchmark harness
 
 ## Rebuild after changing Rust
 
-After editing `rust/lib.rs`, rebuild the extension before running tests:
+After editing any source under `rust/`, rebuild the extension before running tests:
 
 ```bash
 python -m pip install -e .

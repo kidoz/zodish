@@ -3,6 +3,16 @@
 Zodish is a Python API over a Rust validation core. This page explains the split,
 what it buys, and what it costs.
 
+## Rust source layout
+
+`rust/lib.rs` registers the Python module and contains schema construction,
+synchronous evaluation, JSON fast paths, and async sessions. Paths, issue/error
+types, and the GC-aware native issue bundle live in `rust/errors.rs`.
+`rust/schema.rs` exposes operation kinds from `rust/schema/kind.rs`, where
+operation names and constructor arity are checked. The evaluators share these
+definitions; validation behavior and Python-visible class names are unchanged
+by this split.
+
 ## One evaluation boundary
 
 Python schema builders construct native schema nodes. A call to `parse`,
@@ -129,7 +139,7 @@ building from source does. Free-threaded wheels are not part of the published
 compatibility matrix.
 
 An editable install picks up Python edits but does not rebuild Rust. After
-changing `rust/lib.rs`, reinstall the package before testing.
+changing any source under `rust/`, reinstall the package before testing.
 
 ## Related
 
