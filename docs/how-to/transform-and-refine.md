@@ -120,10 +120,15 @@ Type-specific methods therefore must come before those wrappers.
 
 ## Handle callback errors
 
-Callbacks are synchronous. Async callbacks, and callbacks returning awaitables
-or async generators, raise `TypeError` as programming errors. The same rules
-apply to codec `decode` and `encode` callbacks. See
-[Async support](../explanation/async-support.md) for the full behavior.
+Synchronous callbacks are the default. Async callbacks passed to `refine`,
+`transform`, or other synchronous builders raise `TypeError` as programming
+errors, and codec `decode`/`encode` callbacks are synchronous.
+`refine_async`, `super_refine_async`, `transform_async`, `overwrite_async`,
+`default_factory_async`, `catch_async`, and `z.preprocess_async` provide
+asynchronous paths and must be awaited with `parse_async`/`safe_parse_async`.
+They may be nested in containers, unions, intersections, pipes, and wrappers.
+See [Async support](../explanation/async-support.md) for composition and
+limitations.
 
 `safe_parse` catches only `ValidationError`. Exceptions from callback code, such
 as `int("bad")`, propagate unchanged. To turn an expected failure into an issue,

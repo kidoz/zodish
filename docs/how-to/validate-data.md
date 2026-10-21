@@ -37,6 +37,14 @@ fall back to standard JSON decoding and normal validation. Invalid JSON raises a
 `ValidationError` with an `invalid_format` issue and a `position`; schema
 failures use the usual issue codes and paths.
 
+Async schemas use `parse_json_async` or `safe_parse_json_async`:
+
+```python
+await user.parse_json_async(b'{"name": "Alex", "age": 30}')
+await user.safe_parse_json_async('{"name": "Alex", "age": 30}')
+```
+
+
 ## Handle unknown object keys explicitly
 
 Choose one policy and make it visible in the schema:

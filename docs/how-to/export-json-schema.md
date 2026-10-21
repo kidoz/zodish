@@ -68,8 +68,11 @@ to_json_schema(z.string().trim(), unrepresentable="any")
 ```
 
 Operations with no equivalent include `catch`, `refine`/`super_refine`,
-`transform`, `overwrite`, `preprocess`, `pipe`, `lazy`, `default_factory`,
-`instance_of`, `trim`/`lower`/`upper`, and regexes with non-default flags.
+`transform`, `overwrite`, `preprocess`, `pipe`, `lazy`, `async_refine`/
+`async_super_refine`/`async_transform`/`async_preprocess`/
+`async_default_factory`/`async_catch`/`async_overwrite`, `default_factory`,
+`instance_of`,
+`trim`/`lower`/`upper`, and regexes with non-default flags.
 
 ## Avoid target-specific dead ends
 

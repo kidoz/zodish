@@ -29,6 +29,26 @@ Decoding validates the encoded input, calls `decode`, then validates the result
 through the output schema. Encoding validates the decoded input, calls `encode`,
 then validates the result through the input schema.
 
+When either conversion awaits I/O, build an async codec and await the matching
+method:
+
+```python
+lookup = z.codec_async(
+    z.string(),
+    z.integer(),
+    decode=record_id_for_text,
+    encode=text_for_record_id,
+)
+value = await lookup.decode_async("42")
+encoded = await lookup.encode_async(42)
+```
+
+`.decode_async()` and `.safe_decode_async()` are available on codecs;
+`.encode_async()` and `.safe_encode_async()` are available on all schemas.
+`encode_async` walks the same reversible graph as `encode`, so plain reversible schemas, sync
+codecs, async codecs, and containers all work. `.decode()` and `.encode()` on a
+codec that reaches async callbacks raise `TypeError`.
+
 ## Use a built-in codec
 
 The `z.codecs` namespace provides codecs for common string boundaries:
@@ -89,7 +109,9 @@ defaults may be omitted from input, and the dataclass default wins over a
 field-schema default. A field schema that permits missing input without a
 dataclass default is rejected. Input-mode JSON Schema describes the encoded
 object; output mode describes the decoded object, so Python-only field values
-remain unrepresentable.
+remain unrepresentable. Async field codecs are supported through
+`.decode_async()`/`.encode_async()`; field issue paths and dataclass defaults are
+preserved.
 
 ## Compose codecs
 
@@ -163,14 +185,18 @@ to_json_schema(iso_datetime, io="input")
 ```
 
 A decoded side containing Python-only values such as `datetime` is not
-representable, so export input mode when you need the wire format.
+representable, so export input mode when you need the wire format. Async codecs
+export their input and output schemas the same way.
 
 ## Handle callback errors
 
-Codec callbacks are synchronous. Async callbacks are rejected with `TypeError`.
+`z.codec` callbacks are synchronous. Use `z.codec_async` and
+`.decode_async()`/`.encode_async()` for awaitable conversions. Dataclass codecs
+support async field codecs through the same async methods; synchronous
+`.decode()`/`.encode()` reject reached async fields.
 See [Async support](../explanation/async-support.md).
-`safe_decode` and `safe_encode` catch only `ValidationError`; programming errors
-from callbacks propagate.
+`safe_decode`/`safe_decode_async` and `safe_encode`/`safe_encode_async` catch
+only `ValidationError`; programming errors from callbacks propagate.
 
 ## Related
 

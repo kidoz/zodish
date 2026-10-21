@@ -81,7 +81,9 @@ as-is; use JSON-compatible values when serializing.
 These constructs raise `UnrepresentableError` unless `unrepresentable="any"`:
 
 - `catch`, `refine`, `super_refine`, `transform`, `overwrite`, `preprocess`,
-  `pipe`, and `lazy`;
+  `pipe`, `lazy`, `async_refine`, `async_super_refine`, `async_transform`,
+  `async_preprocess`, `async_default_factory`, `async_catch`, and
+  `async_overwrite`;
 - `default_factory`;
 - `instance_of`;
 - `trim`, `lower`, and `upper`;

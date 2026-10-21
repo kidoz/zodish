@@ -22,6 +22,14 @@ value falls outside that subset, the input is decoded with Python's `json` modul
 and validated through the same evaluator, so the fallback does not change
 validation semantics.
 
+Experimental async validation extends the boundary with a native resumable
+session. Rust owns a continuation frame stack for containers, wrappers, unions,
+intersections, pipes, and lazy schemas, and retains snapshots, paths, issues, and
+the per-parse lazy cache. Synchronous subtrees without async descendants still
+use the ordinary native evaluator and its fast paths. The Python adapter only
+awaits a requested callback result and resumes the session; it never walks
+schemas or validates values.
+
 ## What stays in Python
 
 Some behavior must run with Python semantics:

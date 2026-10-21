@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/zodish)](https://pypi.org/project/zodish/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/kidoz/zodish/blob/main/LICENSE)
 
-A synchronous validation library (written in Rust via PyO3) for **CPython 3.14+** (tested on 3.14 and 3.15), with a typed Python API inspired by [Zod](https://zod.dev/).
+A validation library (written in Rust via PyO3) for **CPython 3.14+** (tested on 3.14 and 3.15), with a typed Python API inspired by [Zod](https://zod.dev/). Synchronous parsing is the default; composable async refinements and transforms are experimental.
 
 Handles: **strings, numbers, integers, booleans, none, unknown, literals, enums, objects, arrays, tuples, records, unions, discriminated unions, intersections, optional/nullable/default wrappers, coercion, stringbool, bidirectional codecs, refinements, transforms, pipes, recursive schemas, metadata, and JSON Schema export** — with immutable schemas, ordered operations, aggregated issues, and native-only evaluation. Zodish is an independent implementation of a subset of Zod's API.
 
@@ -63,7 +63,7 @@ else:
     # {"issues": [{"code": "too_small", "minimum": 1, ...}, ...]}
 ```
 
-`parse` returns validated output or raises `ValidationError`. `safe_parse` returns a `Success[T] | Failure` discriminated union. Both validate nested objects and collect sibling errors, including array indices in error paths. A union failure includes each branch's issues in `branches`. `parse_json`, `safe_parse_json`, and `validate_json` apply the same schema directly to JSON `str`, `bytes`, or `bytearray` input.
+`parse` returns validated output or raises `ValidationError`. `safe_parse` returns a `Success[T] | Failure` discriminated union. Both validate nested objects and collect sibling errors, including array indices in error paths. A union failure includes each branch's issues in `branches`. `parse_json`, `safe_parse_json`, and `validate_json` apply the same schema directly to JSON `str`, `bytes`, or `bytearray` input. `parse_async`, `safe_parse_async`, and `validate_async` await async refinements and transforms anywhere in a schema; `parse_json_async` and `safe_parse_json_async` do the same for JSON text. See [Async support](docs/explanation/async-support.md).
 
 ## Errors
 
@@ -101,12 +101,12 @@ except ValidationError as error:
 | Choices | `z.literal(value)`, `z.enum(values)`, `z.union(*schemas)`, `z.discriminated_union(key, options)`, `schema.or_(other)` |
 | Objects | `z.object(shape)`, `.strict()`, `.strip()`, `.passthrough()`, `.catchall(schema)`, `.extend(shape)`, `.pick(*keys)`, `.omit(*keys)`, `.partial(*keys)`, `.required()`, `.keyof()` |
 | Collections | `z.array(item)` / `item.array()`, array `.min(n)`, `.max(n)`, `.length(n)`, `.nonempty()`, `z.tuple(*items)` / `.rest(schema)`, `z.record(value_schema)` / `z.record(key_schema, value_schema)` |
-| Every schema | `.parse(value)`, `.safe_parse(value)`, `.validate(value)`, `.parse_json(data)`, `.safe_parse_json(data)`, `.validate_json(data)`, `.encode(value)`, `.safe_encode(value)`, `.optional()`, `.nonoptional()`, `.nullable()`, `.nullish()`, `.default(value)`, `.default_factory(fn)`, `.catch(value_or_factory)`, `.unwrap()`, `.refine(predicate, message, *, path=())`, `.super_refine(fn)`, `.transform(fn)`, `.overwrite(fn)`, `.pipe(schema)`, `.meta(metadata)`, `.describe(text)`, `.metadata`, `.to_json_schema(...)` |
-| Codecs | `z.codec(input_schema, output_schema, *, decode=fn, encode=fn)`, `.decode(value)`, `.safe_decode(value)`, `.encode(value)`, `.safe_encode(value)`, `.input_schema`, `.output_schema`, `.optional()`, `.nullable()`, `.nonoptional()`, `.nullish()`, `.record()`, `z.codecs.array(codec)`, `z.codecs.union(*schemas)`, `z.codecs.tuple(*schemas)` |
+| Every schema | `.parse(value)`, `.safe_parse(value)`, `.validate(value)`, `.parse_json(data)`, `.safe_parse_json(data)`, `.validate_json(data)`, `.parse_async(value)`, `.safe_parse_async(value)`, `.validate_async(value)`, `.parse_json_async(data)`, `.safe_parse_json_async(data)`, `.encode(value)`, `.safe_encode(value)`, `.optional()`, `.nonoptional()`, `.nullable()`, `.nullish()`, `.default(value)`, `.default_factory(fn)`, `.default_factory_async(fn)`, `.catch(value_or_factory)`, `.catch_async(factory)`, `.unwrap()`, `.refine(predicate, message, *, path=())`, `.refine_async(predicate, message, *, path=())`, `.super_refine(fn)`, `.super_refine_async(fn)`, `.transform(fn)`, `.transform_async(fn)`, `.overwrite(fn)`, `.overwrite_async(fn)`, `.pipe(schema)`, `.meta(metadata)`, `.describe(text)`, `.metadata`, `.to_json_schema(...)` |
+| Codecs | `z.codec(input_schema, output_schema, *, decode=fn, encode=fn)`, `z.codec_async(...)`, `.decode(value)`, `.safe_decode(value)`, `.decode_async(value)`, `.safe_decode_async(value)`, `.encode(value)`, `.safe_encode(value)`, `.encode_async(value)`, `.safe_encode_async(value)`, `.input_schema`, `.output_schema`, `.optional()`, `.nullable()`, `.nonoptional()`, `.nullish()`, `.record()`, `z.codecs.array(codec)`, `z.codecs.union(*schemas)`, `z.codecs.tuple(*schemas)` |
 | Built-in codecs | `z.codecs.iso_date()`, `iso_time()`, `iso_datetime()`, `decimal()`, `json_text()`, `path()`, `bytes_base64(urlsafe=False)`, `dataclass(Cls, fields=None)` |
 | Coercion | `z.coerce.string()`, `z.coerce.number()`, `z.coerce.integer()`, `z.coerce.boolean()`, `z.string().stringbool(...)` |
 | JSON Schema | `z.to_json_schema(schema, *, target=..., io=..., unrepresentable=...)` |
-| Composition | `z.intersection(left, right)` / `schema.and_(other)`, `z.preprocess(fn, schema)`, `z.lazy(factory)` |
+| Composition | `z.intersection(left, right)` / `schema.and_(other)`, `z.preprocess(fn, schema)`, `z.preprocess_async(fn, schema)`, `z.lazy(factory)` |
 
 Built-in constraints accept a keyword-only `message=`. `.refine()` accepts a relative `path=`, and `.super_refine()` may return one `Issue`, a list or tuple of `Issue` objects, or `None`; returned issue paths are relative to the current location. `z.enum()` reports one `invalid_value` issue rather than a union branch.
 
@@ -342,6 +342,24 @@ iso_datetime.encode(datetime(2026, 10, 20, 12, 30))
 # "2026-10-20T12:30:00"
 ```
 
+Use `z.codec_async()` when either conversion awaits I/O, then call
+`.decode_async()`/`.encode_async()` (or their safe variants):
+
+```python
+lookup = z.codec_async(
+    z.string(),
+    z.integer(),
+    decode=record_id_for_text,
+    encode=text_for_record_id,
+)
+value = await lookup.decode_async("42")
+encoded = await lookup.encode_async(42)
+```
+
+Async codecs preserve `.input_schema`, `.output_schema`, optional/nullable
+wrappers, records, arrays, unions, and tuples. Dataclass codecs support async
+field codecs through `.decode_async()`/`.encode_async()`.
+
 Built-in helpers cover common string boundaries:
 
 ```python
@@ -417,7 +435,11 @@ dictionary keys, or tuple positions, and aggregate across siblings.
   present.
 - Use validator schemas for both sides of a codec. One-way transforms inside
   the input or output schema are not supported for encoding.
-- Codec callbacks are synchronous; async callbacks are rejected.
+- `z.codec` callbacks are synchronous; use `z.codec_async` and
+  `.decode_async()`/`.encode_async()` for awaitable conversions.
+- Dataclass codecs support async field codecs through
+  `.decode_async()`/`.encode_async()`; use the synchronous methods only when
+  every reached field is synchronous.
 - JSON Schema export uses the input schema for `io="input"` and the output
   schema for `io="output"`. A decoded side containing Python-only values such as
   `datetime` is not representable.
@@ -461,7 +483,7 @@ credentials = z.object({
 
 `Schema[Out, In]` tracks parsed output and accepted input types for primitives, homogeneous collections, transforms, preprocessors, and wrappers. `In` defaults to `Out`, so `Schema[T]` remains valid when input and output types match. `default()` and `default_factory()` accept input-typed values; after a transform, pass the pre-transform type or apply the default before the transform. Python type checkers cannot generally derive a new `TypedDict` from a dictionary of schema instances as TypeScript does with `z.infer`. Objects return `dict[str, Any]`; `z.tuple()` infers fixed-length tuple types for up to four items, while larger tuples and tuples with a rest schema return `tuple[Any, ...]`. Use `z.codecs.dataclass(Cls, fields=...)` or a transform to produce a statically typed dataclass result. Unions infer up to four alternatives; larger unions fall back to `Any`. There is no type-checker plugin or generated model API.
 
-`safe_parse` catches only `ValidationError`. Exceptions raised by callback code such as `int("bad")` propagate. Use `.refine()` to reject expected invalid values before a transform; use `z.preprocess` for intentional input conversion. Callbacks can raise `ValidationError` to contribute issues to the surrounding validation. Supplied issue paths are preserved as written. A callback raising `ValidationError([])` produces a `custom` issue at the current path with the message `Invalid value`, so the rejection still aggregates with sibling failures. Callbacks are synchronous. Async callbacks, and callbacks returning awaitables or async generators, raise `TypeError` as programming errors. See [Async support](docs/explanation/async-support.md) for the exact behavior.
+`safe_parse` catches only `ValidationError`. Exceptions raised by callback code such as `int("bad")` propagate. Use `.refine()` to reject expected invalid values before a transform; use `z.preprocess` for intentional input conversion. Callbacks can raise `ValidationError` to contribute issues to the surrounding validation. Supplied issue paths are preserved as written. A callback raising `ValidationError([])` produces a `custom` issue at the current path with the message `Invalid value`, so the rejection still aggregates with sibling failures. Sync callbacks are used by default. Asynchronous checks are available through `refine_async`/`super_refine_async`/`transform_async`/`overwrite_async`/`default_factory_async`/`catch_async`/`z.preprocess_async` and `parse_async`/`safe_parse_async`/`validate_async`/`parse_json_async`/`safe_parse_json_async`, including inside objects, arrays, records, tuples, unions, intersections, pipes, and wrappers; async callbacks passed to synchronous builders are rejected. `z.codec_async` supports awaitable codec callbacks and `encode_async`/`safe_encode_async` support async reverse graphs, including async dataclass codecs. Async lazy factories are not supported. See [Async support](docs/explanation/async-support.md) for details and limitations.
 
 ## Recursion
 
@@ -477,7 +499,7 @@ node: Schema[dict[str, Any]] = z.lazy(lambda: z.object({
 node.parse({"name": "root", "children": [{"name": "leaf"}]})
 ```
 
-Inputs must be acyclic. The native evaluator raises `RecursionError` at 256 nested schema-node evaluations, including wrappers, to bound Rust stack use. A lazy node resolves its factory once per parse and reuses that schema for the rest of the parse; a later parse invokes the factory again. Python callbacks may additionally hit Python's recursion limit. Containers are shallow-snapshotted before traversal so callbacks can mutate the original list or dictionary without invalidating the iteration. Email validation checks basic syntax only; regexes use Python's `re.search` behavior. This core does not implement [async validation](docs/explanation/async-support.md), JSON Schema import, or all Zod formats.
+Inputs must be acyclic. The native evaluator raises `RecursionError` at 256 nested schema-node evaluations, including wrappers, to bound Rust stack use. A lazy node resolves its factory once per parse and reuses that schema for the rest of the parse; a later parse invokes the factory again. Python callbacks may additionally hit Python's recursion limit. Containers are shallow-snapshotted before traversal so callbacks can mutate the original list or dictionary without invalidating the iteration. Email validation checks basic syntax only; regexes use Python's `re.search` behavior. This core implements experimental async composition, callback families, JSON parsing, async codecs, async dataclass codecs, and async encoding, but it does not implement async lazy factories, JSON Schema import, or all Zod formats. See [Async support](docs/explanation/async-support.md).
 
 ## Metadata
 
@@ -556,7 +578,7 @@ Built in Rust for speed. Typical benchmarks (Apple M4 Max, Python 3.14.3, `parse
 | Recursive tree (depth 4) | 110,799 | 9.03 µs |
 | Refinement callback | 7,066,718 | 0.14 µs |
 
-Numbers are medians over seven repetitions from `benchmarks/bench_parse.py`. The array row uses the native fast path for primitive item validators and exact-list iteration, the recursive row benefits from per-parse lazy resolution, object parsing skips the unknown-key scan and input copy when every input key belongs to the shape, and failures defer Python `Issue` materialization and message formatting until they are read. Results depend on the host, Python version, and native build profile; the harness has no pass/fail thresholds. A pinned cross-library comparison with Pydantic, msgspec, and Marshmallow is recorded under [`benchmarks/results/`](benchmarks/results/).
+Numbers are medians over seven repetitions from `benchmarks/bench_parse.py`. The array row uses the native fast path for primitive item validators and exact-list iteration, the recursive row benefits from per-parse lazy resolution, object parsing skips the unknown-key scan and input copy when every input key belongs to the shape, and failures defer Python `Issue` materialization and message formatting until they are read. Results depend on the host, Python version, and native build profile; the harness has no pass/fail thresholds. A pinned cross-library comparison with Pydantic, msgspec, and Marshmallow is recorded under [`benchmarks/results/`](benchmarks/results/), along with a release-wheel [async benchmark summary](benchmarks/results/2026-10-21-macos-arm64-async-release.md).
 
 ## Development
 
@@ -567,6 +589,7 @@ python -m pip install --group dev -e .
 python -m unittest discover -s tests -v
 python examples/quickstart.py
 python benchmarks/bench_parse.py --smoke
+python benchmarks/bench_async.py --smoke
 ruff check .
 mypy
 cargo fmt --check
@@ -575,9 +598,9 @@ cargo clippy --locked -- -D warnings
 
 Editable installation picks up Python edits. After changing `rust/lib.rs`, rebuild the native extension with `python -m pip install -e .` before running tests; an editable install does not automatically rebuild Rust code.
 
-If `just` is installed, run `just` to list the recipes. Use `PYTHON=python just install` to install dependencies, `just check` for static checks, `PYTHON=python just ci` to run static checks, tests, and examples, or `just bench` to run the benchmark harness. `PYTHON` selects the interpreter for recipes that run Python; its default is `python3.14`.
+If `just` is installed, run `just` to list the recipes. Use `PYTHON=python just install` to install dependencies, `just check` for static checks, `PYTHON=python just ci` to run static checks, tests, and examples, or `just bench` for synchronous benchmarks or `just bench-async` for the async harness. `PYTHON` selects the interpreter for recipes that run Python; its default is `python3.14`.
 
-Ruff and strict mypy settings live in `pyproject.toml`; the `dev` dependency group installs both tools. Python 3.14+ syntax is intentional. `py.typed` is included for type checkers. `Cargo.lock` pins the Rust dependencies. The [CI workflow](.github/workflows/tests.yml) runs tests, the quickstart, and a benchmark smoke run on Ubuntu with Python 3.14 and 3.15. Its packaging job builds the wheel and sdist on Ubuntu, macOS, and Windows with Python 3.14, verifies both artifact contents, then installs each artifact and runs the test suite, quickstart, and native-extension check against it; it also re-runs the abi3 wheel smoke test under Python 3.15 on Linux. Free-threaded Python builds are not validated. The [typing examples](examples/typing_checks.py) are checked by mypy.
+Ruff and strict mypy settings live in `pyproject.toml`; the `dev` dependency group installs both tools. Python 3.14+ syntax is intentional. `py.typed` is included for type checkers. `Cargo.lock` pins the Rust dependencies. The [CI workflow](.github/workflows/tests.yml) runs tests, the quickstart, and synchronous/async benchmark smoke runs on Ubuntu with Python 3.14 and 3.15. Its packaging job builds the wheel and sdist on Ubuntu, macOS, and Windows with Python 3.14, verifies both artifact contents, then installs each artifact and runs the test suite, quickstart, and native-extension check against it; it also re-runs the abi3 wheel smoke test under Python 3.15 on Linux. Free-threaded Python builds are not validated. The [typing examples](examples/typing_checks.py) are checked by mypy.
 
 ### Benchmarks
 
@@ -590,6 +613,14 @@ python benchmarks/bench_parse.py --filter union
 ```
 
 It reports median throughput over repeated runs and has no pass/fail thresholds: results depend on the host, Python version, and native build profile. The failing scenarios use `safe_parse`, and one of them reads `.issues`; the other scenarios use `parse`. `--smoke` uses minimal counts for CI.
+
+The async harness measures synchronous graphs through `parse_async`, immediately completing callbacks, `asyncio.sleep(0)` suspension, sequential callbacks, nested failures, and concurrent parses. Event loops are created outside timed iterations, and `--memory` records retained and peak `tracemalloc` values:
+
+```sh
+python benchmarks/bench_async.py
+python benchmarks/bench_async.py --json
+python benchmarks/bench_async.py --filter concurrent --memory
+```
 
 For comparisons with Pydantic, msgspec, and Marshmallow, use the optional pyperf
 harness:
@@ -624,7 +655,7 @@ Zodish follows [Semantic Versioning](https://semver.org/). Until 1.0, minor rele
 
 Covered by SemVer guarantees:
 
-- The `z` schema builders, schema methods, and `parse`/`safe_parse`/`validate`/`parse_json`/`safe_parse_json`/`validate_json`/`encode`/`safe_encode` behavior.
+- The `z` schema builders, schema methods, and `parse`/`safe_parse`/`validate`/`parse_json`/`safe_parse_json`/`validate_json`/`parse_async`/`safe_parse_async`/`validate_async`/`parse_json_async`/`safe_parse_json_async`/`encode`/`safe_encode`/`encode_async`/`safe_encode_async` behavior.
 - The public result and error classes: `ValidationError`, `Issue`, `Success`, `Failure`, and `MISSING`.
 - `Schema[Out, In]` typing and the `py.typed` marker.
 - JSON Schema export behavior for the supported subset.

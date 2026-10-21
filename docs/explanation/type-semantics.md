@@ -146,12 +146,16 @@ type generally widens when a refinement, transform, pipe, or wrapper is applied.
 
 ## Callbacks and errors
 
-Callbacks are synchronous. Async callbacks, and callbacks returning awaitables
-or async generators, raise `TypeError`. `safe_parse` catches only
-`ValidationError`; other callback exceptions propagate. This keeps programming
-errors visible while still allowing callbacks to report validation issues
-explicitly. See [Async support](async-support.md) for construction-time and
-evaluation-time behavior.
+Synchronous callbacks are the default. Async callbacks passed to synchronous
+builders raise `TypeError`; `refine_async`, `super_refine_async`,
+`transform_async`, `overwrite_async`, `default_factory_async`, `catch_async`,
+and `z.preprocess_async` use `parse_async`/`safe_parse_async` and may appear
+anywhere in a schema. `z.codec_async` and asynchronous encoding use
+`decode_async`/`encode_async` and their safe variants.
+`safe_parse` and `safe_parse_async` catch only `ValidationError`; other callback
+exceptions propagate. This keeps programming errors visible while still allowing
+callbacks to report validation issues explicitly. See
+[Async support](async-support.md) for the supported subset and limitations.
 
 ## Related
 

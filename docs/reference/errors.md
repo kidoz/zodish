@@ -64,7 +64,7 @@ Each failure is an `Issue` with:
 
 Params are merged into each serialized issue. Codes not listed here should be
 treated as new categories rather than parsed by message text. Malformed input to
-`parse_json` reports `invalid_format` at the root with `format="json"` and a
+`parse_json` and `parse_json_async` report `invalid_format` at the root with `format="json"` and a
 `position`.
 
 ## Aggregation
@@ -86,8 +86,10 @@ current location. Raising `ValidationError([])` produces a `custom` issue at the
 current path with the message `Invalid value`, so the rejection still aggregates
 with sibling failures.
 
-`safe_parse` and `safe_encode` catch only `ValidationError`. Other exceptions
-from callbacks propagate.
+`safe_parse`, `safe_parse_async`, `safe_parse_json_async`, `safe_decode`,
+`safe_decode_async`, `safe_encode`, and `safe_encode_async` catch only
+`ValidationError`. Other exceptions from callbacks and asyncio cancellation
+propagate.
 
 ## Related
 

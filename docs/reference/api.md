@@ -20,8 +20,8 @@ in declaration order, and the order affects results.
 | Choices | `z.literal(value)`, `z.enum(values)`, `z.union(*schemas)`, `z.discriminated_union(key, options)` |
 | Objects | `z.object(shape)` |
 | Collections | `z.array(item)`, `z.tuple(*items)`, `z.record(value_schema)`, `z.record(key_schema, value_schema)` |
-| Composition | `z.intersection(left, right)`, `z.preprocess(fn, schema)`, `z.lazy(factory)` |
-| Codecs | `z.codec(input_schema, output_schema, *, decode=fn, encode=fn)` |
+| Composition | `z.intersection(left, right)`, `z.preprocess(fn, schema)`, `z.preprocess_async(fn, schema)`, `z.lazy(factory)` |
+| Codecs | `z.codec(input_schema, output_schema, *, decode=fn, encode=fn)`, `z.codec_async(...)` |
 
 `z.date()`, `z.datetime()`, `z.time()`, `z.timedelta()`, `z.decimal()`,
 `z.bytes()`, and `z.path()` validate Python objects. They are not string format
@@ -86,6 +86,7 @@ formats.
 | `z.discriminated_union(key, options)` | Dispatch on a dictionary key |
 | `z.intersection(left, right)` | Validate against both schemas |
 | `z.preprocess(fn, schema)` | Convert input before validation |
+| `z.preprocess_async(fn, schema)` | Await input conversion before validation |
 | `z.lazy(factory)` | Recursive schema; the factory is resolved once per lazy node per parse |
 
 ## Methods on every schema
@@ -98,6 +99,11 @@ formats.
 | `.parse_json(data)` | Parse JSON text and validate the decoded value |
 | `.safe_parse_json(data)` | Return `Success[T]` or `Failure` for JSON input |
 | `.validate_json(data)` | Return whether JSON text parses and validates |
+| `.parse_async(value)` | Await parsing, including nested async callbacks |
+| `.safe_parse_async(value)` | Return `Success[T]` or `Failure` from async parsing |
+| `.validate_async(value)` | Return whether async validation succeeds |
+| `.parse_json_async(data)` | Parse JSON text and await nested async callbacks |
+| `.safe_parse_json_async(data)` | Return `Success[T]` or `Failure` from async JSON parsing |
 | `.encode(value)` | Reverse-validate and encode when the schema is reversible |
 | `.safe_encode(value)` | Return `Success[In]` or `Failure` |
 | `.optional()` | Accept missing input; not `None` |
@@ -106,12 +112,18 @@ formats.
 | `.nullish()` | Accept missing input and `None` |
 | `.default(value)` | Supply a fallback for missing input |
 | `.default_factory(fn)` | Call `fn()` for missing input |
+| `.default_factory_async(fn)` | Await `fn()` for missing input, then validate it |
 | `.catch(value_or_factory)` | Fall back on invalid or missing input |
+| `.catch_async(factory)` | Await a fallback factory on validation failure |
 | `.unwrap()` | Return the tracked inner schema |
-| `.refine(predicate, message, *, path=())` | Add a custom check |
+| `.refine(predicate, message, *, path=())` | Add a custom synchronous check |
+| `.refine_async(predicate, message, *, path=())` | Add a check awaiting an awaitable result |
+| `.super_refine_async(fn)` | Await returned issues, or `None`/empty for success |
 | `.super_refine(fn)` | Return one `Issue`, a list/tuple of issues, or `None` |
-| `.transform(fn)` | Convert parsed output |
+| `.transform(fn)` | Convert parsed output synchronously |
+| `.transform_async(fn)` | Convert parsed output by awaiting an awaitable |
 | `.overwrite(fn)` | Change a value without changing its type |
+| `.overwrite_async(fn)` | Await a value change without changing its static type |
 | `.pipe(schema)` | Feed output into another schema |
 | `.meta(metadata)` | Merge documentation metadata |
 | `.describe(text)` | Replace the `description` metadata |
@@ -122,13 +134,26 @@ Built-in constraints accept a keyword-only `message=`. `.refine()` paths are
 relative to the current location, and `.super_refine()` issue paths are also
 relative.
 
-## Synchronous evaluation
+## Evaluation modes
 
-All schema methods and callbacks are synchronous. There is no async API:
-`parse`, `safe_parse`, `validate`, `parse_json`, `safe_parse_json`,
-`validate_json`, `encode`, and `safe_encode` return directly, and async
-callbacks are rejected with `TypeError`. See
-[Async support](../explanation/async-support.md).
+Synchronous parsing is the default: `parse`, `safe_parse`, `validate`,
+`parse_json`, `safe_parse_json`, `validate_json`, `encode`, and `safe_encode`
+return directly.
+
+`parse_async`, `safe_parse_async`, `validate_async`, `parse_json_async`, and
+`safe_parse_json_async` add an experimental async path. `refine_async`,
+`super_refine_async`, `transform_async`, `overwrite_async`,
+`default_factory_async`, `catch_async`, and `z.preprocess_async` callbacks may
+be `async def` functions or ordinary callables returning awaitables. Async
+operations compose with objects, arrays, records, tuples, unions, intersections,
+discriminated unions, pipes, wrappers, and synchronous lazy factories.
+`z.codec_async` adds awaitable codec callbacks; `.decode_async()`,
+`.encode_async()`, and their safe variants use the same session protocol.
+Calling a synchronous parser or encoder on a reached async node raises
+`TypeError`; an optional, nullable, or earlier union branch may bypass it. Async
+lazy factories remain unsupported. See
+[Async support](../explanation/async-support.md) for the complete status and
+limitations.
 
 ## Coercion
 
@@ -147,12 +172,15 @@ callbacks are rejected with `TypeError`. See
 | Builder or method | Purpose |
 | --- | --- |
 | `z.codec(input_schema, output_schema, *, decode=fn, encode=fn)` | Build a bidirectional conversion |
+| `z.codec_async(input_schema, output_schema, *, decode=fn, encode=fn)` | Build a codec with awaitable conversion callbacks |
 | `z.codecs.iso_date()`, `iso_time()`, `iso_datetime()` | ISO strings ↔ `date`, `time`, `datetime` |
 | `z.codecs.decimal()`, `json_text()` | String ↔ `Decimal` or JSON-compatible values |
 | `z.codecs.path()`, `bytes_base64(urlsafe=False)` | String ↔ `Path` or `bytes` |
 | `z.codecs.dataclass(Cls, fields=None)` | Encoded dictionary ↔ dataclass instance; field schemas inferred from annotations, with optional overrides |
 | `.decode(value)`, `.safe_decode(value)` | Decode; equivalent to `.parse()` and `.safe_parse()` |
+| `.decode_async(value)`, `.safe_decode_async(value)` | Await decoding, including async codecs |
 | `.encode(value)`, `.safe_encode(value)` | Reverse-validate decoded input and produce encoded output |
+| `.encode_async(value)`, `.safe_encode_async(value)` | Await reverse validation and encoding |
 | `.input_schema`, `.output_schema` | Encoded and decoded schema references |
 | `.optional()`, `.nullable()`, `.nonoptional()`, `.nullish()` | Preserve codec conversion through wrappers |
 | `.record()` | Encoded dictionary values ↔ decoded dictionary values |
@@ -161,13 +189,21 @@ callbacks are rejected with `TypeError`. See
 
 Decoding validates encoded input, calls `decode`, then validates decoded output.
 Encoding validates decoded input, calls `encode`, then validates encoded output.
-Callbacks must be synchronous.
+`z.codec` callbacks are synchronous. `z.codec_async` requires awaitable callbacks;
+use `.decode_async()`/`.encode_async()` for that codec. Ordinary callables
+returning awaitables are accepted. Async codecs preserve the same input/output
+schemas, wrappers, records, arrays, unions, tuples, and dataclass codecs.
+Synchronous codec entry points reject async field codecs; use
+`.decode_async()`/`.encode_async()` instead.
 
 Encoding is available only for reversible schema trees. Primitives, constraints,
 codecs, optional/nullable/nonoptional wrappers, and structural containers are
 reversible. Transforms, overwrites, refinements, coercions and `stringbool`,
 defaults and `default_factory`, catches, pipes, preprocessors, and lazy schemas
-are one-way, so `.encode()` raises `TypeError` when they occur.
+are one-way, so `.encode()` and `.encode_async()` raise `TypeError` when they
+occur. Async codec callbacks participate in the reverse graph; plain schemas and
+codecs can use `.encode_async()`, and synchronous reverse graphs complete through
+the same session protocol.
 
 ## JSON Schema export
 
