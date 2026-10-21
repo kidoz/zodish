@@ -1865,6 +1865,17 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
             await async_limit(await asynchronous_schema()),
         )
 
+    async def test_async_intersection_merge_depth_is_bounded(self):
+        schema = z.intersection(z.unknown(), z.unknown())
+        nested = {}
+        for _ in range(1000):
+            nested = {"child": nested}
+        with self.assertRaises(RecursionError):
+            await schema.safe_parse_async(nested)
+        self.assertEqual(
+            await schema.parse_async({"a": {"b": 1}}), {"a": {"b": 1}},
+        )
+
     async def test_session_gc_and_pending_coroutine_cleanup(self):
         cleanup_calls = []
 

@@ -2696,6 +2696,7 @@ impl AsyncSession {
                 let merged = merge_dicts(
                     left.cast::<PyDict>().map_err(PyErr::from)?,
                     right.cast::<PyDict>().map_err(PyErr::from)?,
+                    0,
                 );
                 Ok(deliver_at(merged.map_err(Error::Python), path))
             }
@@ -4582,6 +4583,7 @@ impl NativeSchema {
                         let merged = merge_dicts(
                             left.cast::<PyDict>().map_err(PyErr::from)?,
                             right.cast::<PyDict>().map_err(PyErr::from)?,
+                            0,
                         )?;
                         Ok(merged)
                     }
@@ -5169,7 +5171,16 @@ fn is_json_value(value: &Bound<'_, PyAny>, depth: usize) -> PyResult<bool> {
     Ok(false)
 }
 
-fn merge_dicts<'py>(left: &Bound<'py, PyDict>, right: &Bound<'py, PyDict>) -> PyResult<Py<PyAny>> {
+fn merge_dicts<'py>(
+    left: &Bound<'py, PyDict>,
+    right: &Bound<'py, PyDict>,
+    depth: usize,
+) -> PyResult<Py<PyAny>> {
+    if depth >= MAX_DEPTH {
+        return Err(PyRecursionError::new_err(
+            "Intersection merge depth exceeds 256 levels",
+        ));
+    }
     let result = left.copy()?;
     for (key, right_value) in right.iter() {
         let merged = match result.get_item(&key)? {
@@ -5180,6 +5191,7 @@ fn merge_dicts<'py>(left: &Bound<'py, PyDict>, right: &Bound<'py, PyDict>) -> Py
                 merge_dicts(
                     left_value.cast::<PyDict>().map_err(PyErr::from)?,
                     right_value.cast::<PyDict>().map_err(PyErr::from)?,
+                    depth + 1,
                 )?
             }
             _ => right_value.unbind(),

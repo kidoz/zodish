@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Intersection parsing bounds recursive dictionary merging at the native depth
+  limit, raising `RecursionError` instead of overflowing the Rust stack for
+  deeply nested or cyclic dictionaries.
+
 ## [0.5.0] - 2026-10-21
 
 ### Changed

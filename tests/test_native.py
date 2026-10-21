@@ -419,6 +419,19 @@ class NativeTests(unittest.TestCase):
         with self.assertRaises(RecursionError):
             circular.parse(1)
 
+    def test_intersection_merge_depth_is_bounded(self):
+        schema = z.intersection(z.unknown(), z.unknown())
+        nested = {}
+        for _ in range(1000):
+            nested = {"child": nested}
+        with self.assertRaises(RecursionError):
+            schema.safe_parse(nested)
+        cyclic = {}
+        cyclic["child"] = cyclic
+        with self.assertRaises(RecursionError):
+            schema.safe_parse(cyclic)
+        self.assertEqual(schema.parse({"a": {"b": 1}}), {"a": {"b": 1}})
+
     def test_native_gc_traces_recursive_closures(self):
         def create_cycle():
             schema = z.lazy(lambda: schema)
