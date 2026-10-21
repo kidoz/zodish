@@ -25,6 +25,7 @@ SDIST_REQUIRED = {
     "rust/errors.rs",
     "rust/runtime.rs",
     "rust/schema.rs",
+    "rust/schema/checks.rs",
     "rust/schema/kind.rs",
     "rust/values.rs",
     "src/zodish/__init__.py",

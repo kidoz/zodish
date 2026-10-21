@@ -1,5 +1,6 @@
 //! Immutable native schema nodes, Python construction, and GC integration.
 
+mod checks;
 mod kind;
 
 use std::collections::HashSet;
@@ -10,8 +11,10 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyString, PyTuple, PyType};
 
 use crate::errors::ErrorTemplate;
+use crate::parse_json_value;
 use crate::runtime::Context;
-use crate::{build_error_template, parse_json_value};
+
+use checks::build_error_template;
 
 pub(crate) use kind::Kind;
 
