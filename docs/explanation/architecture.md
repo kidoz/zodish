@@ -12,6 +12,10 @@ types, and the GC-aware native issue bundle live in `rust/errors.rs`.
 and lazy caches: local storage for sync parsing and session-owned shared storage
 for async parsing. Session GC traversal and cleanup still visit and release
 the same cached references.
+`rust/values.rs` shares Python value predicates, numeric multiple checks,
+coercion, error-value formatting, JSON-value compatibility checks, dictionary
+merging, and copying across validation paths. JSON decoding and container fast
+paths remain with the evaluator in `rust/lib.rs`.
 `rust/schema.rs` exposes operation kinds from `rust/schema/kind.rs`, where
 operation names and constructor arity are checked. The evaluators share these
 definitions; validation behavior and Python-visible class names are unchanged
