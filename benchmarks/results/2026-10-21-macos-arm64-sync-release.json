@@ -1,0 +1,101 @@
+[
+  {
+    "expect_failure": false,
+    "items_per_operation": 1,
+    "items_per_second": 6885077.395704755,
+    "iterations": 20000,
+    "microseconds_per_operation": 0.14524164980684873,
+    "name": "string_success",
+    "operations_per_second": 6885077.395704755,
+    "parse_mode": "parse",
+    "repeats": 9
+  },
+  {
+    "expect_failure": false,
+    "items_per_operation": 1,
+    "items_per_second": 2616544.828149019,
+    "iterations": 5000,
+    "microseconds_per_operation": 0.38218340050661936,
+    "name": "object_success",
+    "operations_per_second": 2616544.828149019,
+    "parse_mode": "parse",
+    "repeats": 9
+  },
+  {
+    "expect_failure": true,
+    "items_per_operation": 1,
+    "items_per_second": 922551.7783174752,
+    "iterations": 5000,
+    "microseconds_per_operation": 1.083949999883771,
+    "name": "object_failure",
+    "operations_per_second": 922551.7783174752,
+    "parse_mode": "safe_parse",
+    "repeats": 9
+  },
+  {
+    "expect_failure": true,
+    "items_per_operation": 1,
+    "items_per_second": 403484.7525203786,
+    "iterations": 5000,
+    "microseconds_per_operation": 2.47840840020217,
+    "name": "object_failure_issues",
+    "operations_per_second": 403484.7525203786,
+    "parse_mode": "safe_parse+issues",
+    "repeats": 9
+  },
+  {
+    "expect_failure": false,
+    "items_per_operation": 1000,
+    "items_per_second": 171061815.27316585,
+    "iterations": 100,
+    "microseconds_per_operation": 5.845839987159707,
+    "name": "array_1000",
+    "operations_per_second": 171061.81527316585,
+    "parse_mode": "parse",
+    "repeats": 9
+  },
+  {
+    "expect_failure": false,
+    "items_per_operation": 1,
+    "items_per_second": 4400598.830261719,
+    "iterations": 5000,
+    "microseconds_per_operation": 0.2272418001666665,
+    "name": "union_first",
+    "operations_per_second": 4400598.830261719,
+    "parse_mode": "parse",
+    "repeats": 9
+  },
+  {
+    "expect_failure": false,
+    "items_per_operation": 1,
+    "items_per_second": 1382217.7665071462,
+    "iterations": 5000,
+    "microseconds_per_operation": 0.723475000995677,
+    "name": "union_last",
+    "operations_per_second": 1382217.7665071462,
+    "parse_mode": "parse",
+    "repeats": 9
+  },
+  {
+    "expect_failure": false,
+    "items_per_operation": 1,
+    "items_per_second": 98993.15051063604,
+    "iterations": 1000,
+    "microseconds_per_operation": 10.101709005539306,
+    "name": "recursive_tree",
+    "operations_per_second": 98993.15051063604,
+    "parse_mode": "parse",
+    "repeats": 9
+  },
+  {
+    "expect_failure": false,
+    "items_per_operation": 1,
+    "items_per_second": 5627462.02199886,
+    "iterations": 5000,
+    "microseconds_per_operation": 0.17769999976735562,
+    "name": "refine_callback",
+    "operations_per_second": 5627462.02199886,
+    "parse_mode": "parse",
+    "repeats": 9
+  }
+]

@@ -45,6 +45,10 @@ ci: check test examples
 bench:
     {{ python }} benchmarks/bench_parse.py
 
+# Run the async parse benchmarks.
+bench-async *args:
+    {{ python }} benchmarks/bench_async.py {{ args }}
+
 # Verify competitor semantics without collecting timings.
 bench-check:
     {{ python }} benchmarks/bench_compare.py --check-only

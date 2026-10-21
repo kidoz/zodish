@@ -1,5 +1,28 @@
 # Recorded benchmark runs
 
+## 2026-10-21: Release async harness, macOS ARM64, CPython 3.14.8
+
+- [Async summary and synchronous comparison](2026-10-21-macos-arm64-async-release.md)
+- [Raw async samples](2026-10-21-macos-arm64-async-release.json)
+- [Raw synchronous samples](2026-10-21-macos-arm64-sync-release.json)
+- [Benchmark contract and installation instructions](../README.md)
+
+Zodish was installed from a 0.4.0 release-candidate `abi3` wheel built from the
+working tree at `f159880` plus the async changes. The async harness ran nine
+repeated samples per scenario with memory reporting; the synchronous
+`bench_parse.py` harness ran nine samples against the same isolated wheel and
+Python 3.14.8 interpreter.
+
+Median results included 29.7 µs/operation for a synchronous graph through
+`parse_async`, 33.8 µs for an immediately completing async callback, 90.5 µs
+when four callbacks each yield through `asyncio.sleep(0)`, 152.1 µs for eight
+sequential callbacks, and 249.6 µs per 16-parse concurrent batch (about 64,000
+individual parses/s). The summary reports sample standard deviation, min/max,
+and retained/peak `tracemalloc` bytes; raw files retain every per-sample median.
+These are local exploratory measurements, not performance thresholds. The
+summary contains wheel, benchmark, installed Python, and installed native
+hashes.
+
 ## 2026-10-20: Post-optimization rerun, macOS ARM64, CPython 3.14.8
 
 - [Summary table](2026-10-20-macos-arm64-rerun.md)

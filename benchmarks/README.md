@@ -1,6 +1,12 @@
 # Comparing validation libraries
 
-The existing `bench_parse.py` is a dependency-free Zodish microbenchmark.
+`bench_parse.py` is a dependency-free synchronous Zodish microbenchmark.
+`bench_async.py` measures the asynchronous path with the same style: synchronous
+graphs through `parse_async`, immediately completing callbacks,
+`asyncio.sleep(0)` suspension, many sequential callbacks, nested failures, and
+concurrent parses of one schema. It creates event loops outside timed
+iterations, reports median/sample standard deviation/min/max, and can report
+retained and peak `tracemalloc` values.
 `bench_compare.py` uses pyperf to compare public validation APIs against
 Pydantic, msgspec, and Marshmallow. It measures Python dictionaries as output,
 not model or Struct construction.
@@ -17,6 +23,8 @@ python -m pip install --group benchmark 'maturin>=1.15,<2'
 maturin build --release --locked --interpreter python --out /tmp/zodish-bench/wheels
 python -m pip install --force-reinstall /tmp/zodish-bench/wheels/*.whl
 python examples/verify_native.py
+python benchmarks/bench_parse.py --smoke
+python benchmarks/bench_async.py --smoke
 python benchmarks/bench_compare.py --check-only
 python benchmarks/bench_compare.py --build-profile release -o comparison.json
 python benchmarks/summarize.py comparison.json --output comparison.md
@@ -128,8 +136,14 @@ Versions were researched on 2026-10-20:
 - [pyperf 2.10.0](https://pypi.org/project/pyperf/2.10.0/) and
   [runner options](https://pyperf.readthedocs.io/en/latest/runner.html).
 
-CI runs conformance and a tiny worker smoke test, without performance thresholds.
-The timing comparison is intended for deliberate local runs.
+CI runs conformance, async/sync microbenchmark smoke tests, and a tiny worker
+smoke test, without performance thresholds. The timing comparison is intended
+for deliberate local runs.
+
+Async measurements include event-loop transport in each operation. Use
+`--memory` for a one-operation retained/peak snapshot, and record the build
+profile and commit alongside published results. A successful correctness run
+does not establish a performance improvement.
 
 ## Recorded local results
 
@@ -140,3 +154,8 @@ interpreter and pinned dependency versions as the
 [run notes](results/README.md) for commands, hashes, and the comparison. These
 exploratory runs use installed release snapshots; their hashes identify the
 measured code even if the checkout changes.
+
+The [2026-10-21 async release run](results/2026-10-21-macos-arm64-async-release.md)
+records the isolated release-wheel async harness alongside a synchronous
+comparison, including per-sample variability, memory snapshots, and
+reproducibility hashes.
