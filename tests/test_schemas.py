@@ -2753,6 +2753,61 @@ class JSONSchemaTests(unittest.TestCase):
             "Rest",
         )
 
+    def test_async_nodes_follow_unsupported_and_missing_rules(self):
+        async def callback(value):
+            return True
+
+        schema = z.object({
+            "value": z.string().optional().refine_async(callback),
+            "extra": z.string().optional().super_refine_async(callback),
+        })
+        with self.assertRaises(UnrepresentableError):
+            to_json_schema(schema)
+        exported = to_json_schema(schema, unrepresentable="any")
+        self.assertEqual(exported["properties"]["value"], {})
+        self.assertEqual(exported["properties"]["extra"], {})
+        self.assertNotIn("required", exported)
+        with self.assertRaises(TypeError):
+            schema.encode({})
+
+    def test_more_async_nodes_follow_unsupported_and_missing_rules(self):
+        async def callback(value):
+            return value
+
+        async def factory():
+            return "x"
+
+        cases = (
+            z.preprocess_async(callback, z.string()),
+            z.string().overwrite_async(callback),
+            z.string().default_factory_async(factory),
+            z.string().catch_async(factory),
+        )
+        for schema in cases:
+            with self.subTest(schema=schema):
+                with self.assertRaises(UnrepresentableError):
+                    to_json_schema(schema)
+                self.assertEqual(
+                    to_json_schema(schema, unrepresentable="any"), {},
+                )
+                with self.assertRaises(TypeError):
+                    schema.encode("x")
+
+        missing = z.object({
+            "factory": z.string().default_factory_async(factory),
+            "caught": z.string().catch_async(factory),
+        })
+        input_export = to_json_schema(
+            missing, io="input", unrepresentable="any",
+        )
+        self.assertNotIn("required", input_export)
+        output_export = to_json_schema(
+            missing, io="output", unrepresentable="any",
+        )
+        self.assertEqual(
+            set(output_export["required"]), {"factory", "caught"},
+        )
+
     def test_unrepresentable_nodes(self):
         cases = (
             z.string().transform(len),

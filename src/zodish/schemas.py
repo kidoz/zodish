@@ -15,14 +15,15 @@ import pathlib as _pathlib
 import re
 import types
 import typing
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from functools import wraps
 from types import MappingProxyType
 from typing import Any, Literal, Self, cast, overload
 
-from ._native import NativeSchema
+from ._async import drive
+from ._native import AsyncSession, NativeSchema
 
 
 type Path = builtins.tuple[str | int, ...]
@@ -111,6 +112,15 @@ def _sync_callback[F: Callable[..., Any]](fn: F, role: str) -> F:
         return result
 
     return cast(F, checked)
+
+
+def _async_callback[F: Callable[..., Any]](fn: F, role: str) -> F:
+    """Validate an asynchronous callback without wrapping its result."""
+    if not callable(fn):
+        raise TypeError(f"{role} must be callable")
+    if inspect.isasyncgenfunction(fn):
+        raise TypeError(f"{role} must not be an async generator")
+    return fn
 
 
 def _message(value: str | None, default: str) -> str:
@@ -439,31 +449,78 @@ class Schema[Out, In = Out]:
         except ValidationError as error:
             return Failure(error)
 
+    async def parse_async(self, value: In | Missing = MISSING) -> Out:
+        """Parse, awaiting async callback results when required."""
+        session = AsyncSession(self._node, value, MISSING, Issue, ValidationError)
+        return cast(Out, await drive(session))
+
+    async def safe_parse_async(
+        self, value: In | Missing = MISSING,
+    ) -> Success[Out] | Failure:
+        """Catch validation errors from async parsing only."""
+        try:
+            return Success(await self.parse_async(value))
+        except ValidationError as error:
+            return Failure(error)
+
     def validate(self, value: In | Missing = MISSING) -> bool:
         """Return whether validation succeeds; callback errors still propagate."""
         return self.safe_parse(value).success
 
-    def parse_json(self, data: str | builtins.bytes | bytearray) -> Out:
-        """Parse JSON text and validate the decoded value."""
+    async def validate_async(self, value: In | Missing = MISSING) -> bool:
+        """Return whether async validation succeeds.
+
+        Programming errors still propagate, matching ``validate``.
+        """
+        return (await self.safe_parse_async(value)).success
+
+    def _json_input(
+        self, data: str | builtins.bytes | bytearray,
+    ) -> builtins.tuple[bool, Any]:
+        """Return ``(native_fast, value)`` for validated JSON input.
+
+        ``native_fast`` is true when the native decoder fully validated and
+        parsed the input. Otherwise ``value`` is the decoded JSON value for the
+        caller's normal or async evaluator.
+        """
         if not isinstance(data, (str, builtins.bytes, bytearray)):
             raise TypeError("JSON input must be str, bytes, or bytearray")
         fast, value = self._node.parse_json(data)
         if fast:
-            return cast(Out, value)
+            return True, value
         try:
-            decoded = _json.loads(data)
+            return False, _json.loads(data)
         except _json.JSONDecodeError as error:
             position = error.pos
         except UnicodeDecodeError as error:
             position = error.start
-        else:
-            return self.parse(decoded)
         raise ValidationError([Issue(
             "invalid_format",
             "Invalid JSON",
             (),
             params={"format": "json", "position": position},
         )]) from None
+
+    def parse_json(self, data: str | builtins.bytes | bytearray) -> Out:
+        """Parse JSON text and validate the decoded value."""
+        fast, value = self._json_input(data)
+        return cast(Out, value) if fast else self.parse(value)
+
+    async def parse_json_async(
+        self, data: str | builtins.bytes | bytearray,
+    ) -> Out:
+        """Parse JSON text and await the normal asynchronous evaluator."""
+        fast, value = self._json_input(data)
+        return cast(Out, value) if fast else await self.parse_async(value)
+
+    async def safe_parse_json_async(
+        self, data: str | builtins.bytes | bytearray,
+    ) -> Success[Out] | Failure:
+        """Catch validation errors from asynchronous JSON parsing only."""
+        try:
+            return Success(await self.parse_json_async(data))
+        except ValidationError as error:
+            return Failure(error)
 
     def safe_parse_json(
         self, data: str | builtins.bytes | bytearray,
@@ -494,6 +551,21 @@ class Schema[Out, In = Out]:
         """Catch validation errors only; programming errors remain visible."""
         try:
             return Success(self.encode(value))
+        except ValidationError as error:
+            return Failure(error)
+
+    async def encode_async(self, value: Out) -> In:
+        """Encode through the reverse graph, awaiting async callbacks."""
+        node = _encode_node_for(self)
+        if node is None:
+            raise TypeError("Schema has no reversible encoder")
+        session = AsyncSession(node, value, MISSING, Issue, ValidationError)
+        return cast(In, await drive(session))
+
+    async def safe_encode_async(self, value: Out) -> Success[In] | Failure:
+        """Catch validation errors from async encoding only."""
+        try:
+            return Success(await self.encode_async(value))
         except ValidationError as error:
             return Failure(error)
 
@@ -541,6 +613,47 @@ class Schema[Out, In = Out]:
             _meta=self._meta,
         )
 
+    def refine_async(
+        self,
+        predicate: Callable[[Out], Awaitable[bool]],
+        message: str = "Invalid value",
+        *,
+        path: Sequence[str | int] = (),
+    ) -> Schema[Out, In]:
+        """Asynchronously reject a parsed value; requires ``parse_async``."""
+        if not callable(predicate):
+            raise TypeError("refine_async callback must be callable")
+        if inspect.isasyncgenfunction(predicate):
+            raise TypeError("refine_async callback must not be an async generator")
+        return Schema[Out, In](
+            NativeSchema(
+                "async_refine",
+                (self._node,),
+                (predicate, _message(message, "Invalid value"), _relative_path(path)),
+            ),
+            _inner=self,
+            _meta=self._meta,
+        )
+
+    def super_refine_async(
+        self,
+        fn: Callable[[Out], Awaitable[
+            Issue | list[Issue] | builtins.tuple[Issue, ...] | None
+        ]],
+    ) -> Schema[Out, In]:
+        """Asynchronously emit issues relative to the current location."""
+        if not callable(fn):
+            raise TypeError("super_refine_async callback must be callable")
+        if inspect.isasyncgenfunction(fn):
+            raise TypeError(
+                "super_refine_async callback must not be an async generator",
+            )
+        return Schema[Out, In](
+            NativeSchema("async_super_refine", (self._node,), (fn,)),
+            _inner=self,
+            _meta=self._meta,
+        )
+
     def super_refine(
         self,
         fn: Callable[[Out], Issue | list[Issue] | builtins.tuple[Issue, ...] | None],
@@ -561,11 +674,34 @@ class Schema[Out, In = Out]:
             _meta=self._meta,
         )
 
+    def transform_async[U](self, fn: Callable[[Out], Awaitable[U]]) -> Schema[U, In]:
+        """Asynchronously transform parsed output; requires ``parse_async``."""
+        if not callable(fn):
+            raise TypeError("transform_async callback must be callable")
+        if inspect.isasyncgenfunction(fn):
+            raise TypeError("transform_async callback must not be an async generator")
+        return Schema[U, In](
+            NativeSchema("async_transform", (self._node,), (fn,)),
+            _inner=self,
+            _meta=self._meta,
+        )
+
     def overwrite(self, fn: Callable[[Out], Out]) -> Schema[Out, In]:
         """Transform a parsed value without changing its static type."""
         fn = _sync_callback(fn, "overwrite callback")
         return Schema[Out, In](
             NativeSchema("overwrite", (self._node,), (fn,)),
+            _inner=self,
+            _meta=self._meta,
+        )
+
+    def overwrite_async(
+        self, fn: Callable[[Out], Awaitable[Out]],
+    ) -> Schema[Out, In]:
+        """Await a parsed-value change without changing its static type."""
+        fn = _async_callback(fn, "overwrite_async callback")
+        return Schema[Out, In](
+            NativeSchema("async_overwrite", (self._node,), (fn,)),
             _inner=self,
             _meta=self._meta,
         )
@@ -618,12 +754,34 @@ class Schema[Out, In = Out]:
             _meta=self._meta,
         )
 
+    def default_factory_async(
+        self, factory: Callable[[], Awaitable[In]],
+    ) -> Schema[Out, In]:
+        """Await a factory for missing input, then validate its result."""
+        factory = _async_callback(factory, "default_factory_async callback")
+        return Schema[Out, In](
+            NativeSchema("async_default_factory", (self._node,), (factory,)),
+            _inner=self,
+            _meta=self._meta,
+        )
+
     def catch[U](self, fallback: U | Callable[[], U]) -> Schema[Out | U, In]:
         """Return a fallback when validation fails; callback errors propagate."""
         if callable(fallback):
             fallback = _sync_callback(fallback, "catch fallback")
         return Schema[Out | U, In](
             NativeSchema("catch", (self._node,), (fallback,)),
+            _inner=self,
+            _meta=self._meta,
+        )
+
+    def catch_async[U](
+        self, fallback: Callable[[], Awaitable[U]],
+    ) -> Schema[Out | U, In]:
+        """Await a fallback factory when validation fails."""
+        fallback = _async_callback(fallback, "catch_async fallback")
+        return Schema[Out | U, In](
+            NativeSchema("async_catch", (self._node,), (fallback,)),
             _inner=self,
             _meta=self._meta,
         )
@@ -675,6 +833,16 @@ class CodecSchema[Out, In = Out](Schema[Out, In]):
     ) -> Success[Out] | Failure:
         return self.safe_parse(value)
 
+    async def decode_async(self, value: In | Missing = MISSING) -> Out:
+        """Decode, awaiting asynchronous codec and schema callbacks."""
+        return await self.parse_async(value)
+
+    async def safe_decode_async(
+        self, value: In | Missing = MISSING,
+    ) -> Success[Out] | Failure:
+        """Catch validation errors from asynchronous decoding only."""
+        return await self.safe_parse_async(value)
+
     def optional(self) -> CodecSchema[Out | Missing, In | Missing]:
         result = _optional_codec(self)
         return cast(
@@ -702,6 +870,157 @@ class CodecSchema[Out, In = Out](Schema[Out, In]):
             CodecSchema[dict[str, Out], dict[str, In]],
             replace(result, _meta=self._meta),
         )
+
+
+@dataclass(frozen=True)
+class AsyncCodecSchema[Out, In = Out](CodecSchema[Out, In]):
+    """Codec whose decode and/or encode graph contains async callbacks."""
+
+    _json_output_schema: Schema[Any, Any] = field(
+        repr=False, kw_only=True, compare=False,
+    )
+
+    def optional(self) -> AsyncCodecSchema[Out | Missing, In | Missing]:
+        output_schema = self.output_schema.optional()
+        json_output_schema = _json_output_schema_for(self).optional()
+        return AsyncCodecSchema[Out | Missing, In | Missing](
+            NativeSchema("optional", (self._node,), ()),
+            _encode_node=NativeSchema("optional", (self._encode_node,), ()),
+            _input_schema=self.input_schema.optional(),
+            _output_schema=output_schema,
+            _json_output_schema=json_output_schema,
+            _inner=output_schema,
+            _meta=self._meta,
+        )
+
+    def nonoptional(self) -> AsyncCodecSchema[Out, In]:
+        output_schema = self.output_schema.nonoptional()
+        json_output_schema = _json_output_schema_for(self).nonoptional()
+        return AsyncCodecSchema[Out, In](
+            NativeSchema("nonoptional", (self._node,), ()),
+            _encode_node=NativeSchema("nonoptional", (self._encode_node,), ()),
+            _input_schema=self.input_schema.nonoptional(),
+            _output_schema=output_schema,
+            _json_output_schema=json_output_schema,
+            _inner=output_schema,
+            _meta=self._meta,
+        )
+
+    def nullable(self) -> AsyncCodecSchema[Out | None, In | None]:
+        output_schema = self.output_schema.nullable()
+        json_output_schema = _json_output_schema_for(self).nullable()
+        return AsyncCodecSchema[Out | None, In | None](
+            NativeSchema("nullable", (self._node,), ()),
+            _encode_node=NativeSchema("nullable", (self._encode_node,), ()),
+            _input_schema=self.input_schema.nullable(),
+            _output_schema=output_schema,
+            _json_output_schema=json_output_schema,
+            _inner=output_schema,
+            _meta=self._meta,
+        )
+
+    def nullish(
+        self,
+    ) -> AsyncCodecSchema[Out | Missing | None, In | Missing | None]:
+        return self.nullable().optional()
+
+    def record(self) -> AsyncCodecSchema[dict[str, Out], dict[str, In]]:
+        output_schema = record(self.output_schema)
+        json_output_schema = record(_json_output_schema_for(self))
+        return AsyncCodecSchema[dict[str, Out], dict[str, In]](
+            NativeSchema("record", (self._node,), (None,)),
+            _encode_node=NativeSchema(
+                "record", (self._encode_node,), (None,),
+            ),
+            _input_schema=record(self.input_schema),
+            _output_schema=output_schema,
+            _json_output_schema=json_output_schema,
+            _inner=output_schema,
+            _meta=self._meta,
+        )
+
+
+def _is_async_codec(codec: CodecSchema[Any, Any]) -> bool:
+    return codec._node.has_async or codec._encode_node.has_async
+
+
+def _promote_async_codec(
+    codec: CodecSchema[Any, Any],
+) -> AsyncCodecSchema[Any, Any]:
+    if isinstance(codec, AsyncCodecSchema):
+        return codec
+    return AsyncCodecSchema[Any, Any](
+        codec._node,
+        _encode_node=codec._encode_node,
+        _input_schema=codec.input_schema,
+        _output_schema=codec.output_schema,
+        _json_output_schema=_json_output_schema_for(codec),
+        _inner=codec._inner,
+        _meta=codec._meta,
+    )
+
+
+def _async_array_codec(
+    inner: CodecSchema[Any, Any],
+) -> AsyncCodecSchema[Any, Any]:
+    output_schema = array(inner.output_schema)
+    return AsyncCodecSchema[Any, Any](
+        NativeSchema("array", (inner._node,), ()),
+        _encode_node=NativeSchema("array", (inner._encode_node,), ()),
+        _input_schema=array(inner.input_schema),
+        _output_schema=output_schema,
+        _json_output_schema=array(_json_output_schema_for(inner)),
+        _inner=output_schema,
+        _meta=inner._meta,
+    )
+
+
+def _async_union_codec(
+    branches: Sequence[CodecSchema[Any, Any]],
+) -> AsyncCodecSchema[Any, Any]:
+    output_schema = union(*(branch.output_schema for branch in branches))
+    return AsyncCodecSchema[Any, Any](
+        NativeSchema(
+            "union",
+            builtins.tuple(branch._node for branch in branches),
+            (),
+        ),
+        _encode_node=NativeSchema(
+            "union",
+            builtins.tuple(branch._encode_node for branch in branches),
+            (),
+        ),
+        _input_schema=union(*(branch.input_schema for branch in branches)),
+        _output_schema=output_schema,
+        _json_output_schema=union(
+            *(_json_output_schema_for(branch) for branch in branches)
+        ),
+        _inner=output_schema,
+    )
+
+
+def _async_tuple_codec(
+    branches: Sequence[CodecSchema[Any, Any]],
+) -> AsyncCodecSchema[Any, Any]:
+    output_schema = tuple(*(branch.output_schema for branch in branches))
+    return AsyncCodecSchema[Any, Any](
+        NativeSchema(
+            "tuple",
+            builtins.tuple(branch._node for branch in branches),
+            (None,),
+        ),
+        _encode_node=NativeSchema(
+            "tuple",
+            builtins.tuple(branch._encode_node for branch in branches),
+            (None,),
+        ),
+        _input_schema=tuple(*(branch.input_schema for branch in branches)),
+        _output_schema=output_schema,
+        _json_output_schema=tuple(
+            *(_json_output_schema_for(branch) for branch in branches)
+        ),
+        _inner=output_schema,
+    )
 
 
 @dataclass(frozen=True)
@@ -1514,6 +1833,18 @@ def preprocess[Out, In](fn: Callable[[Any], Any], schema: Schema[Out, In]) -> Sc
     )
 
 
+def preprocess_async[Out, In](
+    fn: Callable[[Any], Awaitable[Any]], schema: Schema[Out, In],
+) -> Schema[Out, Any]:
+    """Await input conversion before validating through ``schema``."""
+    fn = _async_callback(fn, "preprocess_async callback")
+    return Schema[Out, Any](
+        NativeSchema("async_preprocess", (schema._node,), (fn,)),
+        _inner=schema,
+        _meta=schema._meta,
+    )
+
+
 def codec[Out, In](
     input_schema: Schema[In, Any],
     output_schema: Schema[Out, Any],
@@ -1561,7 +1892,48 @@ def codec[Out, In](
     )
 
 
+def codec_async[Out, In](
+    input_schema: Schema[In, Any],
+    output_schema: Schema[Out, Any],
+    *,
+    decode: Callable[[In], Awaitable[Out]],
+    encode: Callable[[Out], Awaitable[In]],
+) -> AsyncCodecSchema[Out, In]:
+    """Build a bidirectional codec with asynchronous callbacks."""
+    if not isinstance(input_schema, Schema) or not isinstance(output_schema, Schema):
+        raise TypeError("Codec input and output must be schemas")
+    decode = _async_callback(decode, "decode_async callback")
+    encode = _async_callback(encode, "encode_async callback")
+
+    decode_node = NativeSchema(
+        "pipe",
+        (
+            NativeSchema("async_transform", (input_schema._node,), (decode,)),
+            output_schema._node,
+        ),
+        (),
+    )
+    encode_node = NativeSchema(
+        "pipe",
+        (
+            NativeSchema("async_transform", (output_schema._node,), (encode,)),
+            input_schema._node,
+        ),
+        (),
+    )
+    return AsyncCodecSchema[Out, In](
+        decode_node,
+        _encode_node=encode_node,
+        _input_schema=input_schema,
+        _output_schema=output_schema,
+        _json_output_schema=output_schema,
+        _inner=output_schema,
+    )
+
+
 def _json_output_schema_for(schema: Schema[Any, Any]) -> Schema[Any, Any]:
+    if isinstance(schema, AsyncCodecSchema):
+        return schema._json_output_schema
     if isinstance(schema, _CompoundCodecSchema):
         return schema._json_output_schema
     if isinstance(schema, CodecSchema):
@@ -1599,6 +1971,9 @@ def _identity_codec(schema: Schema[Any, Any]) -> CodecSchema[Any, Any]:
 
 
 def _array_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
+    if _is_async_codec(inner):
+        return _async_array_codec(_promote_async_codec(inner))
+
     def decode_values(values: list[Any]) -> list[Any]:
         result: list[Any] = []
         issues: list[Issue] = []
@@ -1633,6 +2008,9 @@ def _array_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
 
 
 def _record_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
+    if _is_async_codec(inner):
+        return _promote_async_codec(inner).record()
+
     def decode_values(values: dict[str, Any]) -> dict[str, Any]:
         result: dict[str, Any] = {}
         issues: list[Issue] = []
@@ -1667,6 +2045,9 @@ def _record_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
 
 
 def _optional_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
+    if _is_async_codec(inner):
+        return _promote_async_codec(inner).optional()
+
     def decode_value(value: Any) -> Any:
         return MISSING if value is MISSING else inner.decode(value)
 
@@ -1683,6 +2064,8 @@ def _optional_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
 
 
 def _nonoptional_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
+    if _is_async_codec(inner):
+        return _promote_async_codec(inner).nonoptional()
     return _compound_codec(
         inner.input_schema.nonoptional(),
         inner.output_schema.nonoptional(),
@@ -1693,6 +2076,9 @@ def _nonoptional_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
 
 
 def _nullable_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
+    if _is_async_codec(inner):
+        return _promote_async_codec(inner).nullable()
+
     def decode_value(value: Any) -> Any:
         return None if value is None else inner.decode(value)
 
@@ -1718,6 +2104,8 @@ def _union_codec(options: Sequence[Schema[Any, Any]]) -> CodecSchema[Any, Any]:
         option if isinstance(option, CodecSchema) else _identity_codec(option)
         for option in options
     ]
+    if any(_is_async_codec(branch) for branch in branches):
+        return _async_union_codec(branches)
     input_schema = union(*(branch.input_schema for branch in branches))
     output_schema = union(*(branch.output_schema for branch in branches))
 
@@ -1765,6 +2153,8 @@ def _tuple_codec(options: Sequence[Schema[Any, Any]]) -> CodecSchema[Any, Any]:
         option if isinstance(option, CodecSchema) else _identity_codec(option)
         for option in options
     ]
+    if any(_is_async_codec(branch) for branch in branches):
+        return _async_tuple_codec(branches)
     input_schema = tuple(*(branch.input_schema for branch in branches))
     output_schema = tuple(*(branch.output_schema for branch in branches))
 
@@ -2187,6 +2577,29 @@ class _Codecs:
                 raise ValidationError(issues)
             return cls(**decoded)
 
+        async def decode_value_async(data: dict[str, Any]) -> DataclassT:
+            decoded: dict[str, Any] = {}
+            issues: list[Issue] = []
+            for name in names:
+                schema = schemas_by_name[name]
+                value = data.get(name, MISSING)
+                if value is MISSING:
+                    if not has_default[name]:
+                        issues.append(Issue("required", "Required", (name,)))
+                    continue
+                if isinstance(schema, CodecSchema):
+                    try:
+                        value = await schema.decode_async(value)
+                    except ValidationError as error:
+                        issues.extend(
+                            _prefix_issue(item, name) for item in error.issues
+                        )
+                        continue
+                decoded[name] = value
+            if issues:
+                raise ValidationError(issues)
+            return cls(**decoded)
+
         def encode_value(value: DataclassT) -> dict[str, Any]:
             encoded: dict[str, Any] = {}
             issues: list[Issue] = []
@@ -2206,12 +2619,62 @@ class _Codecs:
                 raise ValidationError(issues)
             return encoded
 
-        return _compound_codec(
-            input_schema,
-            output_schema,
-            output_json_schema,
-            decode=decode_value,
-            encode=encode_value,
+        async def encode_value_async(value: DataclassT) -> dict[str, Any]:
+            encoded: dict[str, Any] = {}
+            issues: list[Issue] = []
+            for name in names:
+                schema = schemas_by_name[name]
+                field_value = getattr(value, name)
+                if isinstance(schema, CodecSchema):
+                    try:
+                        field_value = await schema.encode_async(field_value)
+                    except ValidationError as error:
+                        issues.extend(
+                            _prefix_issue(item, name) for item in error.issues
+                        )
+                        continue
+                encoded[name] = field_value
+            if issues:
+                raise ValidationError(issues)
+            return encoded
+
+        decode_async_needed = any(
+            isinstance(schema, CodecSchema) and schema._node.has_async
+            for schema in schemas_by_name.values()
+        )
+        encode_async_needed = any(
+            isinstance(schema, CodecSchema) and schema._encode_node.has_async
+            for schema in schemas_by_name.values()
+        )
+
+        decode_transform = NativeSchema(
+            "async_transform" if decode_async_needed else "transform",
+            (input_schema._node,),
+            (decode_value_async if decode_async_needed else decode_value,),
+        )
+        decode_node = NativeSchema(
+            "pipe",
+            (decode_transform, output_schema._node),
+            (),
+        )
+        encode_transform = NativeSchema(
+            "async_transform" if encode_async_needed else "transform",
+            (output_schema._node,),
+            (encode_value_async if encode_async_needed else encode_value,),
+        )
+        encode_node = NativeSchema(
+            "pipe",
+            (encode_transform, input_schema._node),
+            (),
+        )
+
+        return _CompoundCodecSchema[DataclassT, dict[str, Any]](
+            decode_node,
+            _encode_node=encode_node,
+            _input_schema=input_schema,
+            _output_schema=output_schema,
+            _json_output_schema=output_json_schema,
+            _inner=output_schema,
         )
 
 
@@ -2381,22 +2844,33 @@ def _node_accepts_missing(node: NativeSchema, io: JSONSchemaIO) -> bool:
         return True
     if kind == "nonoptional":
         return False
-    if kind == "catch":
+    if kind in ("catch", "async_catch"):
         if _node_accepts_missing(node.children[0], io):
             return True
         return io == "input"
-    if kind in ("default", "default_factory"):
+    if kind in ("default", "default_factory", "async_default_factory"):
         return io == "input"
     if kind in _CONSTRAINT_KINDS or kind in ("nullable", "coerce", "string_bool"):
         return _node_accepts_missing(node.children[0], io)
     if kind == "union":
         return any(_node_accepts_missing(child, io) for child in node.children)
-    if kind in ("pipe", "refine", "super_refine", "transform", "overwrite"):
+    if kind in (
+        "pipe", "refine", "super_refine", "transform", "overwrite",
+        "async_refine", "async_super_refine", "async_transform",
+        "async_overwrite",
+    ):
         return _node_accepts_missing(node.children[0], io)
     return False
 
 
 def _schema_accepts_missing(schema: Schema[Any, Any], io: JSONSchemaIO) -> bool:
+    if isinstance(schema, AsyncCodecSchema):
+        source = (
+            schema.input_schema
+            if io == "input"
+            else schema._json_output_schema
+        )
+        return _node_accepts_missing(source._node, io)
     if isinstance(schema, _CompoundCodecSchema):
         source = (
             schema.input_schema
@@ -2491,6 +2965,15 @@ def _export_node(
 ) -> JSONSchema:
     if isinstance(schema, _JsonTextSchema):
         return {"type": "string"}
+    if isinstance(schema, AsyncCodecSchema):
+        source = (
+            schema.input_schema
+            if io == "input"
+            else schema._json_output_schema
+        )
+        return _export_schema(
+            source, path, target, io, unrepresentable, relax_strip,
+        )
     if isinstance(schema, _CompoundCodecSchema):
         source = (
             schema.input_schema

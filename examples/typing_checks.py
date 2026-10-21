@@ -46,6 +46,80 @@ assert_type(z.integer().parse_json("1"), int)
 assert_type(z.integer().parse_json(bytearray(b"1")), int)
 assert_type(z.integer().safe_parse_json(b"1"), Success[int] | Failure)
 assert_type(z.integer().validate_json(b"1"), bool)
+async def _async_typing_checks() -> None:
+    async def positive(value: int) -> bool:
+        return value > 0
+
+    async def stringify(value: int) -> str:
+        return str(value)
+
+    async def no_issues(value: int) -> None:
+        return None
+
+    checked = z.integer().refine_async(positive)
+    assert_type(await checked.parse_async(1), int)
+    assert_type(await checked.safe_parse_async(1), Success[int] | Failure)
+    sup = z.integer().super_refine_async(no_issues)
+    assert_type(await sup.parse_async(1), int)
+    transformed = z.integer().transform_async(stringify)
+    assert_type(await transformed.parse_async(1), str)
+    composed = z.object({
+        "value": z.integer().refine_async(positive),
+        "values": z.integer().transform_async(stringify).array(),
+    })
+    assert_type(await composed.parse_async({"value": 1, "values": [1]}), dict[str, Any])
+    assert_type(await z.integer().parse_json_async(b"1"), int)
+    assert_type(
+        await z.integer().safe_parse_json_async(b"1"),
+        Success[int] | Failure,
+    )
+    assert_type(await z.integer().validate_async(1), bool)
+
+    async def stringify_input(value: Any) -> str:
+        return str(value)
+
+    async def bump(value: int) -> int:
+        return value + 1
+
+    async def default_int() -> int:
+        return 1
+
+    async def fallback_text() -> str:
+        return "fallback"
+
+    preprocessed = z.preprocess_async(stringify_input, z.string())
+    assert_type(await preprocessed.parse_async(1), str)
+    overwritten = z.integer().overwrite_async(bump)
+    assert_type(await overwritten.parse_async(1), int)
+    defaulted = z.integer().default_factory_async(default_int)
+    assert_type(await defaulted.parse_async(), int)
+    caught = z.integer().catch_async(fallback_text)
+    assert_type(await caught.parse_async(1), int | str)
+
+    async def async_decode(value: str) -> int:
+        return int(value)
+
+    async def async_encode(value: int) -> str:
+        return str(value)
+
+    async_codec = z.codec_async(
+        z.string(),
+        z.integer(),
+        decode=async_decode,
+        encode=async_encode,
+    )
+    assert_type(async_codec, z.AsyncCodecSchema[int, str])
+    assert_type(await async_codec.decode_async("1"), int)
+    assert_type(await async_codec.safe_decode_async("1"), Success[int] | Failure)
+    assert_type(await async_codec.encode_async(1), str)
+    assert_type(await async_codec.safe_encode_async(1), Success[str] | Failure)
+    assert_type(
+        async_codec.optional(),
+        z.AsyncCodecSchema[int | Missing, str | Missing],
+    )
+    assert_type(z.codecs.array(async_codec), z.CodecSchema[list[int], list[str]])
+
+
 assert_type(z.string().array().unwrap(), Schema[str, str])
 assert_type(z.string().optional().unwrap(), Schema[Any, Any])
 assert_type(z.record(z.integer()).unwrap(), Schema[int, int])
