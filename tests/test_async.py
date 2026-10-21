@@ -7,7 +7,7 @@ import unittest
 import weakref
 from dataclasses import dataclass
 
-from zodish import MISSING, Failure, Issue, ValidationError, z
+from zodish import MISSING, Failure, Issue, Success, ValidationError, z
 from zodish._native import AsyncSession
 
 
@@ -18,6 +18,385 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         failure = await schema.safe_parse_async({"value": 0})
         self.assertIsInstance(failure, Failure)
         self.assertEqual(failure.error.issues[0].path, ("value",))
+
+    async def test_missing_root_containers_match_sync(self):
+        async def async_always(value):
+            return True
+
+        def sync_always(value):
+            return True
+
+        sync_lazy = z.lazy(lambda: z.object({
+            "value": z.integer().refine(sync_always),
+        }))
+        async_lazy = z.lazy(lambda: z.object({
+            "value": z.integer().refine_async(async_always),
+        }))
+        pairs = [
+            (
+                "object",
+                z.object({"value": z.integer().refine(sync_always)}),
+                z.object({"value": z.integer().refine_async(async_always)}),
+                MISSING,
+            ),
+            (
+                "array",
+                z.array(z.integer().refine(sync_always)),
+                z.array(z.integer().refine_async(async_always)),
+                MISSING,
+            ),
+            (
+                "tuple",
+                z.tuple(z.integer().refine(sync_always)),
+                z.tuple(z.integer().refine_async(async_always)),
+                MISSING,
+            ),
+            (
+                "record",
+                z.record(z.integer().refine(sync_always)),
+                z.record(z.integer().refine_async(async_always)),
+                MISSING,
+            ),
+            (
+                "intersection",
+                z.intersection(
+                    z.object({"left": z.integer().refine(sync_always)}),
+                    z.object({"right": z.integer().refine(sync_always)}),
+                ),
+                z.intersection(
+                    z.object({"left": z.integer().refine_async(async_always)}),
+                    z.object({"right": z.integer().refine_async(async_always)}),
+                ),
+                MISSING,
+            ),
+            (
+                "discriminated union",
+                z.discriminated_union("kind", {
+                    "a": z.object({
+                        "kind": z.literal("a"),
+                        "value": z.integer().refine(sync_always),
+                    }),
+                }),
+                z.discriminated_union("kind", {
+                    "a": z.object({
+                        "kind": z.literal("a"),
+                        "value": z.integer().refine_async(async_always),
+                    }),
+                }),
+                MISSING,
+            ),
+            (
+                "union of containers",
+                z.union(
+                    z.object({"value": z.integer().refine(sync_always)}),
+                    z.array(z.integer().refine(sync_always)),
+                ),
+                z.union(
+                    z.object({"value": z.integer().refine_async(async_always)}),
+                    z.array(z.integer().refine_async(async_always)),
+                ),
+                MISSING,
+            ),
+            ("lazy", sync_lazy, async_lazy, MISSING),
+            (
+                "missing nested field",
+                z.object({"child": z.object({
+                    "value": z.integer().refine(sync_always),
+                })}),
+                z.object({"child": z.object({
+                    "value": z.integer().refine_async(async_always),
+                })}),
+                {},
+            ),
+        ]
+
+        for name, sync_schema, async_schema, value in pairs:
+            with self.subTest(name=name):
+                sync_result = sync_schema.safe_parse(value)
+                async_result = await async_schema.safe_parse_async(value)
+                self.assertIsInstance(sync_result, Failure)
+                self.assertIsInstance(async_result, Failure)
+                self.assertEqual(
+                    async_result.error.to_dict(),
+                    sync_result.error.to_dict(),
+                )
+
+        missing_object = await z.object({
+            "value": z.integer().refine_async(async_always),
+        }).safe_parse_async(MISSING)
+        self.assertIsInstance(missing_object, Failure)
+        self.assertEqual(missing_object.error.issues[0].code, "required")
+
+    async def test_async_matches_sync_across_schema_families(self):
+        async def always(value):
+            return True
+
+        async def nonempty(value):
+            return bool(value)
+
+        async def stringify(value):
+            return str(value)
+
+        async def super_issues(value):
+            return [
+                Issue("custom", "first", ("x",)),
+                Issue("custom", "second", ("y",)),
+            ]
+
+        async def default_factory():
+            return 4
+
+        async def catch_factory():
+            return 9
+
+        async def preprocess(value):
+            return str(value)
+
+        async def resolved(value):
+            return value
+
+        class Boom(Exception):
+            pass
+
+        async def explode(value):
+            raise Boom("boom")
+
+        def sync_always(value):
+            return True
+
+        def sync_nonempty(value):
+            return bool(value)
+
+        def sync_stringify(value):
+            return str(value)
+
+        def sync_super_issues(value):
+            return [
+                Issue("custom", "first", ("x",)),
+                Issue("custom", "second", ("y",)),
+            ]
+
+        def sync_explode(value):
+            raise Boom("boom")
+
+        pairs = [
+            (
+                "string",
+                z.string().trim().min(2).max(5).regex("^[a-z ]+$"),
+                z.string().trim().min(2).max(5).regex("^[a-z ]+$")
+                .refine_async(always),
+                [" ab ", "A", 1, "", "abcdef", MISSING],
+            ),
+            (
+                "object",
+                z.object({
+                    "id": z.integer().positive(),
+                    "name": z.string().optional(),
+                    "items": z.string().refine(sync_nonempty).array(),
+                }).catchall(z.integer()),
+                z.object({
+                    "id": z.integer().positive().refine_async(always),
+                    "name": z.string().optional().refine_async(always),
+                    "items": z.string().refine_async(nonempty).array(),
+                }).catchall(z.integer().refine_async(always)),
+                [
+                    {"id": 1, "items": ["x"], "extra": 2},
+                    {"id": 0, "items": [""]},
+                    {"id": 1, "items": ["x"], "extra": "bad"},
+                    {"id": 1, "items": ["x"], "name": None},
+                    MISSING,
+                ],
+            ),
+            (
+                "tuple",
+                z.tuple(z.string(), z.integer()).rest(z.integer()),
+                z.tuple(z.string(), z.integer().refine_async(always))
+                .rest(z.integer().refine_async(always)),
+                [["a", 1], ["a", 1, 2], ["a"], ["a", 1, "b"], MISSING],
+            ),
+            (
+                "record",
+                z.record(z.string().min(1), z.integer()),
+                z.record(
+                    z.string().min(1).refine_async(always),
+                    z.integer().refine_async(always),
+                ),
+                [{"a": 1}, {"": 1}, {"a": "bad"}, {"a": 1, 2: 3}, MISSING],
+            ),
+            (
+                "union",
+                z.union(z.integer().positive(), z.string().min(1)),
+                z.union(
+                    z.integer().positive().refine_async(always),
+                    z.string().min(1).refine_async(always),
+                ),
+                [1, 0, "", "x", None, MISSING],
+            ),
+            (
+                "intersection",
+                z.intersection(
+                    z.object({"a": z.integer()}),
+                    z.object({"b": z.string()}),
+                ),
+                z.intersection(
+                    z.object({"a": z.integer().refine_async(always)}),
+                    z.object({"b": z.string().refine_async(always)}),
+                ),
+                [{"a": 1, "b": "x"}, {"a": 1}, {"a": "x", "b": "x"}, MISSING],
+            ),
+            (
+                "discriminated union",
+                z.discriminated_union("kind", {
+                    "a": z.object({
+                        "kind": z.literal("a"),
+                        "value": z.integer(),
+                    }),
+                    "b": z.object({
+                        "kind": z.literal("b"),
+                        "value": z.string(),
+                    }),
+                }),
+                z.discriminated_union("kind", {
+                    "a": z.object({
+                        "kind": z.literal("a"),
+                        "value": z.integer().refine_async(always),
+                    }),
+                    "b": z.object({
+                        "kind": z.literal("b"),
+                        "value": z.string().refine_async(always),
+                    }),
+                }),
+                [
+                    {"kind": "a", "value": 1},
+                    {"kind": "b", "value": "x"},
+                    {"kind": "c", "value": 1},
+                    {"value": 1},
+                    [],
+                    MISSING,
+                ],
+            ),
+            (
+                "pipe and wrappers",
+                z.object({
+                    "o": z.string().optional(),
+                    "n": z.string().nullable(),
+                    "d": z.string().default("d"),
+                    "c": z.integer().positive().catch(5),
+                    "p": z.integer().transform(sync_stringify)
+                    .pipe(z.string().min(2)),
+                }),
+                z.object({
+                    "o": z.string().optional(),
+                    "n": z.string().nullable().refine_async(always),
+                    "d": z.string().default("d"),
+                    "c": z.integer().positive().refine_async(always).catch(5),
+                    "p": z.integer().transform_async(stringify)
+                    .pipe(z.string().min(2).refine_async(always)),
+                }),
+                [
+                    {"n": None, "c": 1, "p": 10},
+                    {"n": None, "c": 0, "p": 10},
+                    {"n": "x", "o": None, "p": 10},
+                    MISSING,
+                ],
+            ),
+            (
+                "callbacks",
+                z.object({
+                    "a": z.integer().default_factory(lambda: 4),
+                    "b": z.integer().positive().catch(9),
+                    "c": z.integer().transform(lambda value: value + 1),
+                    "d": z.preprocess(str, z.string().min(2)),
+                }),
+                z.object({
+                    "a": z.integer().default_factory_async(default_factory),
+                    "b": z.integer().positive().catch_async(catch_factory),
+                    "c": z.integer().transform_async(
+                        lambda value: resolved(value + 1),
+                    ),
+                    "d": z.preprocess_async(preprocess, z.string().min(2)),
+                }),
+                [
+                    {"b": 1, "c": 2, "d": 42},
+                    {"b": 0, "c": 2, "d": 42},
+                    {"d": 4},
+                    MISSING,
+                ],
+            ),
+            (
+                "super refine",
+                z.integer().super_refine(sync_super_issues),
+                z.integer().super_refine_async(super_issues),
+                [1, MISSING],
+            ),
+            (
+                "coerce and stringbool",
+                z.object({
+                    "number": z.coerce.integer().refine(sync_always),
+                    "flag": z.string().stringbool().refine(sync_always),
+                }),
+                z.object({
+                    "number": z.coerce.integer().refine_async(always),
+                    "flag": z.string().stringbool().refine_async(always),
+                }),
+                [
+                    {"number": "2", "flag": "true"},
+                    {"number": "x", "flag": "yes"},
+                    {"number": 2.0, "flag": True},
+                    MISSING,
+                ],
+            ),
+            (
+                "lazy",
+                z.lazy(lambda: z.object({
+                    "value": z.integer().refine(sync_always),
+                })),
+                z.lazy(lambda: z.object({
+                    "value": z.integer().refine_async(always),
+                })),
+                [{"value": 1}, {"value": "x"}, {}, MISSING],
+            ),
+            (
+                "transform error",
+                z.integer().transform(sync_explode),
+                z.integer().transform_async(explode),
+                [1, "x", MISSING],
+            ),
+        ]
+
+        for name, sync_schema, async_schema, values in pairs:
+            for value in values:
+                with self.subTest(name=name, value=value):
+                    try:
+                        sync_result = sync_schema.safe_parse(value)
+                        sync_error = None
+                    except Exception as error:
+                        sync_result = None
+                        sync_error = error
+                    try:
+                        async_result = await async_schema.safe_parse_async(value)
+                        async_error = None
+                    except Exception as error:
+                        async_result = None
+                        async_error = error
+
+                    if sync_error is not None or async_error is not None:
+                        self.assertIsNotNone(sync_error)
+                        self.assertIsNotNone(async_error)
+                        self.assertIs(type(sync_error), type(async_error))
+                        self.assertEqual(str(sync_error), str(async_error))
+                        continue
+
+                    if isinstance(sync_result, Failure):
+                        self.assertIsInstance(async_result, Failure)
+                        self.assertEqual(
+                            async_result.error.to_dict(),
+                            sync_result.error.to_dict(),
+                        )
+                    else:
+                        self.assertIsInstance(sync_result, Success)
+                        self.assertIsInstance(async_result, Success)
+                        self.assertEqual(async_result.data, sync_result.data)
 
     async def test_async_codec_decode_and_encode(self):
         decode_calls = []
@@ -773,6 +1152,105 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
             non_object_failure.error.issues[0].code,
             "invalid_intersection_types",
         )
+
+    async def test_intersection_outcome_matrix(self):
+        calls = []
+        errors = {
+            "left": RuntimeError("left failed"),
+            "right": RuntimeError("right failed"),
+        }
+
+        def callback_for(side, outcome):
+            async def callback(value):
+                calls.append(f"{side} {outcome}")
+                if outcome == "success":
+                    return True
+                if outcome == "invalid":
+                    return False
+                raise errors[side]
+
+            return callback
+
+        def schema_for(side, outcome):
+            callback = callback_for(side, outcome)
+            if outcome == "error":
+                field = z.integer().transform_async(callback)
+            else:
+                message = f"{side} invalid"
+                field = z.integer().refine_async(callback, message)
+            return z.object({side: field})
+
+        for left_kind in ("success", "invalid", "error"):
+            for right_kind in ("success", "invalid", "error"):
+                with self.subTest(left=left_kind, right=right_kind):
+                    calls.clear()
+                    schema = z.intersection(
+                        schema_for("left", left_kind),
+                        schema_for("right", right_kind),
+                    )
+                    expected_calls = [
+                        f"left {left_kind}",
+                        f"right {right_kind}",
+                    ]
+                    if left_kind == "error" or right_kind == "error":
+                        expected = errors[
+                            "left" if left_kind == "error" else "right"
+                        ]
+                        with self.assertRaises(RuntimeError) as caught:
+                            await schema.parse_async({"left": 1, "right": 2})
+                        self.assertIs(caught.exception, expected)
+                        self.assertEqual(calls, expected_calls)
+                        continue
+
+                    result = await schema.safe_parse_async({
+                        "left": 1,
+                        "right": 2,
+                    })
+                    self.assertEqual(calls, expected_calls)
+                    if left_kind == "success" and right_kind == "success":
+                        self.assertIsInstance(result, Success)
+                        self.assertEqual(
+                            result.data,
+                            {"left": 1, "right": 2},
+                        )
+                        continue
+                    self.assertIsInstance(result, Failure)
+                    expected_issues = []
+                    if left_kind == "invalid":
+                        expected_issues.append(("left invalid", ("left",)))
+                    if right_kind == "invalid":
+                        expected_issues.append(("right invalid", ("right",)))
+                    self.assertEqual(
+                        [
+                            (issue.message, issue.path)
+                            for issue in result.error.issues
+                        ],
+                        expected_issues,
+                    )
+
+        class Control(BaseException):
+            pass
+
+        calls.clear()
+        control = Control("right control")
+        left = z.object({
+            "left": z.integer().refine_async(
+                callback_for("left", "success"),
+            ),
+        })
+
+        async def stop(value):
+            calls.append("right control")
+            raise control
+
+        right = z.object({"right": z.integer().refine_async(stop)})
+        with self.assertRaises(Control) as caught:
+            await z.intersection(left, right).parse_async({
+                "left": 1,
+                "right": 2,
+            })
+        self.assertIs(caught.exception, control)
+        self.assertEqual(calls, ["left success", "right control"])
 
     async def test_pipe_catch_lazy_and_discriminated_composition(self):
         async def nonempty(value):
@@ -1546,6 +2024,126 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(caught.exception, original)
         with self.assertRaises(Control):
             await schema.safe_parse_async(1)
+
+    async def test_many_concurrent_parses_isolate_sessions(self):
+        factory_calls = []
+
+        async def nonempty(value):
+            await asyncio.sleep(0)
+            return bool(value)
+
+        def factory():
+            factory_calls.append(1)
+            return z.object({"name": z.string().refine_async(nonempty)})
+
+        schema = z.object({
+            "id": z.integer().refine_async(nonempty),
+            "item": z.lazy(factory),
+        })
+        payloads = [
+            {"id": index, "item": {"name": f"name-{index}"}}
+            for index in range(1, 65)
+        ]
+        results = await asyncio.gather(
+            *(schema.parse_async(payload) for payload in payloads),
+        )
+        self.assertEqual(results, payloads)
+        self.assertEqual(len(factory_calls), len(payloads))
+
+        failures = await asyncio.gather(*(
+            schema.safe_parse_async({"id": 0, "item": {"name": "x"}})
+            for _ in range(32)
+        ))
+        for failure in failures:
+            self.assertIsInstance(failure, Failure)
+            self.assertEqual(
+                [(issue.code, issue.path) for issue in failure.error.issues],
+                [("custom", ("id",))],
+            )
+
+    async def test_cancellation_at_nested_await_points_stops_work(self):
+        started = asyncio.Event()
+        cleaned = asyncio.Event()
+        later = []
+        fallback_calls = []
+
+        async def wait(value):
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cleaned.set()
+
+        async def sibling(value):
+            later.append(value)
+            return True
+
+        async def fallback():
+            fallback_calls.append(1)
+            return 9
+
+        schema = z.object({
+            "first": z.integer().refine_async(wait),
+            "second": z.integer().refine_async(sibling),
+        }).catch_async(fallback)
+        task = asyncio.create_task(schema.parse_async({
+            "first": 1,
+            "second": 2,
+        }))
+        await started.wait()
+        task.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+        await asyncio.wait_for(cleaned.wait(), timeout=1)
+        self.assertEqual(later, [])
+        self.assertEqual(fallback_calls, [])
+
+        timeout_started = asyncio.Event()
+        timeout_cleaned = asyncio.Event()
+
+        async def timeout_wait(value):
+            timeout_started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                timeout_cleaned.set()
+
+        timed = z.object({
+            "value": z.integer().refine_async(timeout_wait),
+        })
+        with self.assertRaises(TimeoutError):
+            await asyncio.wait_for(
+                timed.parse_async({"value": 1}),
+                timeout=0.01,
+            )
+        await asyncio.wait_for(timeout_cleaned.wait(), timeout=1)
+
+    async def test_async_codec_cancellation_cleans_decode(self):
+        started = asyncio.Event()
+        cleaned = asyncio.Event()
+        encode_calls = []
+
+        async def decode(value):
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cleaned.set()
+
+        async def encode(value):
+            encode_calls.append(value)
+            return str(value)
+
+        codec = z.codec_async(
+            z.string(), z.integer(), decode=decode, encode=encode,
+        )
+        task = asyncio.create_task(codec.decode_async("1"))
+        await started.wait()
+        task.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+        await asyncio.wait_for(cleaned.wait(), timeout=1)
+        self.assertEqual(encode_calls, [])
 
     async def test_cancellation_propagates_and_cleans_up(self):
         started = asyncio.Event()
