@@ -178,9 +178,10 @@ are available with the report.
 
 Python builders plus a native core require maturin and PyO3 at build time. Wheels
 use the GIL-enabled CPython 3.14+ stable ABI and must match the operating system
-and architecture. Installing a compatible prebuilt wheel does not require Rust;
-building from source does. Free-threaded wheels are not part of the published
-compatibility matrix.
+and architecture. Version-specific free-threaded `cp314t`/`cp315t` wheels are
+published for Linux x86_64/aarch64 glibc, macOS x86_64/arm64, and Windows x64.
+Installing a compatible prebuilt wheel does not require Rust; building from
+source does. Free-threaded musllinux wheels are not published.
 
 An editable install picks up Python edits but does not rebuild Rust. After
 changing any source under `rust/`, reinstall the package before testing.

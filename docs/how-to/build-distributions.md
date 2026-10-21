@@ -67,12 +67,14 @@ that does not match the manifest version.
 
 ## Know the artifact constraints
 
-- Wheels use the GIL-enabled CPython 3.14+ stable ABI and must match the
-  operating system and architecture. An Apple Silicon macOS wheel cannot be used
-  on Linux or Windows.
+- GIL wheels use the CPython 3.14+ stable ABI and must match the operating
+  system and architecture. An Apple Silicon macOS wheel cannot be used on Linux
+  or Windows.
+- Version-specific free-threaded `cp314t`/`cp315t` wheels are published for
+  Linux x86_64/aarch64 glibc, macOS x86_64/arm64, and Windows x64.
 - Installing a compatible prebuilt wheel does not require Rust. Building from
   source does.
-- Free-threaded wheels are not part of the published compatibility matrix.
+- Free-threaded musllinux wheels are not published.
 
 ## Related
 

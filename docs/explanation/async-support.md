@@ -147,9 +147,10 @@ field issue prefixes and dataclass defaults.
 Each parse uses its own native session, so concurrent parses of one immutable
 schema keep independent validation state and lazy caches. A session is bound to
 the thread that starts it; resuming from another thread is a protocol error.
-Concurrent coroutine tasks on the same event-loop thread are supported. The
-supported distribution target is GIL-enabled CPython 3.14+; free-threaded wheels
-are not part of the published compatibility matrix.
+Concurrent coroutine tasks on the same event-loop thread are supported.
+GIL-enabled CPython 3.14+ remains the default distribution target; version-specific
+`cp314t`/`cp315t` free-threaded wheels are published for Linux x86_64/aarch64
+glibc, macOS x86_64/arm64, and Windows x64.
 
 ## Current limitations
 
