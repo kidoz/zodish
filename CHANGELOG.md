@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `z.typed_object(TypedDictClass, shape)` produces a statically typed
+  `TypedDict` result while preserving ordinary object policies and runtime
+  behavior.
+- `.brand(NewType)` applies a typing-only branded output type without changing
+  runtime validation.
+
 ## [0.6.0] - 2026-10-21
 
 ### Added

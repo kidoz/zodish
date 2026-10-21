@@ -110,6 +110,55 @@ of schema instances the way TypeScript infers types from Zod. As a result:
 - unions infer up to four alternatives, then fall back to `Any`;
 - there is no type-checker plugin or generated model API.
 
+### Typed object results
+
+Pass an explicit `TypedDict` to `z.typed_object` when the output dictionary should
+have a static shape:
+
+```python
+from typing import TypedDict
+from zodish import z
+
+class User(TypedDict):
+    name: str
+    age: int
+
+user_schema = z.typed_object(User, {
+    "name": z.string().min(1),
+    "age": z.integer().gte(0),
+})
+
+user = user_schema.parse({"name": "Alex", "age": 30})
+# static type: User
+```
+
+The schema shape must cover every required `TypedDict` key and may include
+declared optional keys. Shape keys outside the `TypedDict` are rejected at
+construction. Runtime policies, issue paths, JSON Schema export, and async
+parsing are the same as `z.object`; `.strict()`, `.passthrough()`, `.strip()`,
+and `.catchall()` retain the typed result, while shape-changing methods such as
+`.pick()`, `.omit()`, and `.partial()` return the ordinary `ObjectSchema` type.
+
+### Brands
+
+A `NewType` brand changes only the static output type:
+
+```python
+from typing import NewType
+from zodish import z
+
+UserId = NewType("UserId", int)
+user_id_schema = z.integer().positive().brand(UserId)
+
+user_id = user_id_schema.parse(3)
+# static type: UserId
+```
+
+`.brand()` is a runtime no-op and is terminal: the returned `Schema[Brand, In]`
+does not expose narrower schema methods. Use a frozen dataclass codec or a
+runtime transform when the value itself must become immutable; `.readonly()` is
+not implemented.
+
 Use a dataclass codec for a statically typed result that also encodes back:
 
 ```python

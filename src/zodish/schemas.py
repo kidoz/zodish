@@ -154,6 +154,11 @@ def _string_argument(value: str, role: str) -> str:
     return value
 
 
+def _brand_argument(newtype: Any) -> None:
+    if not callable(newtype) or getattr(newtype, "__supertype__", _UNSET) is _UNSET:
+        raise TypeError("Brand must be a typing.NewType")
+
+
 def _string_values(values: Sequence[str], role: str) -> builtins.tuple[str, ...]:
     result = builtins.tuple(values)
     if not result:
@@ -446,6 +451,11 @@ class Schema[Out, In = Out]:
         if not isinstance(description, str):
             raise TypeError("Description must be a string")
         return self.meta({"description": description})
+
+    def brand[Brand](self, newtype: Callable[[Out], Brand]) -> Schema[Brand, In]:
+        """Apply a typing-only ``NewType`` brand to parsed output."""
+        _brand_argument(newtype)
+        return Schema[Brand, In](self._node, _inner=self, _meta=self._meta)
 
     def parse(self, value: In | Missing = MISSING) -> Out:
         return cast(Out, self._node.parse(value, MISSING, Issue, ValidationError))
@@ -832,6 +842,19 @@ class CodecSchema[Out, In = Out](Schema[Out, In]):
     def output_schema(self) -> Schema[Out, Any]:
         return self._output_schema
 
+    def brand[Brand](
+        self, newtype: Callable[[Out], Brand],
+    ) -> CodecSchema[Brand, In]:
+        _brand_argument(newtype)
+        return CodecSchema[Brand, In](
+            self._node,
+            _encode_node=self._encode_node,
+            _input_schema=self._input_schema,
+            _output_schema=cast(Schema[Brand, Any], self._output_schema),
+            _inner=self,
+            _meta=self._meta,
+        )
+
     def decode(self, value: In | Missing = MISSING) -> Out:
         """Decode an encoded value; equivalent to ``parse``."""
         return self.parse(value)
@@ -887,6 +910,20 @@ class AsyncCodecSchema[Out, In = Out](CodecSchema[Out, In]):
     _json_output_schema: Schema[Any, Any] = field(
         repr=False, kw_only=True, compare=False,
     )
+
+    def brand[Brand](
+        self, newtype: Callable[[Out], Brand],
+    ) -> AsyncCodecSchema[Brand, In]:
+        _brand_argument(newtype)
+        return AsyncCodecSchema[Brand, In](
+            self._node,
+            _encode_node=self._encode_node,
+            _input_schema=self._input_schema,
+            _output_schema=cast(Schema[Brand, Any], self._output_schema),
+            _json_output_schema=self._json_output_schema,
+            _inner=self,
+            _meta=self._meta,
+        )
 
     def optional(self) -> AsyncCodecSchema[Out | Missing, In | Missing]:
         output_schema = self.output_schema.optional()
@@ -1582,6 +1619,99 @@ class ObjectSchema(Schema[dict[str, Any], dict[str, Any]]):
 
 
 @dataclass(frozen=True)
+class TypedObjectSchema[Shape](Schema[Shape, Shape]):
+    shape: Mapping[str, Schema[Any, Any]]
+    unknown_keys: UnknownKeys | Literal["catchall"] = "strip"
+    _catchall: Schema[Any, Any] | None = field(default=None, repr=False)
+
+    def _base_rebuild(
+        self,
+        shape: Mapping[str, Schema[Any, Any]],
+        unknown_keys: UnknownKeys | Literal["catchall"] | None = None,
+        catchall: Schema[Any, Any] | builtins.object | None = _UNSET,
+    ) -> ObjectSchema:
+        policy = self.unknown_keys if unknown_keys is None else unknown_keys
+        effective_catchall = (
+            self._catchall
+            if catchall is _UNSET
+            else cast(Schema[Any, Any] | None, catchall)
+        )
+        rebuilt = object(
+            shape,
+            unknown_keys=policy,
+            catchall=effective_catchall,
+        )
+        return replace(rebuilt, _meta=self._meta)
+
+    def _typed_rebuild(
+        self,
+        shape: Mapping[str, Schema[Any, Any]],
+        unknown_keys: UnknownKeys | Literal["catchall"] | None = None,
+        catchall: Schema[Any, Any] | builtins.object | None = _UNSET,
+    ) -> TypedObjectSchema[Shape]:
+        rebuilt = self._base_rebuild(shape, unknown_keys, catchall)
+        return TypedObjectSchema[Shape](
+            rebuilt._node,
+            rebuilt.shape,
+            rebuilt.unknown_keys,
+            rebuilt._catchall,
+            _meta=self._meta,
+        )
+
+    def strict(self) -> TypedObjectSchema[Shape]:
+        return self._typed_rebuild(self.shape, "strict", catchall=None)
+
+    def passthrough(self) -> TypedObjectSchema[Shape]:
+        return self._typed_rebuild(self.shape, "passthrough", catchall=None)
+
+    def strip(self) -> TypedObjectSchema[Shape]:
+        return self._typed_rebuild(self.shape, "strip", catchall=None)
+
+    def catchall(
+        self, schema: Schema[Any, Any],
+    ) -> TypedObjectSchema[Shape]:
+        if not isinstance(schema, Schema):
+            raise TypeError("Catchall must be a schema")
+        return self._typed_rebuild(self.shape, "catchall", catchall=schema)
+
+    def extend(self, shape: Mapping[str, Schema[Any, Any]]) -> ObjectSchema:
+        return self._base_rebuild({**self.shape, **shape})
+
+    def pick(self, *keys: str) -> ObjectSchema:
+        _check_keys(self.shape, keys)
+        return self._base_rebuild({key: self.shape[key] for key in keys})
+
+    def omit(self, *keys: str) -> ObjectSchema:
+        _check_keys(self.shape, keys)
+        return self._base_rebuild({
+            key: value for key, value in self.shape.items() if key not in keys
+        })
+
+    def partial(self, *keys: str) -> ObjectSchema:
+        if keys:
+            _check_keys(self.shape, keys)
+            selected = builtins.set(keys)
+            return self._base_rebuild({
+                key: value.optional() if key in selected else value
+                for key, value in self.shape.items()
+            })
+        return self._base_rebuild({
+            key: value.optional() for key, value in self.shape.items()
+        })
+
+    def required(self) -> ObjectSchema:
+        return self._base_rebuild({
+            key: value.nonoptional() for key, value in self.shape.items()
+        })
+
+    def keyof(self) -> Schema[str, str]:
+        keys = builtins.tuple(self.shape)
+        if not keys:
+            raise ValueError("Cannot take keyof of an object with no keys")
+        return enum(keys)
+
+
+@dataclass(frozen=True)
 class RecordSchema[Out, In = Out](Schema[dict[str, Out], dict[str, In]]):
     value_schema: Schema[Out, In]
 
@@ -1703,6 +1833,51 @@ def object(
         ),
     )
     return ObjectSchema(node, frozen, policy, catchall)
+
+
+def typed_object[Shape](
+    typ: type[Shape],
+    shape: Mapping[str, Schema[Any, Any]],
+    *,
+    unknown_keys: UnknownKeys | Literal["catchall"] = "strip",
+    catchall: Schema[Any, Any] | None = None,
+) -> TypedObjectSchema[Shape]:
+    """Build an object schema whose parsed result is statically typed."""
+    if not typing.is_typeddict(typ):
+        raise TypeError("typed_object requires a TypedDict class")
+    if not isinstance(shape, Mapping):
+        raise TypeError("Object shape must be a mapping")
+    keys = builtins.set(shape)
+    if not all(isinstance(key, str) for key in keys):
+        raise TypeError("Object shape keys must be strings")
+
+    required = frozenset(getattr(typ, "__required_keys__", ()))
+    optional = frozenset(getattr(typ, "__optional_keys__", ()))
+    missing = required - keys
+    if missing:
+        raise ValueError(
+            "Typed object shape is missing required keys: "
+            + ", ".join(sorted(missing))
+        )
+    unknown = keys - required - optional
+    if unknown:
+        raise ValueError(
+            "Typed object shape has undeclared keys: "
+            + ", ".join(sorted(unknown))
+        )
+
+    base = object(
+        shape,
+        unknown_keys=unknown_keys,
+        catchall=catchall,
+    )
+    return TypedObjectSchema[Shape](
+        base._node,
+        base.shape,
+        base.unknown_keys,
+        base._catchall,
+        _meta=base._meta,
+    )
 
 
 @overload

@@ -18,7 +18,7 @@ in declaration order, and the order affects results.
 | Numbers | `z.number()`, `z.integer()` |
 | Other values | `z.boolean()`, `z.none()`, `z.unknown()`, `z.date()`, `z.datetime()`, `z.time()`, `z.timedelta()`, `z.decimal()`, `z.bytes()`, `z.path()`, `z.json()`, `z.native_enum(EnumClass)`, `z.instance_of(cls)` |
 | Choices | `z.literal(value)`, `z.enum(values)`, `z.union(*schemas)`, `z.discriminated_union(key, options)` |
-| Objects | `z.object(shape)` |
+| Objects | `z.object(shape)`, `z.typed_object(TypedDictClass, shape)` |
 | Collections | `z.array(item)`, `z.set(item)`, `z.map(key_schema, value_schema)`, `z.tuple(*items)`, `z.record(value_schema)`, `z.record(key_schema, value_schema)` |
 | Composition | `z.intersection(left, right)`, `z.preprocess(fn, schema)`, `z.preprocess_async(fn, schema)`, `z.lazy(factory)` |
 | Codecs | `z.codec(input_schema, output_schema, *, decode=fn, encode=fn)`, `z.codec_async(...)` |
@@ -126,6 +126,7 @@ native record evaluator as `z.record(key_schema, value_schema)`.
 | `.catch(value_or_factory)` | Fall back on invalid or missing input |
 | `.catch_async(factory)` | Await a fallback factory on validation failure |
 | `.unwrap()` | Return the tracked inner schema |
+| `.brand(NewType)` | Apply a typing-only brand to parsed output |
 | `.refine(predicate, message, *, path=())` | Add a custom synchronous check |
 | `.refine_async(predicate, message, *, path=())` | Add a check awaiting an awaitable result |
 | `.super_refine_async(fn)` | Await returned issues, or `None`/empty for success |
@@ -252,12 +253,14 @@ to `Out`, so `Schema[T]` is valid when input and output types match.
 `In` is the encoded type.
 
 Type checkers cannot generally derive a new `TypedDict` from a dictionary of
-schema instances. Objects return `dict[str, Any]`. `z.tuple()` infers a
-fixed-length tuple type for up to four items; larger tuples and tuples with a
-rest schema return `tuple[Any, ...]`. Use `z.codecs.dataclass(Cls, fields=...)`
-or a transform to produce a statically typed dataclass result. Unions infer up to four
-alternatives; larger unions fall back to `Any`. There is no type-checker plugin
-or generated model API.
+schema instances. Plain objects return `dict[str, Any]`; use
+`z.typed_object(TypedDictClass, shape)` for a statically typed dictionary
+result. `z.tuple()` infers a fixed-length tuple type for up to four items; larger
+tuples and tuples with a rest schema return `tuple[Any, ...]`. Use
+`z.codecs.dataclass(Cls, fields=...)` or a transform to produce a statically
+typed dataclass result. Unions infer up to four alternatives; larger unions fall
+back to `Any`. `.brand(NewType)` changes only the static output type and is a
+runtime no-op. There is no type-checker plugin or generated model API.
 
 ## Related
 

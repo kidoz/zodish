@@ -9,9 +9,14 @@ from datetime import timedelta as TimeDelta
 from decimal import Decimal
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, assert_type
+from typing import Any, NewType, TypedDict, assert_type
 
 from zodish import Failure, Issue, Missing, Schema, Success, to_json_schema, z
+
+
+class TypedUser(TypedDict):
+    name: str
+    age: int
 
 
 assert_type(z.string().parse("x"), str)
@@ -35,6 +40,21 @@ assert_type(z.boolean().parse(True), bool)
 assert_type(z.string().array().parse(["x"]), list[str])
 assert_type(z.set(z.integer()).parse({1}), set[int])
 assert_type(z.map(z.string(), z.integer()).parse({"x": 1}), dict[str, int])
+typed_user = z.typed_object(TypedUser, {
+    "name": z.string(),
+    "age": z.integer(),
+})
+assert_type(typed_user, z.TypedObjectSchema[TypedUser])
+assert_type(typed_user.parse({"name": "Alex", "age": 30}), TypedUser)
+assert_type(
+    typed_user.safe_parse({"name": "Alex", "age": 30}),
+    Success[TypedUser] | Failure,
+)
+assert_type(typed_user.strict(), z.TypedObjectSchema[TypedUser])
+UserId = NewType("UserId", int)
+branded_id = z.integer().positive().brand(UserId)
+assert_type(branded_id, Schema[UserId, int])
+assert_type(branded_id.parse(1), UserId)
 assert_type(z.set(z.integer()), z.SetSchema[int, int])
 assert_type(z.map(z.string(), z.integer()), z.MapSchema[str, int, int])
 assert_type(z.record(z.integer()).parse({"x": 1}), dict[str, int])
@@ -117,6 +137,10 @@ async def _async_typing_checks() -> None:
     assert_type(await async_codec.safe_decode_async("1"), Success[int] | Failure)
     assert_type(await async_codec.encode_async(1), str)
     assert_type(await async_codec.safe_encode_async(1), Success[str] | Failure)
+    assert_type(
+        async_codec.brand(UserId),
+        z.AsyncCodecSchema[UserId, str],
+    )
     assert_type(
         async_codec.optional(),
         z.AsyncCodecSchema[int | Missing, str | Missing],

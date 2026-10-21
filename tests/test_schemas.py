@@ -7,7 +7,16 @@ import math
 import pathlib
 import re
 import unittest
-from typing import Annotated, Any, Literal, get_type_hints
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    NewType,
+    NotRequired,
+    Required,
+    TypedDict,
+    get_type_hints,
+)
 
 from zodish import (
     MISSING,
@@ -452,6 +461,90 @@ class SchemaTests(unittest.TestCase):
             z.set(z.integer()).encode({1})
         with self.assertRaises(TypeError):
             z.map(z.string(), z.integer()).encode({"a": 1})
+
+    def test_typed_object_and_brand(self):
+        class User(TypedDict):
+            name: str
+            age: int
+            nickname: NotRequired[str]
+
+        schema = z.typed_object(User, {
+            "name": z.string().min(1),
+            "age": z.integer().gte(0),
+        })
+        self.assertIsInstance(schema, z.TypedObjectSchema)
+        self.assertEqual(
+            schema.parse({"name": "Alex", "age": 30}),
+            {"name": "Alex", "age": 30},
+        )
+        self.assertEqual(
+            schema.safe_parse({"name": "", "age": 30}).error.issues[0].code,
+            "too_small",
+        )
+        self.assertEqual(
+            to_json_schema(schema),
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "minLength": 1},
+                    "age": {"type": "integer", "minimum": 0},
+                },
+                "required": ["name", "age"],
+                "additionalProperties": False,
+            },
+        )
+
+        strict = schema.strict()
+        self.assertIsInstance(strict, z.TypedObjectSchema)
+        self.assertIsInstance(
+            strict.safe_parse({"name": "Alex", "age": 30, "extra": 1}),
+            Failure,
+        )
+        self.assertIsInstance(schema.partial(), z.ObjectSchema)
+        self.assertEqual(schema.required().parse({"name": "Alex", "age": 30}), {
+            "name": "Alex", "age": 30,
+        })
+
+        class Partial(TypedDict, total=False):
+            name: str
+
+        self.assertEqual(z.typed_object(Partial, {}).parse({}), {})
+
+        class Mixed(TypedDict, total=False):
+            id: Required[int]
+            name: str
+
+        mixed = z.typed_object(Mixed, {"id": z.integer()})
+        self.assertEqual(mixed.parse({"id": 1}), {"id": 1})
+
+        with self.assertRaises(TypeError):
+            z.typed_object(dict, {})
+        with self.assertRaises(ValueError):
+            z.typed_object(User, {"name": z.string()})
+        with self.assertRaises(ValueError):
+            z.typed_object(User, {
+                "name": z.string(),
+                "age": z.integer(),
+                "extra": z.string(),
+            })
+        with self.assertRaises(TypeError):
+            z.typed_object(User, {"name": "bad", "age": z.integer()})
+
+        UserId = NewType("UserId", int)
+        base = z.integer().positive()
+        branded = base.brand(UserId)
+        self.assertEqual(branded.parse(3), 3)
+        self.assertIsInstance(branded.safe_parse(0), Failure)
+        self.assertIs(branded.unwrap(), base)
+        with self.assertRaises(TypeError):
+            z.integer().brand("bad")
+        with self.assertRaises(TypeError):
+            z.integer().brand(lambda value: value)
+
+        codec = z.codec(z.string(), z.integer(), decode=int, encode=str)
+        branded_codec = codec.brand(UserId)
+        self.assertEqual(branded_codec.decode("3"), 3)
+        self.assertEqual(branded_codec.encode(3), "3")
 
     def test_string_predicates(self):
         schema = z.string().starts_with("ab").ends_with("yz").includes("cd")

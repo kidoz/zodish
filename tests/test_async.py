@@ -6,6 +6,7 @@ import threading
 import unittest
 import weakref
 from dataclasses import dataclass
+from typing import NewType
 
 from zodish import MISSING, Failure, Issue, Success, ValidationError, z
 from zodish._native import AsyncSession
@@ -2173,6 +2174,21 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
                 timeout=0.01,
             )
         await asyncio.wait_for(timeout_cleaned.wait(), timeout=1)
+
+    async def test_async_codec_brand(self):
+        UserId = NewType("UserId", int)
+
+        async def decode(value):
+            return int(value)
+
+        async def encode(value):
+            return str(value)
+
+        codec = z.codec_async(
+            z.string(), z.integer(), decode=decode, encode=encode,
+        ).brand(UserId)
+        self.assertEqual(await codec.decode_async("3"), 3)
+        self.assertEqual(await codec.encode_async(3), "3")
 
     async def test_async_codec_cancellation_cleans_decode(self):
         started = asyncio.Event()
