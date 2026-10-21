@@ -45,7 +45,7 @@ published, or when the workflow is dispatched manually.
 
 1. Sync the `pyproject.toml` and `Cargo.toml` versions and update `CHANGELOG.md`.
 2. Create and publish a GitHub release whose tag matches the version, for
-   example `v0.5.0`.
+   example `v0.5.1`.
 3. The workflow verifies the manifest versions and release tag, builds the
    sdist, builds abi3 wheels for glibc and musllinux Linux (x86_64 and aarch64),
    macOS (x86_64 and arm64), and Windows x64, verifies every artifact, and
