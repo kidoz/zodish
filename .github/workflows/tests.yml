@@ -38,6 +38,25 @@ jobs:
           python benchmarks/bench_compare.py --library pydantic
           --scenario object_success --processes 1 --values 1
           --warmups 1 --min-time 0.001
+  free-threaded:
+    name: free-threaded (${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.14t', '3.15t']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: dtolnay/rust-toolchain@stable
+      - run: python -m pip install .
+      - run: python examples/verify_native.py
+      - run: python -m unittest discover -s tests -v
+      - run: python examples/quickstart.py
+      - run: python benchmarks/bench_parse.py --smoke
+      - run: python benchmarks/bench_async.py --smoke
   package:
     name: package (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
