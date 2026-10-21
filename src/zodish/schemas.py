@@ -1548,6 +1548,61 @@ class SetSchema[Out, In = Out](
     def unwrap(self) -> Schema[Out, In]:
         return self.item
 
+    def min(self, length: int, *, message: str | None = None) -> Self:
+        _length_bound(length)
+        return self._wrap(
+            "length_min",
+            length,
+            _message(
+                message,
+                f"Must contain at least {_bound_text(length)} items",
+            ),
+        )
+
+    def max(self, length: int, *, message: str | None = None) -> Self:
+        _length_bound(length)
+        return self._wrap(
+            "length_max",
+            length,
+            _message(
+                message,
+                f"Must contain at most {_bound_text(length)} items",
+            ),
+        )
+
+    def length(self, length: int, *, message: str | None = None) -> Self:
+        _length_bound(length)
+        return self.min(length, message=message).max(length, message=message)
+
+
+@dataclass(frozen=True)
+class BytesSchema(Schema[builtins.bytes, builtins.bytes]):
+    def min(self, length: int, *, message: str | None = None) -> Self:
+        _length_bound(length)
+        return self._wrap(
+            "length_min",
+            length,
+            _message(
+                message,
+                f"Must contain at least {_bound_text(length)} bytes",
+            ),
+        )
+
+    def max(self, length: int, *, message: str | None = None) -> Self:
+        _length_bound(length)
+        return self._wrap(
+            "length_max",
+            length,
+            _message(
+                message,
+                f"Must contain at most {_bound_text(length)} bytes",
+            ),
+        )
+
+    def length(self, length: int, *, message: str | None = None) -> Self:
+        _length_bound(length)
+        return self.min(length, message=message).max(length, message=message)
+
 
 def _bound_text(value: int | float) -> str:
     try:
@@ -1659,8 +1714,8 @@ def decimal() -> Schema[_decimal.Decimal, _decimal.Decimal]:
     )
 
 
-def bytes() -> Schema[builtins.bytes, builtins.bytes]:
-    return Schema[builtins.bytes, builtins.bytes](
+def bytes() -> BytesSchema:
+    return BytesSchema(
         NativeSchema("exact_instance", (), (builtins.bytes,)),
     )
 

@@ -171,6 +171,18 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
             codec_result.error.issues[0].message, "translated:invalid_format",
         )
 
+    async def test_set_and_bytes_lengths(self):
+        set_result = await z.set(z.integer()).min(2).safe_parse_async({1})
+        self.assertIsInstance(set_result, Failure)
+        self.assertEqual(set_result.error.issues[0].params, {
+            "minimum": 2, "inclusive": True, "origin": "set",
+        })
+        bytes_result = await z.bytes().max(1).safe_parse_async(b"ab")
+        self.assertIsInstance(bytes_result, Failure)
+        self.assertEqual(bytes_result.error.issues[0].params, {
+            "maximum": 1, "inclusive": True, "origin": "bytes",
+        })
+
     async def test_sync_schema_through_async_parser(self):
         schema = z.object({"value": z.integer().positive()})
         self.assertEqual(await schema.parse_async({"value": 1}), {"value": 1})

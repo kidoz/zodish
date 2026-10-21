@@ -462,6 +462,44 @@ class SchemaTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             z.map(z.string(), z.integer()).encode({"a": 1})
 
+    def test_set_and_bytes_lengths(self):
+        values = z.set(z.integer()).min(2).max(3)
+        self.assertEqual(values.parse({1, 2}), {1, 2})
+        too_small = values.safe_parse({1})
+        self.assertIsInstance(too_small, Failure)
+        self.assertEqual(too_small.error.issues[0].code, "too_small")
+        self.assertEqual(too_small.error.issues[0].params, {
+            "minimum": 2, "inclusive": True, "origin": "set",
+        })
+        too_big = values.safe_parse({1, 2, 3, 4})
+        self.assertIsInstance(too_big, Failure)
+        self.assertEqual(too_big.error.issues[0].code, "too_big")
+        self.assertEqual(too_big.error.issues[0].params, {
+            "maximum": 3, "inclusive": True, "origin": "set",
+        })
+        self.assertEqual(z.set(z.string()).length(2).parse({"a", "b"}), {"a", "b"})
+        self.assertIsInstance(z.set(z.string()).length(2).safe_parse({"a"}), Failure)
+        with self.assertRaises(ValueError):
+            z.set(z.integer()).min(-1)
+
+        data = z.bytes().min(2).max(3)
+        self.assertEqual(data.parse(b"ab"), b"ab")
+        too_small = data.safe_parse(b"a")
+        self.assertIsInstance(too_small, Failure)
+        self.assertEqual(too_small.error.issues[0].params, {
+            "minimum": 2, "inclusive": True, "origin": "bytes",
+        })
+        too_big = data.safe_parse(b"abcd")
+        self.assertIsInstance(too_big, Failure)
+        self.assertEqual(too_big.error.issues[0].params, {
+            "maximum": 3, "inclusive": True, "origin": "bytes",
+        })
+        exact = z.bytes().length(2)
+        self.assertEqual(exact.parse(b"ab"), b"ab")
+        self.assertEqual(exact.encode(b"ab"), b"ab")
+        with self.assertRaises(ValueError):
+            z.bytes().length(1.5)  # type: ignore[arg-type]
+
     def test_typed_object_and_brand(self):
         class User(TypedDict):
             name: str

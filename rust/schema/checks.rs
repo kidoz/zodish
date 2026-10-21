@@ -4,7 +4,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyInt, PyString, PyTuple};
+use pyo3::types::{PyBytes, PyDict, PyInt, PySet, PyString, PyTuple};
 
 use super::{Kind, NativeSchema};
 use crate::errors::{ErrorTemplate, Path, Result};
@@ -104,14 +104,7 @@ impl NativeSchema {
                 let params = PyDict::new(py);
                 params.set_item("minimum", safe_param(py, self.args[0].bind(py))?)?;
                 params.set_item("inclusive", true)?;
-                params.set_item(
-                    "origin",
-                    if parsed.is_instance_of::<PyString>() {
-                        "string"
-                    } else {
-                        "array"
-                    },
-                )?;
+                params.set_item("origin", length_origin(parsed))?;
                 (
                     "too_small",
                     self.args[1].bind(py).extract::<String>()?,
@@ -122,14 +115,7 @@ impl NativeSchema {
                 let params = PyDict::new(py);
                 params.set_item("maximum", safe_param(py, self.args[0].bind(py))?)?;
                 params.set_item("inclusive", true)?;
-                params.set_item(
-                    "origin",
-                    if parsed.is_instance_of::<PyString>() {
-                        "string"
-                    } else {
-                        "array"
-                    },
-                )?;
+                params.set_item("origin", length_origin(parsed))?;
                 (
                     "too_big",
                     self.args[1].bind(py).extract::<String>()?,
@@ -277,6 +263,18 @@ impl NativeSchema {
             _ => unreachable!(),
         };
         ctx.fail_with(code, &message, path, params)
+    }
+}
+
+fn length_origin(parsed: &Bound<'_, PyAny>) -> &'static str {
+    if parsed.is_instance_of::<PyString>() {
+        "string"
+    } else if parsed.is_instance_of::<PySet>() {
+        "set"
+    } else if parsed.is_instance_of::<PyBytes>() {
+        "bytes"
+    } else {
+        "array"
     }
 }
 

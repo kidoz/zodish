@@ -80,8 +80,8 @@ them exactly.
 
 | Method | Applies to | Purpose |
 | --- | --- | --- |
-| `.min(n)`, `.max(n)` | Arrays | Item-count bounds |
-| `.length(n)` | Arrays | Exact item count |
+| `.min(n)`, `.max(n)` | Arrays, sets, `z.bytes()` | Item-count, cardinality, or byte-count bounds |
+| `.length(n)` | Arrays, sets, `z.bytes()` | Exact count |
 | `.nonempty()` | Arrays | At least one item |
 | `.rest(schema)` | Tuples | Trailing rest schema |
 | `.array()` | Any schema | Shorthand for `z.array(schema)` |
