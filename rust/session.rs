@@ -4,12 +4,13 @@
 //! reuse the schema evaluator and shared checks. Container continuations live
 //! in `containers`, union/intersection continuations in `composition`; frame
 //! storage and Python lifecycle methods stay here. Callback resumption and
-//! awaitability checks live in `callbacks`.
+//! awaitability checks live in `callbacks`; frame GC traversal lives in `gc`.
 
 mod callbacks;
 mod composition;
 mod containers;
 mod dispatch;
+mod gc;
 
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
@@ -19,9 +20,11 @@ use pyo3::exceptions::{PyException, PyRuntimeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTraceback};
 
-use crate::errors::{Error, Issue, Path, Result, visit_issue};
+use crate::errors::{Error, Issue, Path, Result};
 use crate::runtime::{Context, LazyHandle, LazyState};
 use crate::schema::NativeSchema;
+
+use gc::visit_async_frame;
 
 static ASYNC_TOKEN_COUNTER: AtomicU64 = AtomicU64::new(1);
 
@@ -540,149 +543,4 @@ fn clone_path(py: Python<'_>, path: &Path) -> Path {
 
 fn deliver_at(outcome: Result<Py<PyAny>>, path: Path) -> AsyncNext {
     AsyncNext::Task(AsyncTask::Deliver { outcome, path })
-}
-
-fn visit_async_frame(
-    frame: &AsyncFrame,
-    visit: &PyVisit<'_>,
-) -> std::result::Result<(), PyTraverseError> {
-    match frame {
-        AsyncFrame::AsyncCallback(frame) => {
-            visit.call(&frame.node)?;
-            for part in &frame.path {
-                part.visit(visit)?;
-            }
-        }
-        AsyncFrame::Catch(frame) => {
-            visit.call(&frame.node)?;
-            visit.call(&frame.fallback)?;
-            for part in &frame.path {
-                part.visit(visit)?;
-            }
-        }
-        AsyncFrame::Refine(frame) => {
-            visit.call(&frame.node)?;
-            for part in &frame.path {
-                part.visit(visit)?;
-            }
-        }
-        AsyncFrame::SuperRefine(frame) => {
-            visit.call(&frame.node)?;
-            for part in &frame.path {
-                part.visit(visit)?;
-            }
-        }
-        AsyncFrame::PostChild(frame) => {
-            visit.call(&frame.node)?;
-            for part in &frame.path {
-                part.visit(visit)?;
-            }
-        }
-        AsyncFrame::StringBool(frame) => {
-            visit.call(&frame.node)?;
-            for part in &frame.path {
-                part.visit(visit)?;
-            }
-        }
-        AsyncFrame::Pipe(frame) => {
-            visit.call(&frame.node)?;
-            for part in &frame.path {
-                part.visit(visit)?;
-            }
-        }
-        AsyncFrame::Array(frame) => {
-            visit.call(&frame.node)?;
-            for part in &frame.path {
-                part.visit(visit)?;
-            }
-            for item in &frame.items {
-                visit.call(item)?;
-            }
-            for item in &frame.result {
-                visit.call(item)?;
-            }
-            for issue in &frame.issues {
-                visit_issue(issue, visit)?;
-            }
-            if let Some(rest) = &frame.rest {
-                visit.call(rest)?;
-            }
-        }
-        AsyncFrame::Object(frame) => {
-            visit.call(&frame.node)?;
-            for part in &frame.path {
-                part.visit(visit)?;
-            }
-            for key in &frame.keys {
-                visit.call(key)?;
-            }
-            for value in frame.values.iter().flatten() {
-                visit.call(value)?;
-            }
-            visit.call(&frame.result)?;
-            for issue in &frame.issues {
-                visit_issue(issue, visit)?;
-            }
-            for (key, value) in &frame.extras {
-                visit.call(key)?;
-                visit.call(value)?;
-            }
-        }
-        AsyncFrame::Record(frame) => {
-            visit.call(&frame.node)?;
-            for part in &frame.path {
-                part.visit(visit)?;
-            }
-            for (key, value) in &frame.entries {
-                visit.call(key)?;
-                visit.call(value)?;
-            }
-            if let Some(key) = &frame.parsed_key {
-                visit.call(key)?;
-            }
-            visit.call(&frame.result)?;
-            for issue in &frame.issues {
-                visit_issue(issue, visit)?;
-            }
-            if let Some(key) = &frame.key_node {
-                visit.call(key)?;
-            }
-        }
-        AsyncFrame::Union(frame) => {
-            visit.call(&frame.node)?;
-            visit.call(&frame.value)?;
-            for part in &frame.path {
-                part.visit(visit)?;
-            }
-            for branch in &frame.branches {
-                for issue in branch {
-                    visit_issue(issue, visit)?;
-                }
-            }
-        }
-        AsyncFrame::Intersection(frame) => {
-            visit.call(&frame.node)?;
-            visit.call(&frame.value)?;
-            for part in &frame.path {
-                part.visit(visit)?;
-            }
-            if let Some(outcome) = &frame.left {
-                match outcome {
-                    StoredOutcome::Value(value) => visit.call(value)?,
-                    StoredOutcome::Invalid(issues) => {
-                        for issue in issues {
-                            visit_issue(issue, visit)?;
-                        }
-                    }
-                    StoredOutcome::Python(error) => {
-                        visit.call(&error.value)?;
-                        if let Some(traceback) = &error.traceback {
-                            visit.call(traceback)?;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    Ok(())
 }
