@@ -22,6 +22,13 @@ impl NativeSchema {
         path: &Path,
     ) -> Result<Py<PyAny>> {
         let py = ctx.py;
+        if matches!(self.kind, Kind::RequiredOutput) {
+            return if parsed.is(&ctx.missing) {
+                ctx.fail("required", "Required", path)
+            } else {
+                Ok(parsed.clone().unbind())
+            };
+        }
         let valid = match self.kind {
             Kind::Transform | Kind::Overwrite => {
                 return Ok(self.args[0].bind(py).call1((parsed,))?.unbind());

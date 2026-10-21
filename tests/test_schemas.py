@@ -546,6 +546,151 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(branded_codec.decode("3"), 3)
         self.assertEqual(branded_codec.encode(3), "3")
 
+    def test_typed_object_required_output(self):
+        class User(TypedDict, total=False):
+            age: Required[int]
+            nickname: str
+
+        field = z.integer().optional()
+        schema = z.typed_object(User, {
+            "age": field, "nickname": z.string().optional(),
+        }).describe("User")
+        for value in ({}, {"age": MISSING}):
+            failure = schema.safe_parse(value)
+            self.assertIsInstance(failure, Failure)
+            self.assertEqual(
+                [(issue.code, issue.path) for issue in failure.error.issues],
+                [("required", ("age",))],
+            )
+        self.assertEqual(schema.parse({"age": 1}), {"age": 1})
+        self.assertEqual(schema.parse({"age": 1, "nickname": "x"}), {
+            "age": 1, "nickname": "x",
+        })
+        self.assertIsInstance(schema.safe_parse({"age": None}), Failure)
+        self.assertIs(field.parse(), MISSING)
+        self.assertEqual(z.object({"age": field}).parse({}), {})
+        self.assertEqual(schema.partial().parse({}), {})
+        self.assertEqual(schema.extend({"age": field}).parse({}), {})
+        for rebuilt in (
+            schema.strict(), schema.strip(), schema.passthrough(), schema.catchall(z.integer()),
+        ):
+            with self.subTest(policy=rebuilt.unknown_keys):
+                self.assertIsInstance(rebuilt, z.TypedObjectSchema)
+                self.assertEqual(rebuilt.metadata, {"description": "User"})
+                self.assertIsInstance(rebuilt.safe_parse({}), Failure)
+                self.assertEqual(rebuilt.parse({"age": 1}), {"age": 1})
+
+        defaults = z.typed_object(User, {"age": z.integer().default(7)})
+        self.assertEqual(defaults.parse({}), {"age": 7})
+        self.assertEqual(defaults.strict().parse({}), {"age": 7})
+        factory_calls = []
+        factory = z.typed_object(User, {
+            "age": z.integer().default_factory(lambda: factory_calls.append(1) or 8),
+        })
+        self.assertEqual(factory.parse({}), {"age": 8})
+        self.assertEqual(factory_calls, [1])
+        self.assertEqual(factory.parse({"age": 9}), {"age": 9})
+        self.assertEqual(factory_calls, [1])
+        self.assertEqual(
+            z.typed_object(User, {"age": z.integer().nullable()}).parse({"age": None}),
+            {"age": None},
+        )
+        transformed = z.typed_object(User, {
+            "age": z.integer().transform(lambda _: MISSING),
+        })
+        self.assertIsInstance(transformed.safe_parse({"age": 1}), Failure)
+        nested = z.object({"user": schema, "label": z.string()})
+        failure = nested.safe_parse({"user": {}, "label": 1})
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in failure.error.issues],
+            [("required", ("user", "age")), ("invalid_type", ("label",))],
+        )
+        json.dumps(failure.error.to_dict())
+        for data in ('{}', '{"age": 1}', '{"age": null}'):
+            parsed_json = schema.safe_parse_json(data)
+            parsed_python = schema.safe_parse(json.loads(data))
+            if isinstance(parsed_python, Failure):
+                self.assertEqual(parsed_json.error.to_dict(), parsed_python.error.to_dict())
+            else:
+                self.assertEqual(parsed_json.data, parsed_python.data)
+
+    def test_typed_object_postponed_key_qualifiers(self):
+        namespace = {"__name__": __name__}
+        exec(
+            "from __future__ import annotations\n"
+            "from typing import Annotated, NotRequired, Required, TypedDict\n"
+            "class Mixed(TypedDict, total=False):\n"
+            "    age: Required[int]\n"
+            "    nullable: Annotated[Required[int | None], 'metadata']\n"
+            "    nickname: NotRequired[str]\n"
+            "    unresolved: MissingValueType\n"
+            "class Total(TypedDict):\n"
+            "    age: int\n"
+            "    nickname: NotRequired[str]\n",
+            namespace,
+        )
+        schema = z.typed_object(namespace["Mixed"], {
+            "age": z.integer().optional(),
+            "nullable": z.integer().nullable().optional(),
+        })
+        failure = schema.safe_parse({})
+        self.assertEqual([issue.path for issue in failure.error.issues], [
+            ("age",), ("nullable",),
+        ])
+        self.assertEqual(schema.parse({"age": 1, "nullable": None}), {
+            "age": 1, "nullable": None,
+        })
+        self.assertEqual(
+            z.typed_object(namespace["Total"], {"age": z.integer()}).parse({"age": 1}),
+            {"age": 1},
+        )
+        with self.assertRaisesRegex(ValueError, "missing required keys"):
+            z.typed_object(namespace["Mixed"], {"nullable": z.integer().nullable()})
+
+    def test_typed_object_required_output_json_schema(self):
+        class Count(TypedDict):
+            value: int
+
+        cases = (
+            (z.integer().optional(), False),
+            (z.integer().optional().nullable(), False),
+            (z.integer().default(1), True),
+            (z.integer().optional().default(1), True),
+            (z.integer().default(1).optional(), False),
+            (z.union(z.integer().optional(), z.integer().default(1)), False),
+            (z.union(z.integer().default(1), z.integer().optional()), True),
+        )
+        for field, accepts_missing in cases:
+            with self.subTest(field=field):
+                schema = z.typed_object(Count, {"value": field})
+                result = schema.safe_parse({})
+                if accepts_missing:
+                    self.assertEqual(result.data, {"value": 1})
+                else:
+                    self.assertIsInstance(result, Failure)
+                for target in ("draft-2020-12", "openapi-3.0"):
+                    output = schema.to_json_schema(io="output", target=target)
+                    self.assertEqual(output["required"], ["value"])
+                    input_schema = schema.to_json_schema(io="input", target=target)
+                    self.assertEqual(
+                        input_schema.get("required", []),
+                        [] if accepts_missing else ["value"],
+                    )
+        field = z.integer().min(0).default(5).describe("Count")
+        schema = z.typed_object(Count, {"value": field})
+        self.assertEqual(schema.to_json_schema()["properties"]["value"], {
+            "type": "integer", "minimum": 0, "default": 5, "description": "Count",
+        })
+        codec = z.codec(z.string(), z.integer().min(0), decode=int, encode=str)
+        schema = z.typed_object(Count, {"value": codec})
+        self.assertEqual(schema.parse({"value": "2"}), {"value": 2})
+        self.assertEqual(schema.to_json_schema(io="input")["properties"]["value"], {
+            "type": "string",
+        })
+        self.assertEqual(schema.to_json_schema(io="output")["properties"]["value"], {
+            "type": "integer", "minimum": 0,
+        })
+
     def test_string_predicates(self):
         schema = z.string().starts_with("ab").ends_with("yz").includes("cd")
         self.assertEqual(schema.parse("abcdyz"), "abcdyz")

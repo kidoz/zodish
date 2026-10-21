@@ -1842,6 +1842,8 @@ def typed_object[Shape](
     catchall: Schema[Any, Any] | None = None,
 ) -> TypedObjectSchema[Shape]:
     """Build an object schema whose parsed result is statically typed."""
+    from ._annotations import typed_dict_keys
+
     if not typing.is_typeddict(typ):
         raise TypeError("typed_object requires a TypedDict class")
     if not isinstance(shape, Mapping):
@@ -1850,8 +1852,7 @@ def typed_object[Shape](
     if not all(isinstance(key, str) for key in keys):
         raise TypeError("Object shape keys must be strings")
 
-    required = frozenset(getattr(typ, "__required_keys__", ()))
-    optional = frozenset(getattr(typ, "__optional_keys__", ()))
+    required, optional = typed_dict_keys(typ)
     missing = required - keys
     if missing:
         raise ValueError(
@@ -1865,11 +1866,21 @@ def typed_object[Shape](
             + ", ".join(sorted(unknown))
         )
 
+    # Validate the configuration before wrapping required fields. The guard
+    # checks results, so defaults run before missing output is rejected.
     base = object(
         shape,
         unknown_keys=unknown_keys,
         catchall=catchall,
     )
+    guarded_shape = {
+        key: Schema[Any, Any](
+            NativeSchema("required_output", (schema._node,), ()),
+            _inner=schema, _meta=schema._meta,
+        ) if key in required else schema
+        for key, schema in base.shape.items()
+    }
+    base = base._rebuild(guarded_shape)
     return TypedObjectSchema[Shape](
         base._node,
         base.shape,
@@ -2946,7 +2957,7 @@ def _encode_node_for(schema: Schema[Any, Any]) -> NativeSchema | None:
 
     node = schema._node
     kind = node.kind
-    if kind in ("optional", "nullable", "nonoptional"):
+    if kind in ("optional", "nullable", "nonoptional", "required_output"):
         if schema._inner is None:
             return None
         wrapped_node = _encode_node_for(schema._inner)
@@ -3001,6 +3012,8 @@ def _node_accepts_missing(node: NativeSchema, io: JSONSchemaIO) -> bool:
         return True
     if kind == "nonoptional":
         return False
+    if kind == "required_output":
+        return io == "input" and _node_missing_output(node.children[0]) is True
     if kind in ("catch", "async_catch"):
         if _node_accepts_missing(node.children[0], io):
             return True
@@ -3018,6 +3031,42 @@ def _node_accepts_missing(node: NativeSchema, io: JSONSchemaIO) -> bool:
     ):
         return _node_accepts_missing(node.children[0], io)
     return False
+
+
+def _node_missing_output(node: NativeSchema) -> bool | None:
+    """Classify missing input for export: present, omitted, or rejected.
+
+    This inspects schema structure only; callbacks and factories are never run.
+    Unsupported callback nodes retain the exporter's existing approximation.
+    """
+    kind = node.kind
+    if kind == "optional":
+        return False
+    if kind == "nonoptional":
+        return None
+    if kind in ("default", "default_factory", "async_default_factory"):
+        return True
+    if kind == "union":
+        for child in node.children:
+            result = _node_missing_output(child)
+            if result is not None:
+                return result
+        return None
+    if kind in ("catch", "async_catch"):
+        result = _node_missing_output(node.children[0])
+        return True if result is None else result
+    if kind == "required_output":
+        return True if _node_missing_output(node.children[0]) is True else None
+    if kind == "pipe":
+        result = _node_missing_output(node.children[0])
+        return _node_missing_output(node.children[1]) if result is False else result
+    if kind in _CONSTRAINT_KINDS or kind in (
+        "nullable", "coerce", "string_bool", "refine", "super_refine",
+        "transform", "overwrite", "async_refine", "async_super_refine",
+        "async_transform", "async_overwrite",
+    ):
+        return _node_missing_output(node.children[0])
+    return None
 
 
 def _schema_accepts_missing(schema: Schema[Any, Any], io: JSONSchemaIO) -> bool:
@@ -3053,7 +3102,7 @@ def _node_outputs_string(node: NativeSchema) -> bool:
         return _node_outputs_string(node.children[0])
     if kind == "union":
         return all(_node_outputs_string(child) for child in node.children)
-    if kind in ("optional", "nonoptional", "default", "default_factory"):
+    if kind in ("optional", "nonoptional", "required_output", "default", "default_factory"):
         return _node_outputs_string(node.children[0])
     return False
 
@@ -3066,7 +3115,9 @@ def _node_outputs_dict(node: NativeSchema) -> bool:
         return all(_node_outputs_dict(child) for child in node.children)
     if kind == "union":
         return all(_node_outputs_dict(child) for child in node.children)
-    if kind in ("optional", "nonoptional", "default", "default_factory", "coerce"):
+    if kind in (
+        "optional", "nonoptional", "required_output", "default", "default_factory", "coerce",
+    ):
         return _node_outputs_dict(node.children[0])
     return False
 
@@ -3147,7 +3198,7 @@ def _export_node(
         )
     node = schema._node
     if node.kind in (
-        "optional", "nonoptional", "nullable", "default", "default_factory",
+        "optional", "nonoptional", "required_output", "nullable", "default", "default_factory",
     ):
         return _export_wrapper(
             schema, node, path, target, io, unrepresentable, relax_strip,
@@ -3181,7 +3232,7 @@ def _export_wrapper(
 ) -> JSONSchema:
     kind = node.kind
     child = _inner_schema(schema, node)
-    if kind == "optional":
+    if kind in ("optional", "required_output"):
         return _export_schema(
             child, path, target, io, unrepresentable, relax_strip,
         )
@@ -3426,7 +3477,7 @@ def _export_object(
     unrepresentable: UnrepresentablePolicy,
     relax_strip: bool,
 ) -> JSONSchema:
-    if isinstance(schema, ObjectSchema):
+    if isinstance(schema, (ObjectSchema, TypedObjectSchema)):
         shape = schema.shape
         policy = schema.unknown_keys
         catchall = schema._catchall

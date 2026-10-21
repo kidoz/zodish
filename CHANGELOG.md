@@ -28,6 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was previously ignored. Multiple schema entries raise `TypeError`; unrelated
   annotation metadata remains ignored.
 
+### Fixed
+
+- Typed objects now reject required `TypedDict` fields that resolve to
+  `MISSING`, including optional schemas and transforms. Defaults run before
+  the native output check, optional keys retain their schema behavior, and
+  sync/async validation reports aggregated `required` issues at field paths.
+- Typed object key qualifiers are resolved with postponed annotations, and
+  JSON Schema export preserves field metadata and codecs while marking
+  required output keys and allowing defaulted input keys to be omitted.
+
 ## [0.6.0] - 2026-10-21
 
 ### Added

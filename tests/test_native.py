@@ -12,6 +12,27 @@ from zodish import MISSING, Failure, Issue, ValidationError, _native, z
 
 
 class NativeTests(unittest.TestCase):
+    def test_required_output_native_guard(self):
+        def omit(_):
+            calls.append("omit")
+            return MISSING
+
+        calls = []
+        field = z.integer().transform(omit)
+        node = _native.NativeSchema("required_output", (field._node,), ())
+        with self.assertRaises(ValidationError) as raised:
+            node.parse(1, MISSING, Issue, ValidationError)
+        self.assertEqual(calls, ["omit"])
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in raised.exception.issues],
+            [("required", ())],
+        )
+        node = _native.NativeSchema("required_output", (z.integer().default(3)._node,), ())
+        self.assertEqual(node.parse(MISSING, MISSING, Issue, ValidationError), 3)
+        for children, args in (((), ()), ((field._node,), (1,)), ((field._node,) * 2, ())):
+            with self.subTest(children=children, args=args), self.assertRaises(ValueError):
+                _native.NativeSchema("required_output", children, args)
+
     def test_native_issue_bundle_survives_gc_and_formats(self):
         failure = z.object({
             "name": z.string().min(2),

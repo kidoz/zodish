@@ -121,7 +121,7 @@ impl NativeSchema {
                     self.child_json_fast(py, value, depth)
                 }
             }
-            Kind::NonOptional => self.child_json_fast(py, value, depth),
+            Kind::NonOptional | Kind::RequiredOutput => self.child_json_fast(py, value, depth),
             Kind::LengthMin | Kind::LengthMax => {
                 let Ok(bound) = self.args[0].bind(py).extract::<usize>() else {
                     return Ok(None);

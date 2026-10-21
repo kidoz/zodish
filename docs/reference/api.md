@@ -274,6 +274,13 @@ typed dataclass result. Unions infer up to four alternatives; larger unions fall
 back to `Any`. `.brand(NewType)` changes only the static output type and is a
 runtime no-op. There is no type-checker plugin or generated model API.
 
+Typed objects check required key presence after field validation, including
+async callbacks. A required field returning `MISSING` produces a `required`
+issue at its field path; defaults and factories may supply missing input.
+`None` and optional keys follow their field schemas. Policy methods preserve
+these checks. JSON Schema requires those keys in output and permits defaulted
+input keys to be omitted. Field schemas must produce the declared value types.
+
 ## Related
 
 - [Errors reference](errors.md)

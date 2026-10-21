@@ -9,7 +9,7 @@ from datetime import timedelta as TimeDelta
 from decimal import Decimal
 from enum import Enum
 from pathlib import PurePath
-from typing import Annotated, Any, NewType, TypedDict, assert_type
+from typing import Annotated, Any, NewType, NotRequired, TypedDict, assert_type
 
 from zodish import Failure, Issue, Missing, Schema, Success, to_json_schema, z
 
@@ -17,6 +17,20 @@ from zodish import Failure, Issue, Missing, Schema, Success, to_json_schema, z
 class TypedUser(TypedDict):
     name: str
     age: int
+
+
+class RequiredKeyUser(TypedDict):
+    age: int
+    nickname: NotRequired[str]
+
+
+required_key_user = z.typed_object(RequiredKeyUser, {
+    "age": z.integer().optional(),
+    "nickname": z.string().optional(),
+})
+assert_type(required_key_user.parse({"age": 1}), RequiredKeyUser)
+assert_type(required_key_user.strict(), z.TypedObjectSchema[RequiredKeyUser])
+assert_type(required_key_user.safe_parse({"age": 1}), Success[RequiredKeyUser] | Failure)
 
 
 assert_type(z.string().parse("x"), str)

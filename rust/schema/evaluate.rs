@@ -202,6 +202,7 @@ impl NativeSchema {
                 Err(Error::Invalid(issues))
             }
             Kind::Transform
+            | Kind::RequiredOutput
             | Kind::Overwrite
             | Kind::LengthMin
             | Kind::LengthMax

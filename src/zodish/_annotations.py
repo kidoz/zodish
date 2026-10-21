@@ -6,6 +6,7 @@ The dataclass codec imports this module on demand after schema builders exist.
 
 from __future__ import annotations
 
+import annotationlib
 import builtins
 import dataclasses
 import datetime as _datetime
@@ -34,6 +35,31 @@ def dataclass_type_hints(cls: type[Any]) -> dict[str, Any]:
         return typing.get_type_hints(cls, include_extras=True)
     except (NameError, TypeError) as error:
         raise TypeError("Cannot resolve dataclass annotations") from error
+
+
+def typed_dict_keys(typ: type[Any]) -> builtins.tuple[frozenset[str], frozenset[str]]:
+    """Correct key qualifiers that TypedDict metadata can miss when postponed."""
+    required = builtins.set(getattr(typ, "__required_keys__", ()))
+    optional = builtins.set(getattr(typ, "__optional_keys__", ()))
+    annotations = annotationlib.get_annotations(typ, format=annotationlib.Format.FORWARDREF)
+    for name, raw_annotation in annotations.items():
+        annotation: Any = raw_annotation
+        if isinstance(annotation, str):
+            annotation = typing.ForwardRef(annotation)
+        if isinstance(annotation, typing.ForwardRef):
+            annotation = typing.evaluate_forward_ref(
+                annotation, owner=typ, format=annotationlib.Format.FORWARDREF,
+            )
+        while typing.get_origin(annotation) in (typing.Annotated, typing.ReadOnly):
+            annotation = typing.get_args(annotation)[0]
+        origin = typing.get_origin(annotation)
+        if origin is typing.Required:
+            required.add(name)
+            optional.discard(name)
+        elif origin is typing.NotRequired:
+            optional.add(name)
+            required.discard(name)
+    return frozenset(required), frozenset(optional)
 
 
 def _resolve_annotation(

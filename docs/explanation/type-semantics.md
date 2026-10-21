@@ -134,10 +134,24 @@ user = user_schema.parse({"name": "Alex", "age": 30})
 
 The schema shape must cover every required `TypedDict` key and may include
 declared optional keys. Shape keys outside the `TypedDict` are rejected at
-construction. Runtime policies, issue paths, JSON Schema export, and async
-parsing are the same as `z.object`; `.strict()`, `.passthrough()`, `.strip()`,
-and `.catchall()` retain the typed result, while shape-changing methods such as
-`.pick()`, `.omit()`, and `.partial()` return the ordinary `ObjectSchema` type.
+construction. Choose field schemas whose outputs match the declared value
+types; Zodish checks key declarations and required output presence.
+
+A required key must be present after its field schema runs. An optional schema
+or transform that produces `MISSING` raises a `required` issue at that key.
+Defaults and factories run first, so they can supply a required key when input
+omits it. `None` follows the field schema's nullable rules. `NotRequired` and
+`total=False` keys retain their field-schema behavior; include an optional
+schema when an included field may be omitted. `Required` and `NotRequired`
+qualifiers also work with postponed annotations.
+
+Checks run natively and aggregate sibling issues in both parsing modes.
+JSON Schema output marks required keys as required; input allows keys supplied
+by defaults to be omitted. Field constraints, metadata, and codec input/output
+schemas are preserved. `.strict()`, `.passthrough()`, `.strip()`, and
+`.catchall()` retain the typed result and its required-key checks, while
+shape-changing methods such as `.pick()`, `.omit()`, and `.partial()` return
+the ordinary `ObjectSchema` type.
 
 ### Brands
 

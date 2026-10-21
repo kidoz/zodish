@@ -472,6 +472,7 @@ impl AsyncSession {
                 }))
             }
             Kind::Transform
+            | Kind::RequiredOutput
             | Kind::Overwrite
             | Kind::LengthMin
             | Kind::LengthMax

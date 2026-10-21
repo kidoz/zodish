@@ -153,7 +153,8 @@ impl NativeSchema {
             | Kind::MultipleOf
             | Kind::Nullable
             | Kind::Optional
-            | Kind::NonOptional => children
+            | Kind::NonOptional
+            | Kind::RequiredOutput => children
                 .first()
                 .map(|child| child.try_borrow(py).map(|child| child.json_fast))
                 .transpose()

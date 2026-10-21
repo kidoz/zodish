@@ -6,13 +6,68 @@ import threading
 import unittest
 import weakref
 from dataclasses import dataclass
-from typing import Annotated, NewType
+from typing import Annotated, NewType, NotRequired, TypedDict
 
 from zodish import MISSING, Failure, Issue, Success, ValidationError, z
 from zodish._native import AsyncSession
 
 
 class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_typed_object_required_output(self):
+        class Fields(TypedDict):
+            first: int
+            second: int
+            defaulted: int
+            extra: NotRequired[str]
+
+        events = []
+
+        async def convert(value):
+            events.append(("convert", value))
+            return MISSING if value is MISSING else value * 2
+
+        async def default():
+            events.append(("default",))
+            return 3
+
+        schema = z.typed_object(Fields, {
+            "first": z.integer().optional().transform_async(convert),
+            "second": z.integer().optional(),
+            "defaulted": z.integer().default_factory_async(default),
+            "extra": z.string().optional(),
+        })
+        failure = await schema.safe_parse_async({})
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in failure.error.issues],
+            [("required", ("first",)), ("required", ("second",))],
+        )
+        self.assertEqual(events, [("convert", MISSING), ("default",)])
+        events.clear()
+        self.assertEqual(await schema.parse_async({"first": 1, "second": 2}), {
+            "first": 2, "second": 2, "defaulted": 3,
+        })
+        self.assertEqual(events, [("convert", 1), ("default",)])
+        events.clear()
+        self.assertEqual(await schema.parse_async({"first": 1, "second": 2, "defaulted": 4}), {
+            "first": 2, "second": 2, "defaulted": 4,
+        })
+        self.assertEqual(events, [("convert", 1)])
+        for rebuilt in (
+            schema.strict(), schema.strip(), schema.passthrough(), schema.catchall(z.integer()),
+        ):
+            with self.subTest(policy=rebuilt.unknown_keys):
+                failure = await rebuilt.safe_parse_async({})
+                self.assertEqual(
+                    [issue.path for issue in failure.error.issues], [("first",), ("second",)],
+                )
+        failure = await schema.safe_parse_json_async('{}')
+        self.assertEqual(
+            [issue.path for issue in failure.error.issues], [("first",), ("second",)],
+        )
+        with self.assertRaisesRegex(TypeError, "parse_async"):
+            schema.parse({"first": 1, "second": 2})
+
     async def test_dataclass_annotated_async_fields(self):
         events = []
 
