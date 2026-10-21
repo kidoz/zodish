@@ -5,9 +5,8 @@ what it buys, and what it costs.
 
 ## Rust source layout
 
-`rust/lib.rs` registers the Python module and contains JSON fast paths and async
-sessions. Paths, issue/error
-types, and the GC-aware native issue bundle live in `rust/errors.rs`.
+`rust/lib.rs` registers the Python module and contains async sessions. Paths,
+issue/error types, and the GC-aware native issue bundle live in `rust/errors.rs`.
 `rust/runtime.rs` holds the per-parse `Context`, callback-error normalization,
 and lazy caches: local storage for sync parsing and session-owned shared storage
 for async parsing. Session GC traversal and cleanup still visit and release
@@ -20,9 +19,9 @@ aggregation, and depth checks. Async sessions reuse that evaluator for
 synchronous subtrees and share its primitive-kind classification.
 `rust/schema.rs` defines `NativeSchema`, its unknown-key policy, constructor,
 capability flags, Python-facing methods, and GC integration. Its parse entry
-points call sync validation in `schema/evaluate.rs`; JSON fast evaluation still
-lives in `rust/lib.rs` during extraction. Cached error templates are private to
-the schema module and its children.
+points call sync validation in `schema/evaluate.rs` and JSON decoding and fast
+evaluation in `schema/json.rs`. JSON helpers are private to the schema module.
+Cached error templates are private to the schema module and its children.
 Operation kinds are exposed from `rust/schema/kind.rs`, where operation names
 and constructor arity are checked. `rust/schema/checks.rs` contains shared
 post-child operations and constraint checks, plus the error templates built
