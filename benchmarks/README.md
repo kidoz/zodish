@@ -156,7 +156,8 @@ The latest [post-optimization rerun](results/2026-10-20-macos-arm64-rerun.md)
 and its [raw pyperf data](results/2026-10-20-macos-arm64-rerun.json) use the same
 interpreter and pinned dependency versions as the
 [initial baseline](results/2026-10-20-macos-arm64.md). See the
-[run notes](results/README.md) for commands, hashes, and the comparison. These
+[rerun report](results/2026-10-20-macos-arm64-rerun.md) for commands, hashes,
+and the comparison. These
 exploratory runs use installed release snapshots; their hashes identify the
 measured code even if the checkout changes.
 
