@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Async parsing now reports `required` for missing input at the root of object,
+  array, tuple, record, intersection, discriminated-union, and lazy container
+  schemas, matching synchronous parsing. Nested missing container fields use
+  the same rule.
+
 ## [0.4.0] - 2026-10-21
 
 ### Added

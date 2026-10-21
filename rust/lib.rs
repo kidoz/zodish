@@ -1373,8 +1373,15 @@ impl AsyncSession {
             Kind::Object => self.start_object(py, &ctx, node, &node_ref, value, path, depth),
             Kind::Record => self.start_record(py, &ctx, node, &node_ref, value, path, depth),
             Kind::Union => self.start_union(py, node, &node_ref, value, path, depth),
-            Kind::Intersection => self.start_intersection(py, node, &node_ref, value, path, depth),
+            Kind::Intersection => {
+                self.start_intersection(py, &ctx, node, &node_ref, value, path, depth)
+            }
             Kind::DiscriminatedUnion => {
+                if missing {
+                    drop(node_ref);
+                    let outcome = ctx.fail("required", "Required", &path);
+                    return Ok(AsyncNext::Task(AsyncTask::Deliver { outcome, path }));
+                }
                 let Ok(dict) = value.bind(py).cast::<PyDict>() else {
                     let params = PyDict::new(py);
                     if let Err(error) = params.set_item("expected", "dict with string keys") {
@@ -1924,6 +1931,10 @@ impl AsyncSession {
         path: Path,
         depth: usize,
     ) -> PyResult<AsyncNext> {
+        if value.bind(py).is(&ctx.missing) {
+            let outcome = ctx.fail("required", "Required", &path);
+            return Ok(deliver_at(outcome, path));
+        }
         let Some(dict) = value.bind(py).cast::<PyDict>().ok() else {
             let params = PyDict::new(py);
             params.set_item("expected", "dict with string keys")?;
@@ -2170,6 +2181,10 @@ impl AsyncSession {
     ) -> PyResult<AsyncNext> {
         let is_tuple = matches!(node.kind, Kind::Tuple);
         let bound = value.bind(py);
+        if bound.is(&ctx.missing) {
+            let outcome = ctx.fail("required", "Required", &path);
+            return Ok(deliver_at(outcome, path));
+        }
         if !bound.is_instance_of::<PyList>() && !(is_tuple && bound.is_instance_of::<PyTuple>()) {
             let expected = if is_tuple { "tuple or list" } else { "list" };
             let params = PyDict::new(py);
@@ -2325,6 +2340,10 @@ impl AsyncSession {
         path: Path,
         depth: usize,
     ) -> PyResult<AsyncNext> {
+        if value.bind(py).is(&ctx.missing) {
+            let outcome = ctx.fail("required", "Required", &path);
+            return Ok(deliver_at(outcome, path));
+        }
         let Some(dict) = value.bind(py).cast::<PyDict>().ok() else {
             let params = PyDict::new(py);
             params.set_item("expected", "dict")?;
@@ -2566,15 +2585,21 @@ impl AsyncSession {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn start_intersection(
         &mut self,
         py: Python<'_>,
+        ctx: &Context<'_>,
         node_py: Py<NativeSchema>,
         _node: &NativeSchema,
         value: Py<PyAny>,
         path: Path,
         depth: usize,
     ) -> PyResult<AsyncNext> {
+        if value.bind(py).is(&ctx.missing) {
+            let outcome = ctx.fail("required", "Required", &path);
+            return Ok(deliver_at(outcome, path));
+        }
         self.frames
             .push(AsyncFrame::Intersection(IntersectionFrame {
                 node: node_py,
