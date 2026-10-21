@@ -198,6 +198,8 @@ def _check(scenario: Scenario | SyncScenario) -> None:
 def _run(scenario: Scenario | SyncScenario, *, loop: asyncio.AbstractEventLoop | None) -> Any:
     if isinstance(scenario, SyncScenario):
         return scenario.call()
+    if loop is None:
+        raise RuntimeError("async scenario requires an event loop")
     if scenario.name == "concurrent_parses":
         return loop.run_until_complete(
             Scenario._gather(scenario.schema, scenario.payload, scenario.concurrent),
