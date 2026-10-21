@@ -8,6 +8,10 @@ what it buys, and what it costs.
 `rust/lib.rs` registers the Python module and contains schema construction,
 synchronous evaluation, JSON fast paths, and async sessions. Paths, issue/error
 types, and the GC-aware native issue bundle live in `rust/errors.rs`.
+`rust/runtime.rs` holds the per-parse `Context`, callback-error normalization,
+and lazy caches: local storage for sync parsing and session-owned shared storage
+for async parsing. Session GC traversal and cleanup still visit and release
+the same cached references.
 `rust/schema.rs` exposes operation kinds from `rust/schema/kind.rs`, where
 operation names and constructor arity are checked. The evaluators share these
 definitions; validation behavior and Python-visible class names are unchanged
