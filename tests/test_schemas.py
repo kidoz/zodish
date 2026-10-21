@@ -3915,6 +3915,129 @@ class JSONSchemaTests(unittest.TestCase):
             set(output_export["required"]), {"factory", "caught"},
         )
 
+    def test_recursive_lazy_refs(self):
+        node = z.lazy(lambda: z.object({
+            "name": z.string(),
+            "children": node.array().default([]),
+        }).meta({"id": "Node"}))
+        expected_definition = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "children": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/Node"},
+                    "default": [],
+                },
+            },
+            "required": ["name", "children"],
+            "additionalProperties": False,
+        }
+        self.assertEqual(to_json_schema(node), {
+            "$ref": "#/$defs/Node",
+            "$defs": {"Node": expected_definition},
+        })
+        self.assertEqual(to_json_schema(node, target="openapi-3.0"), {
+            "$ref": "#/components/schemas/Node",
+            "components": {"schemas": {"Node": {
+                **expected_definition,
+                "properties": {
+                    **expected_definition["properties"],
+                    "children": {
+                        "type": "array",
+                        "items": {"$ref": "#/components/schemas/Node"},
+                        "default": [],
+                    },
+                },
+            }}},
+        })
+        self.assertEqual(
+            node.parse({"name": "root", "children": []}),
+            {"name": "root", "children": []},
+        )
+
+        calls: list[int] = []
+
+        def factory():
+            calls.append(1)
+            return z.object({
+                "value": z.integer(),
+                "next": chain.optional(),
+            }).meta({"id": "Chain"})
+
+        chain = z.lazy(factory)
+        exported = to_json_schema(chain)
+        self.assertEqual(calls, [1])
+        self.assertEqual(exported["$ref"], "#/$defs/Chain")
+        self.assertEqual(
+            exported["$defs"]["Chain"]["properties"]["next"],
+            {"$ref": "#/$defs/Chain"},
+        )
+        self.assertNotIn("id", exported["$defs"]["Chain"])
+
+        leaf = z.lazy(lambda: z.string().meta({"id": "Leaf"}))
+        self.assertEqual(to_json_schema(leaf), {
+            "$ref": "#/$defs/Leaf",
+            "$defs": {"Leaf": {"type": "string"}},
+        })
+        escaped = z.lazy(lambda: z.string()).meta({"id": "a/b"})
+        escaped_export = to_json_schema(escaped)
+        self.assertEqual(escaped_export["$ref"], "#/$defs/a~1b")
+        self.assertIn("a/b", escaped_export["$defs"])
+
+        self_ref = None
+        self_ref = z.lazy(
+            lambda: z.object({"next": self_ref.optional()}),
+        ).meta({"id": "Self"})
+        self_export = to_json_schema(self_ref)
+        self.assertEqual(self_export["$ref"], "#/$defs/Self")
+        self.assertEqual(
+            self_export["$defs"]["Self"]["properties"]["next"],
+            {"$ref": "#/$defs/Self"},
+        )
+
+        optional_lazy = z.lazy(
+            lambda: z.string().optional(),
+        ).meta({"id": "Maybe"})
+        optional_export = to_json_schema(
+            z.object({"value": optional_lazy}), io="output",
+        )
+        self.assertNotIn("required", optional_export)
+        self.assertEqual(
+            optional_export["properties"]["value"],
+            {"$ref": "#/$defs/Maybe"},
+        )
+
+        described = z.object({"node": node.describe("Child node")})
+        draft = to_json_schema(described, io="input")
+        self.assertEqual(draft["properties"]["node"], {
+            "$ref": "#/$defs/Node", "description": "Child node",
+        })
+        openapi = to_json_schema(described, io="input", target="openapi-3.0")
+        self.assertEqual(openapi["properties"]["node"], {
+            "allOf": [{"$ref": "#/components/schemas/Node"}],
+            "description": "Child node",
+        })
+
+        without_id = z.lazy(lambda: z.string())
+        with self.assertRaises(UnrepresentableError):
+            to_json_schema(without_id)
+        self.assertEqual(to_json_schema(without_id, unrepresentable="any"), {})
+
+        duplicate_a = z.lazy(lambda: z.string()).meta({"id": "Same"})
+        duplicate_b = z.lazy(lambda: z.integer()).meta({"id": "Same"})
+        with self.assertRaises(UnrepresentableError):
+            to_json_schema(z.object({
+                "a": duplicate_a, "b": duplicate_b,
+            }))
+
+        def broken():
+            raise RuntimeError("boom")
+
+        with self.assertRaises(UnrepresentableError) as caught:
+            to_json_schema(z.lazy(broken).meta({"id": "Broken"}))
+        self.assertIn("lazy factory failed", str(caught.exception))
+
     def test_unrepresentable_nodes(self):
         cases = (
             z.string().transform(len),

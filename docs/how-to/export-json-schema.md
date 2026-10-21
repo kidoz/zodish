@@ -68,11 +68,31 @@ to_json_schema(z.string().trim(), unrepresentable="any")
 ```
 
 Operations with no equivalent include `catch`, `refine`/`super_refine`,
-`transform`, `overwrite`, `preprocess`, `pipe`, `lazy`, `async_refine`/
+`transform`, `overwrite`, `preprocess`, `pipe`, `async_refine`/
 `async_super_refine`/`async_transform`/`async_preprocess`/
 `async_default_factory`/`async_catch`/`async_overwrite`, `default_factory`,
 `instance_of`,
 `trim`/`lower`/`upper`, and regexes with non-default flags.
+
+## Export recursive schemas
+
+Add an `id` to a lazy schema so the exporter can reference it:
+
+```python
+node = z.lazy(lambda: z.object({
+    "name": z.string(),
+    "children": node.array().default([]),
+}).meta({"id": "Node"}))
+
+to_json_schema(node)
+# {"$ref": "#/$defs/Node", "$defs": {"Node": {...}}}
+```
+
+Draft output uses `$defs`; OpenAPI output uses `components/schemas`. Each lazy
+factory runs once per export, so it should be deterministic. A lazy schema
+without an id still raises `UnrepresentableError`; pass
+`unrepresentable="any"` to emit `{}` instead. Duplicate ids for distinct
+schemas raise `UnrepresentableError`.
 
 ## Avoid target-specific dead ends
 

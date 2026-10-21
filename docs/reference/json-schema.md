@@ -82,12 +82,40 @@ as-is; use JSON-compatible values when serializing.
 - Python regex patterns are emitted as `pattern`, so Python-specific syntax may
   not be portable.
 
+## Recursive schemas
+
+Give a lazy schema an `id` in metadata to export it as a reference:
+
+```python
+node = z.lazy(lambda: z.object({
+    "name": z.string(),
+    "children": node.array().default([]),
+}).meta({"id": "Node"}))
+
+to_json_schema(node)
+# {"$ref": "#/$defs/Node", "$defs": {"Node": {...}}}
+```
+
+- The id may be on the lazy schema or its resolved root.
+- Draft 2020-12 places definitions under `$defs`; OpenAPI 3.0 places them under
+  `components/schemas` and references `#/components/schemas/<id>`. The returned
+  OpenAPI mapping includes a root `components` object; merge it into the
+  OpenAPI document.
+- Every exported lazy must carry an id. A lazy without one raises
+  `UnrepresentableError`; `unrepresentable="any"` emits `{}`.
+- Duplicate ids for distinct schemas raise `UnrepresentableError`.
+- The exporter resolves each lazy factory once per export, so factories must be
+  deterministic. Factory failures raise `UnrepresentableError`.
+- `id` is registry metadata and is not emitted as a JSON Schema keyword.
+- For OpenAPI 3.0, metadata next to a `$ref` is emitted through `allOf` because
+  Reference Object siblings are ignored.
+
 ## Not representable
 
 These constructs raise `UnrepresentableError` unless `unrepresentable="any"`:
 
 - `catch`, `refine`, `super_refine`, `transform`, `overwrite`, `preprocess`,
-  `pipe`, `lazy`, `async_refine`, `async_super_refine`, `async_transform`,
+  `pipe`, `async_refine`, `async_super_refine`, `async_transform`,
   `async_preprocess`, `async_default_factory`, `async_catch`, and
   `async_overwrite`;
 - `default_factory`;

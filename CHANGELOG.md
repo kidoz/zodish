@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Recursive lazy schemas export as `$ref` definitions when they declare an
+  `id`; draft output uses `$defs` and OpenAPI output uses
+  `components/schemas`. Lazy factories run once per export.
 - Object fields accept `.wire(name)` to use a separate input key. Parsing
   accepts the wire name, output and encoding use the shape key, and JSON Schema
   input/output modes follow the same split.

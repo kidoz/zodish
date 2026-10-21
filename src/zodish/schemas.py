@@ -15,6 +15,7 @@ import pathlib as _pathlib
 import re
 import typing
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from functools import wraps
@@ -3293,8 +3294,10 @@ def to_json_schema(
 ) -> JSONSchema:
     """Export a schema as a JSON Schema mapping.
 
-    Refinements, transforms, preprocessors, pipes, factories, and lazy schemas
-    are not representable. ``unrepresentable="any"`` emits ``{}`` for them.
+    Refinements, transforms, preprocessors, pipes, and factories are not
+    representable. Lazy schemas are exported as references when they declare an
+    ``id``; resolving them may run each lazy factory once per export.
+    ``unrepresentable="any"`` emits ``{}`` for unsupported nodes.
     """
     if not isinstance(schema, Schema):
         raise TypeError("Expected a Schema")
@@ -3304,7 +3307,20 @@ def to_json_schema(
         raise ValueError("io must be 'input' or 'output'")
     if unrepresentable not in ("throw", "any"):
         raise ValueError("unrepresentable must be 'throw' or 'any'")
-    return _export_schema(schema, (), target, io, unrepresentable, False)
+    context = _ExportContext()
+    token = _EXPORT_CONTEXT.set(context)
+    try:
+        result = _export_schema(
+            schema, (), target, io, unrepresentable, False,
+        )
+    finally:
+        _EXPORT_CONTEXT.reset(token)
+    if context.definitions:
+        if target == "draft-2020-12":
+            result = {**result, "$defs": context.definitions}
+        else:
+            result = {**result, "components": {"schemas": context.definitions}}
+    return result
 
 
 def _unsupported(
@@ -3315,6 +3331,136 @@ def _unsupported(
     raise UnrepresentableError(path, reason)
 
 
+class _LazyCycleError(RuntimeError):
+    """Raised when a lazy factory re-enters itself during export resolution."""
+
+
+class _ExportContext:
+    """Per-export lazy registry, definitions, and memoized factory results."""
+
+    def __init__(self) -> None:
+        self.definitions: dict[str, JSONSchema] = {}
+        self.definition_nodes: dict[str, int] = {}
+        self.resolved: dict[int, Schema[Any, Any]] = {}
+        self.failures: dict[int, Exception] = {}
+        self.resolving: builtins.set[int] = builtins.set()
+
+    def resolve_lazy(self, node: NativeSchema) -> Schema[Any, Any]:
+        key = id(node)
+        resolved = self.resolved.get(key)
+        if resolved is not None:
+            return resolved
+        failure = self.failures.get(key)
+        if failure is not None:
+            raise failure
+        if key in self.resolving:
+            raise _LazyCycleError
+        self.resolving.add(key)
+        try:
+            result = node.args[0]()
+        except Exception as error:
+            self.failures[key] = error
+            raise
+        finally:
+            self.resolving.discard(key)
+        if not isinstance(result, Schema):
+            raise TypeError("Lazy factory must return a Schema")
+        self.resolved[key] = result
+        return result
+
+    def try_resolve_lazy(self, node: NativeSchema) -> Schema[Any, Any] | None:
+        try:
+            return self.resolve_lazy(node)
+        except Exception:
+            return None
+
+
+_EXPORT_CONTEXT: ContextVar[_ExportContext | None] = ContextVar(
+    "zodish_json_schema_export", default=None,
+)
+
+
+def _definition_ref(name: str, target: JSONSchemaTarget) -> str:
+    escaped = name.replace("~", "~0").replace("/", "~1")
+    if target == "draft-2020-12":
+        return f"#/$defs/{escaped}"
+    return f"#/components/schemas/{escaped}"
+
+
+def _lazy_target(node: NativeSchema) -> Schema[Any, Any] | None:
+    context = _EXPORT_CONTEXT.get()
+    if context is None:
+        return None
+    target = context.try_resolve_lazy(node)
+    if target is None or target._node.kind == "lazy":
+        return None
+    return target
+
+
+def _export_lazy(
+    schema: Schema[Any, Any],
+    node: NativeSchema,
+    path: Path,
+    target: JSONSchemaTarget,
+    io: JSONSchemaIO,
+    unrepresentable: UnrepresentablePolicy,
+) -> JSONSchema:
+    context = _EXPORT_CONTEXT.get()
+    if context is None:
+        raise RuntimeError("JSON Schema export context is not active")
+    try:
+        resolved = context.resolve_lazy(node)
+    except _LazyCycleError:
+        return _unsupported(
+            path, "lazy schema cannot resolve itself", unrepresentable,
+        )
+    except Exception as error:
+        raise UnrepresentableError(
+            path, f"lazy factory failed: {error}",
+        ) from error
+
+    lazy_id = schema.metadata.get("id")
+    resolved_id = resolved.metadata.get("id")
+    if lazy_id is not None and resolved_id is not None and lazy_id != resolved_id:
+        raise UnrepresentableError(
+            path, "lazy and resolved schemas declare different ids",
+        )
+    name = lazy_id if lazy_id is not None else resolved_id
+    if name is None:
+        return _unsupported(
+            path, "lazy schemas require an id for export", unrepresentable,
+        )
+    if not isinstance(name, str) or not name:
+        raise UnrepresentableError(
+            path, "lazy schema id must be a non-empty string",
+        )
+
+    identity = id(resolved._node)
+    existing = context.definition_nodes.get(name)
+    if existing is not None:
+        if existing != identity:
+            raise UnrepresentableError(
+                path, f"duplicate schema id {name!r}",
+            )
+        return {"$ref": _definition_ref(name, target)}
+
+    context.definition_nodes[name] = identity
+    context.definitions[name] = {}
+    if target == "draft-2020-12":
+        definition_path: Path = (*path, "$defs", name)
+    else:
+        definition_path = (*path, "components", "schemas", name)
+    context.definitions[name] = _export_schema(
+        resolved,
+        definition_path,
+        target,
+        io,
+        unrepresentable,
+        False,
+    )
+    return {"$ref": _definition_ref(name, target)}
+
+
 def _inner_schema(schema: Schema[Any, Any], node: NativeSchema) -> Schema[Any, Any]:
     if schema._inner is not None:
         return schema._inner
@@ -3323,6 +3469,11 @@ def _inner_schema(schema: Schema[Any, Any], node: NativeSchema) -> Schema[Any, A
 
 def _node_accepts_missing(node: NativeSchema, io: JSONSchemaIO) -> bool:
     kind = node.kind
+    if kind == "lazy":
+        target = _lazy_target(node)
+        return False if target is None else _node_accepts_missing(
+            target._node, io,
+        )
     if kind == "wire":
         return _node_accepts_missing(node.children[0], io)
     if kind == "optional":
@@ -3353,10 +3504,14 @@ def _node_accepts_missing(node: NativeSchema, io: JSONSchemaIO) -> bool:
 def _node_missing_output(node: NativeSchema) -> bool | None:
     """Classify missing input for export: present, omitted, or rejected.
 
-    This inspects schema structure only; callbacks and factories are never run.
-    Unsupported callback nodes retain the exporter's existing approximation.
+    This inspects schema structure only; lazy factories may be resolved during
+    export, but other callbacks never run. Unsupported callback nodes retain
+    the exporter's existing approximation.
     """
     kind = node.kind
+    if kind == "lazy":
+        target = _lazy_target(node)
+        return None if target is None else _node_missing_output(target._node)
     if kind == "optional":
         return False
     if kind == "nonoptional":
@@ -3409,6 +3564,9 @@ def _schema_accepts_missing(schema: Schema[Any, Any], io: JSONSchemaIO) -> bool:
 
 def _node_outputs_string(node: NativeSchema) -> bool:
     kind = node.kind
+    if kind == "lazy":
+        target = _lazy_target(node)
+        return False if target is None else _node_outputs_string(target._node)
     if kind == "string":
         return True
     if kind == "literal":
@@ -3429,6 +3587,9 @@ def _node_outputs_string(node: NativeSchema) -> bool:
 
 def _node_outputs_dict(node: NativeSchema) -> bool:
     kind = node.kind
+    if kind == "lazy":
+        target = _lazy_target(node)
+        return False if target is None else _node_outputs_dict(target._node)
     if kind in ("object", "record", "discriminated_union"):
         return True
     if kind == "intersection":
@@ -3472,6 +3633,7 @@ def _export_schema(
     )
     if schema.metadata:
         metadata = dict(schema.metadata)
+        metadata.pop("id", None)
         if target == "openapi-3.0" and "examples" in metadata:
             examples = metadata.pop("examples")
             if "example" not in metadata:
@@ -3481,6 +3643,9 @@ def _export_schema(
                 else:
                     metadata["example"] = examples
         result = {**result, **metadata}
+        if target == "openapi-3.0" and "$ref" in result and len(result) > 1:
+            reference = result.pop("$ref")
+            result = {"allOf": [{"$ref": reference}], **result}
     return result
 
 
@@ -3518,6 +3683,10 @@ def _export_node(
             source, path, target, io, unrepresentable, relax_strip,
         )
     node = schema._node
+    if node.kind == "lazy":
+        return _export_lazy(
+            schema, node, path, target, io, unrepresentable,
+        )
     if node.kind in (
         "optional", "nonoptional", "required_output", "nullable", "default",
         "default_factory", "wire",
