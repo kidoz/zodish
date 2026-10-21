@@ -5,12 +5,16 @@ what it buys, and what it costs.
 
 ## Rust source layout
 
-`rust/lib.rs` registers the Python module and contains async sessions. Paths,
-issue/error types, and the GC-aware native issue bundle live in `rust/errors.rs`.
+`rust/lib.rs` declares the modules, shares the native depth limit, and registers
+the Python module. `rust/session.rs` owns `AsyncSession`, its frame/state types,
+token counter, Python methods, and GC lifecycle. Its fields and helpers stay
+private; suspended frames retain snapshots, callbacks, issues, and tracebacks.
+Paths, issue/error types, and the GC-aware native issue bundle live in
+`rust/errors.rs`.
 `rust/runtime.rs` holds the per-parse `Context`, callback-error normalization,
 and lazy caches: local storage for sync parsing and session-owned shared storage
-for async parsing. Session GC traversal and cleanup still visit and release
-the same cached references.
+for async parsing. Session GC traversal and cleanup in `rust/session.rs` visit
+and release the same cached references.
 `rust/values.rs` shares Python value predicates, numeric multiple checks,
 coercion, error-value formatting, JSON-value compatibility checks, dictionary
 merging, and copying across validation paths. `rust/schema/evaluate.rs` owns
