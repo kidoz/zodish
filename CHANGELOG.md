@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-21
+
+### Added
+
+- Experimental async validation through `parse_async`, `safe_parse_async`,
+  `refine_async`, `super_refine_async`, and `transform_async`. A native
+  resumable frame stack owns validation, container snapshots, paths, issues,
+  lazy state, and callback continuations; Python only awaits the callback
+  result and resumes the session. Async callbacks compose with objects, arrays,
+  records, tuples, unions, intersections, discriminated unions, pipes, wrapper
+  ordering, defaults, catches, synchronous lazy factories, and synchronous
+  callbacks between suspensions. Sessions are thread-affine, isolate
+  concurrent parses, participate in GC, and close rejected or explicitly
+  abandoned coroutines on cleanup.
+- `parse_json_async` and `safe_parse_json_async` parse JSON `str`, `bytes`, or
+  `bytearray` input and await nested async callbacks. Schemas covered by the
+  native JSON subset keep its fast path; other schemas use standard decoding
+  followed by asynchronous validation. Invalid JSON preserves the existing
+  `invalid_format` issue and position.
+- `validate_async` returns whether asynchronous validation succeeds while
+  propagating programming errors, matching `validate`.
+- Additional async callback families: `z.preprocess_async`,
+  `.default_factory_async()`, `.catch_async()`, and `.overwrite_async()`.
+  Preprocessing and default factories await their result before child
+  validation; async catch fallbacks run only after native validation failures;
+  overwrite preserves the static output type. Async lazy factories remain
+  unsupported.
+- `z.codec_async`, `.decode_async()`/`.safe_decode_async()`, and
+  `.encode_async()`/`.safe_encode_async()`. Async codecs preserve encoded and
+  decoded schemas, wrappers, records, arrays, unions, and tuples; async reverse
+  graphs use the same native continuation session. Sync codecs and reversible
+  schemas also work through the async encoding entry points. Dataclass codecs
+  support async field codecs through the same async methods while preserving
+  field issue prefixes and dataclass defaults.
+- `benchmarks/bench_async.py` measures synchronous schemas through
+  `parse_async`, immediately completing callbacks, `asyncio.sleep(0)`
+  suspension, sequential callbacks, nested failures, and concurrent parses of
+  one schema, with optional retained/peak memory reporting.
+
 ## [0.3.0] - 2026-10-21
 
 ### Changed
