@@ -1402,6 +1402,87 @@ class SchemaTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             z.codecs.tuple("not a schema")
 
+    def test_codec_composition_runs_callbacks_once(self):
+        input_calls: list[str] = []
+        output_calls: list[str] = []
+        decode_calls: list[str] = []
+        encode_calls: list[str] = []
+
+        def input_transform(value: str) -> str:
+            input_calls.append(value)
+            return value + "!"
+
+        def output_transform(value: str) -> str:
+            output_calls.append(value)
+            return value + "?"
+
+        codec = z.codec(
+            z.string().transform(input_transform),
+            z.string().transform(output_transform),
+            decode=lambda value: (decode_calls.append(value), value)[1],
+            encode=lambda value: (encode_calls.append(value), value)[1],
+        )
+
+        def reset() -> None:
+            for calls in (input_calls, output_calls, decode_calls, encode_calls):
+                calls.clear()
+
+        decoded = [
+            ("direct", codec, "a", "a!?"),
+            ("optional", codec.optional(), "a", "a!?"),
+            ("array", z.codecs.array(codec), ["a"], ["a!?"]),
+            ("nested", z.codecs.array(codec.optional()), ["a"], ["a!?"]),
+            ("record", codec.record(), {"a": "a"}, {"a": "a!?"}),
+            ("union", z.codecs.union(codec, z.integer()), "a", "a!?"),
+            ("tuple", z.codecs.tuple(codec, z.integer()), ["a", 1], ("a!?", 1)),
+            ("nullable", codec.nullable(), "a", "a!?"),
+            ("nonoptional", codec.nonoptional(), "a", "a!?"),
+        ]
+        for name, schema, value, expected in decoded:
+            with self.subTest(direction="decode", case=name):
+                reset()
+                self.assertEqual(schema.parse(value), expected)
+                self.assertEqual(input_calls, ["a"])
+                self.assertEqual(decode_calls, ["a!"])
+                self.assertEqual(output_calls, ["a!"])
+                self.assertEqual(encode_calls, [])
+
+        encoded = [
+            ("direct", codec, "v", "v?!"),
+            ("optional", codec.optional(), "v", "v?!"),
+            ("array", z.codecs.array(codec), ["v"], ["v?!"]),
+            ("nested", z.codecs.array(codec.optional()), ["v"], ["v?!"]),
+            ("record", codec.record(), {"a": "v"}, {"a": "v?!"}),
+            ("union", z.codecs.union(codec, z.integer()), "v", "v?!"),
+            ("tuple", z.codecs.tuple(codec, z.integer()), ("v", 1), ("v?!", 1)),
+            ("nullable", codec.nullable(), "v", "v?!"),
+            ("nonoptional", codec.nonoptional(), "v", "v?!"),
+        ]
+        for name, schema, value, expected in encoded:
+            with self.subTest(direction="encode", case=name):
+                reset()
+                self.assertEqual(schema.encode(value), expected)
+                self.assertEqual(output_calls, ["v"])
+                self.assertEqual(encode_calls, ["v?"])
+                self.assertEqual(input_calls, ["v?"])
+                self.assertEqual(decode_calls, [])
+
+        @dataclasses.dataclass
+        class Item:
+            name: str
+
+        item_codec = z.codecs.dataclass(Item, fields={"name": codec})
+        reset()
+        self.assertEqual(item_codec.parse({"name": "a"}), Item("a!?"))
+        self.assertEqual(input_calls, ["a"])
+        self.assertEqual(decode_calls, ["a!"])
+        self.assertEqual(output_calls, ["a!"])
+        reset()
+        self.assertEqual(item_codec.encode(Item("v")), {"name": "v?!"})
+        self.assertEqual(output_calls, ["v"])
+        self.assertEqual(encode_calls, ["v?"])
+        self.assertEqual(input_calls, ["v?"])
+
     def test_discriminated_union(self):
         schema = z.discriminated_union("kind", {
             "created": z.object({"kind": z.literal("created"), "id": z.integer()}),

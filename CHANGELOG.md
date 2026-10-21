@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Intersection parsing bounds recursive dictionary merging at the native depth
   limit, raising `RecursionError` instead of overflowing the Rust stack for
   deeply nested or cyclic dictionaries.
+- Synchronous codec combinators (`optional`, `nonoptional`, `nullable`,
+  `record`, array, union, and tuple codecs) and dataclass codecs now validate
+  encoded and decoded values once, so input/output transforms and refinement
+  callbacks run exactly once per value as they do for direct and async codecs.
 
 ## [0.5.0] - 2026-10-21
 
