@@ -6,8 +6,8 @@ use std::sync::{Arc, Mutex};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::NativeSchema;
 use crate::errors::{Error, ErrorTemplate, Issue, NativeIssueBundle, Path, Result};
+use crate::schema::NativeSchema;
 
 #[derive(Default)]
 pub(crate) struct LazyState {
