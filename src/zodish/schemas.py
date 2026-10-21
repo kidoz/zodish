@@ -223,16 +223,39 @@ def _issue_from_raw(raw: builtins.tuple[Any, ...]) -> Issue:
     return issue
 
 
+type ErrorMap = Callable[[Issue], str]
+
+
+def _check_error_map(error: ErrorMap | None) -> None:
+    if error is not None and not callable(error):
+        raise TypeError("error must be callable or None")
+
+
+def _map_issue(issue: Issue, mapper: ErrorMap) -> Issue:
+    message = mapper(issue)
+    if not isinstance(message, str):
+        raise TypeError("Error mapper must return a string")
+    branches = builtins.tuple(
+        builtins.tuple(_map_issue(branch, mapper) for branch in items)
+        for items in issue.branches
+    )
+    return replace(issue, message=message, branches=branches)
+
+
 class ValidationError(ValueError):
     _issues: builtins.tuple[Issue, ...] | None
     _raw_issues: builtins.tuple[builtins.tuple[Any, ...], ...] | None
     _bundle: Any = None
     _message: str | None = None
+    _error_mapper: ErrorMap | None = None
+    _mapped: bool = False
 
     def __init__(self, issues: Sequence[Issue]):
         self._issues = builtins.tuple(issues)
         self._raw_issues = None
         self._bundle = None
+        self._error_mapper = None
+        self._mapped = False
         super().__init__()
 
     @classmethod
@@ -245,6 +268,8 @@ class ValidationError(ValueError):
         error._issues = None
         error._raw_issues = raw_issues
         error._bundle = None
+        error._error_mapper = None
+        error._mapped = False
         ValueError.__init__(error)
         return error
 
@@ -255,8 +280,17 @@ class ValidationError(ValueError):
         error._issues = None
         error._raw_issues = None
         error._bundle = bundle
+        error._error_mapper = None
+        error._mapped = False
         ValueError.__init__(error)
         return error
+
+    def _set_error_mapper(self, mapper: ErrorMap | None) -> None:
+        """Attach the per-parse mapper used when issues are materialized."""
+        if mapper is None:
+            return
+        self._error_mapper = mapper
+        self._message = None
 
     @property
     def issues(self) -> builtins.tuple[Issue, ...]:
@@ -274,24 +308,39 @@ class ValidationError(ValueError):
             issues = builtins.tuple(builtins.map(_issue_from_raw, raw_issues))
             self._issues = issues
             self._raw_issues = None
+        mapper = self._error_mapper
+        if mapper is not None and not self._mapped:
+            issues = builtins.tuple(
+                _map_issue(issue, mapper) for issue in issues
+            )
+            self._issues = issues
+            self._mapped = True
         return issues
 
     def __str__(self) -> str:
         cached = self._message
         if cached is None:
-            raw_issues = self._raw_issues
-            if raw_issues is None and self._bundle is not None:
-                raw_issues = self._bundle.to_raw()
-            if raw_issues is None:
+            if self._error_mapper is not None:
                 cached = "; ".join(
-                    f"{'.'.join(builtins.map(str, issue.path)) or '<root>'}: {issue.message}"
+                    f"{'.'.join(builtins.map(str, issue.path)) or '<root>'}: "
+                    f"{issue.message}"
                     for issue in self.issues
                 )
             else:
-                cached = "; ".join(
-                    f"{'.'.join(builtins.map(str, raw[2])) or '<root>'}: {raw[1]}"
-                    for raw in raw_issues
-                )
+                raw_issues = self._raw_issues
+                if raw_issues is None and self._bundle is not None:
+                    raw_issues = self._bundle.to_raw()
+                if raw_issues is None:
+                    cached = "; ".join(
+                        f"{'.'.join(builtins.map(str, issue.path)) or '<root>'}: "
+                        f"{issue.message}"
+                        for issue in self.issues
+                    )
+                else:
+                    cached = "; ".join(
+                        f"{'.'.join(builtins.map(str, raw[2])) or '<root>'}: {raw[1]}"
+                        for raw in raw_issues
+                    )
             self._message = cached
         return cached
 
@@ -456,29 +505,53 @@ class Schema[Out, In = Out]:
         _brand_argument(newtype)
         return Schema[Brand, In](self._node, _inner=self, _meta=self._meta)
 
-    def parse(self, value: In | Missing = MISSING) -> Out:
-        return cast(Out, self._node.parse(value, MISSING, Issue, ValidationError))
+    def parse(
+        self, value: In | Missing = MISSING, *, error: ErrorMap | None = None,
+    ) -> Out:
+        """Validate a value; raise ``ValidationError`` on failure.
 
-    def safe_parse(self, value: In | Missing = MISSING) -> Success[Out] | Failure:
+        ``error`` rewrites issue messages when the error's issues are read.
+        """
+        _check_error_map(error)
+        try:
+            return cast(
+                Out, self._node.parse(value, MISSING, Issue, ValidationError),
+            )
+        except ValidationError as failure:
+            failure._set_error_mapper(error)
+            raise
+
+    def safe_parse(
+        self, value: In | Missing = MISSING, *, error: ErrorMap | None = None,
+    ) -> Success[Out] | Failure:
         """Catch validation errors only; programming errors remain visible."""
         try:
-            return Success(self.parse(value))
-        except ValidationError as error:
-            return Failure(error)
+            return Success(self.parse(value, error=error))
+        except ValidationError as failure:
+            return Failure(failure)
 
-    async def parse_async(self, value: In | Missing = MISSING) -> Out:
+    async def parse_async(
+        self, value: In | Missing = MISSING, *, error: ErrorMap | None = None,
+    ) -> Out:
         """Parse, awaiting async callback results when required."""
-        session = AsyncSession(self._node, value, MISSING, Issue, ValidationError)
-        return cast(Out, await drive(session))
+        _check_error_map(error)
+        try:
+            session = AsyncSession(
+                self._node, value, MISSING, Issue, ValidationError,
+            )
+            return cast(Out, await drive(session))
+        except ValidationError as failure:
+            failure._set_error_mapper(error)
+            raise
 
     async def safe_parse_async(
-        self, value: In | Missing = MISSING,
+        self, value: In | Missing = MISSING, *, error: ErrorMap | None = None,
     ) -> Success[Out] | Failure:
         """Catch validation errors from async parsing only."""
         try:
-            return Success(await self.parse_async(value))
-        except ValidationError as error:
-            return Failure(error)
+            return Success(await self.parse_async(value, error=error))
+        except ValidationError as failure:
+            return Failure(failure)
 
     def validate(self, value: In | Missing = MISSING) -> bool:
         """Return whether validation succeeds; callback errors still propagate."""
@@ -518,35 +591,62 @@ class Schema[Out, In = Out]:
             params={"format": "json", "position": position},
         )]) from None
 
-    def parse_json(self, data: str | builtins.bytes | bytearray) -> Out:
+    def parse_json(
+        self,
+        data: str | builtins.bytes | bytearray,
+        *,
+        error: ErrorMap | None = None,
+    ) -> Out:
         """Parse JSON text and validate the decoded value."""
-        fast, value = self._json_input(data)
-        return cast(Out, value) if fast else self.parse(value)
+        _check_error_map(error)
+        try:
+            fast, value = self._json_input(data)
+        except ValidationError as failure:
+            failure._set_error_mapper(error)
+            raise
+        return cast(Out, value) if fast else self.parse(value, error=error)
 
     async def parse_json_async(
-        self, data: str | builtins.bytes | bytearray,
+        self,
+        data: str | builtins.bytes | bytearray,
+        *,
+        error: ErrorMap | None = None,
     ) -> Out:
         """Parse JSON text and await the normal asynchronous evaluator."""
-        fast, value = self._json_input(data)
-        return cast(Out, value) if fast else await self.parse_async(value)
+        _check_error_map(error)
+        try:
+            fast, value = self._json_input(data)
+        except ValidationError as failure:
+            failure._set_error_mapper(error)
+            raise
+        return (
+            cast(Out, value) if fast
+            else await self.parse_async(value, error=error)
+        )
 
     async def safe_parse_json_async(
-        self, data: str | builtins.bytes | bytearray,
+        self,
+        data: str | builtins.bytes | bytearray,
+        *,
+        error: ErrorMap | None = None,
     ) -> Success[Out] | Failure:
         """Catch validation errors from asynchronous JSON parsing only."""
         try:
-            return Success(await self.parse_json_async(data))
-        except ValidationError as error:
-            return Failure(error)
+            return Success(await self.parse_json_async(data, error=error))
+        except ValidationError as failure:
+            return Failure(failure)
 
     def safe_parse_json(
-        self, data: str | builtins.bytes | bytearray,
+        self,
+        data: str | builtins.bytes | bytearray,
+        *,
+        error: ErrorMap | None = None,
     ) -> Success[Out] | Failure:
         """Catch validation errors from JSON parsing only."""
         try:
-            return Success(self.parse_json(data))
-        except ValidationError as error:
-            return Failure(error)
+            return Success(self.parse_json(data, error=error))
+        except ValidationError as failure:
+            return Failure(failure)
 
     def validate_json(self, data: str | builtins.bytes | bytearray) -> bool:
         """Return whether JSON text parses and validates."""
@@ -854,24 +954,28 @@ class CodecSchema[Out, In = Out](Schema[Out, In]):
             _meta=self._meta,
         )
 
-    def decode(self, value: In | Missing = MISSING) -> Out:
+    def decode(
+        self, value: In | Missing = MISSING, *, error: ErrorMap | None = None,
+    ) -> Out:
         """Decode an encoded value; equivalent to ``parse``."""
-        return self.parse(value)
+        return self.parse(value, error=error)
 
     def safe_decode(
-        self, value: In | Missing = MISSING,
+        self, value: In | Missing = MISSING, *, error: ErrorMap | None = None,
     ) -> Success[Out] | Failure:
-        return self.safe_parse(value)
+        return self.safe_parse(value, error=error)
 
-    async def decode_async(self, value: In | Missing = MISSING) -> Out:
+    async def decode_async(
+        self, value: In | Missing = MISSING, *, error: ErrorMap | None = None,
+    ) -> Out:
         """Decode, awaiting asynchronous codec and schema callbacks."""
-        return await self.parse_async(value)
+        return await self.parse_async(value, error=error)
 
     async def safe_decode_async(
-        self, value: In | Missing = MISSING,
+        self, value: In | Missing = MISSING, *, error: ErrorMap | None = None,
     ) -> Success[Out] | Failure:
         """Catch validation errors from asynchronous decoding only."""
-        return await self.safe_parse_async(value)
+        return await self.safe_parse_async(value, error=error)
 
     def optional(self) -> CodecSchema[Out | Missing, In | Missing]:
         result = _optional_codec(self)

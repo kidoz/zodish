@@ -145,6 +145,13 @@ Built-in constraints accept a keyword-only `message=`. `.refine()` paths are
 relative to the current location, and `.super_refine()` issue paths are also
 relative.
 
+`parse`, `safe_parse`, `parse_json`, `safe_parse_json`, the async parse
+variants, and `decode`, `safe_decode`, `decode_async`, and
+`safe_decode_async` accept a keyword-only `error=callable`.
+The mapper receives each `Issue` when issues are materialized and returns the
+replacement `message`. It does not run during successful validation or
+`validate()`; see [Errors reference](errors.md#per-parse-message-mapping).
+
 ## Evaluation modes
 
 Synchronous parsing is the default: `parse`, `safe_parse`, `validate`,

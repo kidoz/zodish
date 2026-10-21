@@ -135,6 +135,42 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(failure, Failure)
         self.assertEqual(failure.error.issues[0].path, ("counts", 0, 0))
 
+    async def test_parse_error_map(self):
+        calls: list[str] = []
+
+        def explain(issue):
+            calls.append(issue.message)
+            return f"translated:{issue.code}"
+
+        schema = z.object({"value": z.integer().min(5)})
+        result = await schema.safe_parse_async({"value": 1}, error=explain)
+        self.assertIsInstance(result, Failure)
+        self.assertEqual(calls, [])
+        self.assertEqual(result.error.issues[0].message, "translated:too_small")
+        self.assertEqual(calls, ["Must be at least 5"])
+
+        with self.assertRaises(ValidationError) as caught:
+            await schema.parse_async({"value": "x"}, error=explain)
+        self.assertEqual(calls, ["Must be at least 5"])
+        self.assertIn("translated:invalid_type", str(caught.exception))
+        self.assertEqual(len(calls), 2)
+
+        json_result = await z.integer().safe_parse_json_async(
+            '"x"', error=explain,
+        )
+        self.assertIsInstance(json_result, Failure)
+        self.assertEqual(
+            json_result.error.issues[0].message, "translated:invalid_type",
+        )
+
+        codec = z.codec(
+            z.string().regex(r"^\d+$"), z.integer(), decode=int, encode=str,
+        )
+        codec_result = await codec.safe_decode_async("x", error=explain)
+        self.assertEqual(
+            codec_result.error.issues[0].message, "translated:invalid_format",
+        )
+
     async def test_sync_schema_through_async_parser(self):
         schema = z.object({"value": z.integer().positive()})
         self.assertEqual(await schema.parse_async({"value": 1}), {"value": 1})

@@ -2386,6 +2386,107 @@ class SchemaTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             error.issues[0].params["minimum"] = 0
 
+    def test_parse_error_map(self):
+        calls: list[str] = []
+
+        def explain(issue):
+            calls.append(issue.message)
+            if issue.code == "too_small" and issue.path == ("age",):
+                return f"Age must be at least {issue.params['minimum']}."
+            return issue.message
+
+        schema = z.object({
+            "age": z.integer().min(18),
+            "name": z.string().min(1),
+        })
+        result = schema.safe_parse({"age": 12, "name": ""}, error=explain)
+        self.assertIsInstance(result, Failure)
+        self.assertEqual(calls, [])
+
+        self.assertEqual(
+            [issue.message for issue in result.error.issues],
+            ["Age must be at least 18.", "Must contain at least 1 characters"],
+        )
+        self.assertEqual(
+            calls, ["Must be at least 18", "Must contain at least 1 characters"],
+        )
+        self.assertEqual(
+            result.error.flatten()["field_errors"]["age"],
+            ["Age must be at least 18."],
+        )
+        self.assertEqual(
+            result.error.to_dict()["issues"][0]["message"],
+            "Age must be at least 18.",
+        )
+        self.assertIn(
+            "name: Must contain at least 1 characters",
+            result.error.prettify(),
+        )
+        self.assertEqual(len(calls), 2)
+
+        raised_calls: list[str] = []
+
+        def raised(issue):
+            raised_calls.append(issue.code)
+            return "mapped"
+
+        with self.assertRaises(ValidationError) as caught:
+            z.string().parse(1, error=raised)
+        self.assertEqual(raised_calls, [])
+        self.assertEqual(str(caught.exception), "<root>: mapped")
+        self.assertEqual(raised_calls, ["invalid_type"])
+
+        json_calls: list[str] = []
+
+        def json_error(issue):
+            json_calls.append(issue.code)
+            return "Bad JSON"
+
+        json_result = z.string().safe_parse_json("not json", error=json_error)
+        self.assertIsInstance(json_result, Failure)
+        self.assertEqual(json_calls, [])
+        self.assertEqual(json_result.error.issues[0].code, "invalid_format")
+        self.assertEqual(json_result.error.issues[0].message, "Bad JSON")
+        self.assertEqual(json_calls, ["invalid_format"])
+
+        codec = z.codec(
+            z.string().regex(r"^\d+$"), z.integer(), decode=int, encode=str,
+        )
+        codec_result = codec.safe_decode("x", error=lambda issue: "digits only")
+        self.assertEqual(codec_result.error.issues[0].message, "digits only")
+
+        with self.assertRaises(TypeError):
+            z.string().safe_parse("x", error=1)  # type: ignore[arg-type]
+
+    def test_parse_error_map_failures(self):
+        non_string = z.string().safe_parse(
+            1, error=lambda issue: 1,  # type: ignore[arg-type,return-value]
+        )
+        self.assertIsInstance(non_string, Failure)
+        with self.assertRaises(TypeError):
+            _ = non_string.error.issues
+
+        def broken(issue):
+            raise RuntimeError(issue.code)
+
+        failed = z.string().safe_parse(1, error=broken)
+        self.assertIsInstance(failed, Failure)
+        with self.assertRaises(RuntimeError):
+            _ = failed.error.issues
+
+        def branch_message(issue):
+            return f"mapped:{issue.code}"
+
+        union = z.union(z.string().min(5), z.integer().min(10))
+        union_result = union.safe_parse(3, error=branch_message)
+        self.assertIsInstance(union_result, Failure)
+        issue = union_result.error.issues[0]
+        self.assertEqual(issue.message, "mapped:invalid_union")
+        self.assertEqual(
+            {branch.message for items in issue.branches for branch in items},
+            {"mapped:invalid_type", "mapped:too_small"},
+        )
+
     def test_metadata_is_immutable_and_propagates(self):
         base = z.string()
         name = base.meta({"title": "Name", "examples": ["Alex"]})

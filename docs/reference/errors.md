@@ -44,6 +44,31 @@ Each failure is an `Issue` with:
 | `treeify()` | `dict` | Nested `errors`, `properties`, and `items` |
 | `prettify()` | `str` | Newline-separated human-readable lines |
 
+## Per-parse message mapping
+
+`parse`, `safe_parse`, `parse_json`, `safe_parse_json`, the matching async
+entry points, and the codec `decode`, `safe_decode`, `decode_async`, and
+`safe_decode_async` variants accept a keyword-only `error=` callable:
+
+```python
+def explain(issue):
+    if issue.code == "too_small" and issue.path == ("age",):
+        return f"Age must be at least {issue.params['minimum']}."
+    return issue.message
+
+result = schema.safe_parse(payload, error=explain)
+```
+
+The callable is not invoked during validation. It runs when issue data is first
+materialized through `.issues`, `str(error)`, `.to_dict()`, `.flatten()`,
+`.treeify()`, or `.prettify()`, and each issue is mapped at most once per
+failure. It receives the original `Issue` and must return the replacement
+`message`; code, path, params, and issue order are unchanged. Branch issues in
+an `invalid_union` are mapped independently. A non-string return raises
+`TypeError`, and exceptions raised by the mapper propagate at materialization.
+`validate()`, `validate_json()`, `validate_async()`, and successful parses never
+call the mapper. There is no locale catalog or global configuration.
+
 ## Issue codes
 
 | Code | Reported when | Example params |

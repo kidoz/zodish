@@ -69,6 +69,8 @@ else:
 
 Issues have a `code`, a `message`, a tuple `path`, and structured `params`. Paths contain object keys and collection indices. Codes include `too_small`, `too_big`, `not_multiple_of`, `invalid_type`, `invalid_value`, `invalid_format`, `invalid_key`, `unrecognized_key`, `invalid_length`, `invalid_union`, `required`, and `custom`. Use `to_dict()` for a JSON-serializable representation; params are merged into each serialized issue.
 
+Parse entry points accept a keyword-only `error=callable` that maps each `Issue` to a replacement `message`. It runs only when issue data is materialized, so `validate()` and successful parses never call it. See [per-parse message mapping](docs/reference/errors.md#per-parse-message-mapping).
+
 ```python
 import json
 from zodish import ValidationError, z

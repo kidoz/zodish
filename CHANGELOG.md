@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Parse entry points accept a keyword-only `error=` callable that rewrites issue
+  messages when issue data is materialized. Successful parses, `validate()`,
+  and issue codes, paths, and params are unchanged.
+
 ## [0.7.0] - 2026-10-21
 
 ### Added
