@@ -23,6 +23,7 @@ SDIST_REQUIRED = {
     "LICENSE",
     "rust/lib.rs",
     "rust/errors.rs",
+    "rust/runtime.rs",
     "rust/schema.rs",
     "rust/schema/kind.rs",
     "src/zodish/__init__.py",
