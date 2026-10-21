@@ -15,8 +15,11 @@ entry points are visible to the session parent. `rust/session/containers.rs`
 contains object, array/set/tuple, and record continuations, including snapshots,
 result construction, primitive object-field fast paths, and issue aggregation.
 Its continuation methods are visible within the session module; its path
-helper stays private. Composition, callback, and GC helpers remain in
-`session.rs` during extraction.
+helper stays private. `rust/session/composition.rs` contains union/intersection
+continuations, outcome storage/restoration, and intersection result combination.
+Its six dispatch entry points have session visibility; outcome helpers stay
+private. Frame and stored-outcome types remain in `session.rs` with GC traversal.
+Callback and GC helpers remain there during extraction.
 Paths, issue/error types, and the GC-aware native issue bundle live in
 `rust/errors.rs`.
 `rust/runtime.rs` holds the per-parse `Context`, callback-error normalization,
