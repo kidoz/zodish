@@ -3,9 +3,11 @@ __pycache__/
 *.egg-info/
 .venv/
 .mypy_cache/
+.ruff_cache/
 build/
 dist/
 target/
 *.so
 *.pyd
 *.dylib
+
