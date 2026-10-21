@@ -1,6 +1,7 @@
 //! Immutable native schema nodes, Python construction, and GC integration.
 
 mod checks;
+mod evaluate;
 mod kind;
 
 use std::collections::HashSet;
@@ -16,6 +17,7 @@ use crate::runtime::Context;
 
 use checks::build_error_template;
 
+pub(crate) use evaluate::is_primitive_kind;
 pub(crate) use kind::Kind;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -37,7 +39,7 @@ pub(crate) struct NativeSchema {
     // their factory resolves. Argument schema edges (object catchall, record
     // key, tuple rest) are included so fast-path selection cannot skip them.
     pub(crate) has_async: bool,
-    pub(crate) error_template: Option<ErrorTemplate>,
+    error_template: Option<ErrorTemplate>,
 }
 
 #[pymethods]
