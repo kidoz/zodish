@@ -547,5 +547,76 @@ class NativeTests(unittest.TestCase):
         self.assertIsInstance(z.tuple(z.integer()).safe_parse(WeirdList([1])), Failure)
 
 
+class AsyncSessionProtocolTests(unittest.IsolatedAsyncioTestCase):
+    async def test_successful_session_releases_references(self):
+        class Payload:
+            pass
+
+        class Callback:
+            async def __call__(self, value):
+                return True
+
+        callback = Callback()
+        value = Payload()
+        schema = z.instance_of(Payload).refine_async(callback)
+        session = _native.AsyncSession(
+            schema._node, value, MISSING, Issue, ValidationError,
+        )
+        refs = (
+            weakref.ref(callback),
+            weakref.ref(value),
+            weakref.ref(session),
+        )
+
+        done, payload = session.start()
+        self.assertFalse(done)
+        token, awaitable = payload
+        awaitable.close()
+        done, output = session.resume_value(token, True)
+        self.assertTrue(done)
+        self.assertIs(output, value)
+
+        del callback, value, schema, session
+        del payload, token, awaitable, output, done
+        gc.collect()
+        self.assertEqual([reference() for reference in refs], [None, None, None])
+
+    async def test_failed_session_releases_references(self):
+        class Payload:
+            pass
+
+        class Callback:
+            async def __call__(self, value):
+                return False
+
+        callback = Callback()
+        value = Payload()
+        schema = z.instance_of(Payload).refine_async(callback)
+        session = _native.AsyncSession(
+            schema._node, value, MISSING, Issue, ValidationError,
+        )
+        refs = (
+            weakref.ref(callback),
+            weakref.ref(value),
+            weakref.ref(session),
+        )
+
+        done, payload = session.start()
+        self.assertFalse(done)
+        token, awaitable = payload
+        awaitable.close()
+        try:
+            session.resume_value(token, False)
+        except ValidationError:
+            pass
+        else:
+            self.fail("expected callback validation to fail")
+
+        del callback, value, schema, session
+        del payload, token, awaitable, done
+        gc.collect()
+        self.assertEqual([reference() for reference in refs], [None, None, None])
+
+
 if __name__ == "__main__":
     unittest.main()
