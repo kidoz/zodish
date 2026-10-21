@@ -169,6 +169,11 @@ formatting until they are read. Materializing `.issues` builds and caches the
 `Issue` objects on first access. Results depend on the host, Python version, and
 native build profile; the harness has no pass/fail thresholds.
 
+A [release comparison of the Rust module split](../../benchmarks/results/2026-10-21-macos-arm64-rust-decomposition.md)
+records 12 paired rounds across 22 scenarios, with unchanged Python code and
+benchmark fixtures. Its raw samples, variation, source review, and build hashes
+are available with the report.
+
 ## Packaging consequences
 
 Python builders plus a native core require maturin and PyO3 at build time. Wheels

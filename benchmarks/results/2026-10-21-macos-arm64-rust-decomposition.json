@@ -1,0 +1,4437 @@
+{
+  "format_version": 1,
+  "started_utc": "2026-10-21T18:23:20.987823+00:00",
+  "revisions": {
+    "before": "c4cf19027a9cac02cb9e962e7ad1c8adcf5465aa",
+    "after": "1dd1cd1563e317b2912d954499a42c7b47c41bc3"
+  },
+  "config": {
+    "target_seconds_per_sample": 0.2,
+    "rounds": 12,
+    "iterations": {
+      "sync/string_success": 1677044,
+      "sync/object_success": 611226,
+      "sync/object_failure": 217268,
+      "sync/object_failure_issues": 91467,
+      "sync/array_1000": 37478,
+      "sync/union_first": 1092625,
+      "sync/union_last": 330282,
+      "sync/recursive_tree": 24037,
+      "sync/refine_callback": 1437330,
+      "async/sync_baseline": 575864,
+      "async/sync_graph": 6860,
+      "async/immediate_coroutine": 6414,
+      "async/sleep_zero": 2406,
+      "async/sequential_callbacks": 1444,
+      "async/nested_failures": 6085,
+      "async/nested_failures_issues": 5893,
+      "async/concurrent_parses": 915,
+      "extra/json_object": 359158,
+      "extra/discriminated_first": 962716,
+      "extra/discriminated_last": 783651,
+      "extra/error_string": 4671945,
+      "extra/schema_build": 23485
+    }
+  },
+  "calibrations": {
+    "before": {
+      "counts": {
+        "sync/string_success": 1595816,
+        "sync/object_success": 604209,
+        "sync/object_failure": 208962,
+        "sync/object_failure_issues": 91027,
+        "sync/array_1000": 37478,
+        "sync/union_first": 1092625,
+        "sync/union_last": 330282,
+        "sync/recursive_tree": 22940,
+        "sync/refine_callback": 1434881,
+        "async/sync_baseline": 575864,
+        "async/sync_graph": 5923,
+        "async/immediate_coroutine": 6201,
+        "async/sleep_zero": 2346,
+        "async/sequential_callbacks": 1423,
+        "async/nested_failures": 6041,
+        "async/nested_failures_issues": 5893,
+        "async/concurrent_parses": 915,
+        "extra/json_object": 359158,
+        "extra/discriminated_first": 956044,
+        "extra/discriminated_last": 783651,
+        "extra/error_string": 4671945,
+        "extra/schema_build": 23241
+      },
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "be55102472e43cf43dff469d1bde716efe630c600ee970928980cfaf82840ea4",
+        "schemas_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      }
+    },
+    "after": {
+      "counts": {
+        "sync/string_success": 1677044,
+        "sync/object_success": 611226,
+        "sync/object_failure": 217268,
+        "sync/object_failure_issues": 91467,
+        "sync/array_1000": 36525,
+        "sync/union_first": 1076345,
+        "sync/union_last": 322940,
+        "sync/recursive_tree": 24037,
+        "sync/refine_callback": 1437330,
+        "async/sync_baseline": 568240,
+        "async/sync_graph": 6860,
+        "async/immediate_coroutine": 6414,
+        "async/sleep_zero": 2406,
+        "async/sequential_callbacks": 1444,
+        "async/nested_failures": 6085,
+        "async/nested_failures_issues": 5838,
+        "async/concurrent_parses": 913,
+        "extra/json_object": 356205,
+        "extra/discriminated_first": 962716,
+        "extra/discriminated_last": 771968,
+        "extra/error_string": 4553685,
+        "extra/schema_build": 23485
+      },
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "5bfb0e680daa12e2598f68e3e03f3a3bc3a3cecc2067d0e347cc32ae865454d0",
+        "schemas_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      }
+    }
+  },
+  "runs": [
+    {
+      "variant": "before",
+      "round": 0,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "be55102472e43cf43dff469d1bde716efe630c600ee970928980cfaf82840ea4",
+        "schemas_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.041844822445578536
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5411316189541954
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12012507841117903
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.19009018739268393
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.542000728831326
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 139.60058864273716
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.32909669909294786
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 218.84735847056444
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.13825777100571526
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.590497509062958
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.477574630445453
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6879877135295069
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.54611120349777
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 35.6836996435313
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.2160960927211788
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.35060817311032194
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 84.54261928527528
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.945796587621612
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.78658013715782
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.2606648240100036
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.1825904424440985
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 33.79604207073584
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "round": 0,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "5bfb0e680daa12e2598f68e3e03f3a3bc3a3cecc2067d0e347cc32ae865454d0",
+        "schemas_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04320743287862887
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5252750878457908
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12169010890636704
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.1856916059955831
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.089528717319112
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 138.49258448821288
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.3360264173984719
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 215.38633879716573
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.13789772842637074
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.389032020505761
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.457749639758765
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6238868118785071
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.517136789100956
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 35.08068895300335
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.20937318586077053
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.36061921738446134
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 95.14806733161204
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9521919150563753
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.428937948288777
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.2678487732419316
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.2207790787846613
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 33.147493837381276
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "round": 1,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "5bfb0e680daa12e2598f68e3e03f3a3bc3a3cecc2067d0e347cc32ae865454d0",
+        "schemas_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12094253818037923
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.7782714373913
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.2144315748363827
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.3348816558834587
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.35621236090349345
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 144.92734279760285
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04270958519435064
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5640617555462991
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.627405247924514
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 32.5453505341258
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.506395965654768
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.2549862221823709
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.578511134751254
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.86920339478812
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6384288002366411
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.1908121871644084
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 88.61561388160831
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 217.38925355291272
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.1393187368237311
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9688303523763068
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 34.970332088838816
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.2269962609493965
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "round": 1,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "be55102472e43cf43dff469d1bde716efe630c600ee970928980cfaf82840ea4",
+        "schemas_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12235039748484165
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.978945743610492
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.21779411062098245
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.33141642207707767
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.35423084443791086
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 139.74379639863537
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04293001437278247
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5646732552275002
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.172175655900972
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 32.7984320459975
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.417584983201156
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.2546872472563747
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.495848413880953
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.82167941092248
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6385591222066989
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.18698993250203444
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 85.74736783055516
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 215.0171672142253
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.14243809146132527
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9423868218013517
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 34.56362786354593
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.2502769741933712
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "round": 2,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "be55102472e43cf43dff469d1bde716efe630c600ee970928980cfaf82840ea4",
+        "schemas_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 86.96905320012576
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 141.88336772828112
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5638271791270106
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.1409480884692542
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.5586672904542
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.3560779975819125
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 33.11604354945488
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04347923252508056
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.468282946562608
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.2581781724256109
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 223.07358797815502
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.754458418307157
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.18692266330973561
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 35.22674495193599
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6257801393952656
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.33028761047426974
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9417660446999111
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.6992902502874925
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.21176477174997232
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.80193760946134
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.1847747384433114
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12238050999275746
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "round": 2,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "5bfb0e680daa12e2598f68e3e03f3a3bc3a3cecc2067d0e347cc32ae865454d0",
+        "schemas_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 84.38111305100031
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 139.07580263160898
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5495270632999651
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.14079830310450678
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.481557218581802
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.3562386987211695
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 34.02326064093768
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04236843541630573
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.460219288851086
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.26721083875316104
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 221.92336065649204
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.609204892432368
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.18819578263269665
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 34.95269811630183
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.634575529393364
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.33222388281948967
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9745897555129813
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.768030577920712
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.21203665774839353
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 29.195128717068492
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.233881705977574
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12118589792575932
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "round": 3,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "5bfb0e680daa12e2598f68e3e03f3a3bc3a3cecc2067d0e347cc32ae865454d0",
+        "schemas_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.603326591462006
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.14116278098932092
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.0448677156947013
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.2122141077965157
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 35.03617291700522
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.53140787188145
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5832343759608541
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9698891461246363
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.35839777273754403
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.1224596915762383
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6418286767057328
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 85.14843100561494
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.24747302776753
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.60253113949819
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.25940996055787624
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.19271021622363665
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.3360795221421629
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.493219355368961
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.2357339258895386
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 228.18560983516184
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 143.84735664771395
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 32.677615776610416
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "round": 3,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "be55102472e43cf43dff469d1bde716efe630c600ee970928980cfaf82840ea4",
+        "schemas_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.731410134155078
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.14014947298095415
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04246618185790157
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.21945733113272362
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 34.769104530967816
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.494964723053396
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5654346415793446
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9540333459155942
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.3545390057367997
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12269192102333168
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6123309020783887
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 87.2501213629446
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.060785001404195
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.689329658451443
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.2577539300022356
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.18884643313211302
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.3443099050105597
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.523103554071967
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.2649165819250356
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 215.15824262310733
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 139.33347783999645
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 32.466776171091645
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "round": 4,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "be55102472e43cf43dff469d1bde716efe630c600ee970928980cfaf82840ea4",
+        "schemas_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 85.56461263533787
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.18646154078493155
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 33.549034511241445
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 29.063247084646378
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6222759399554644
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12267418147626166
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.714577151914371
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.2115379385002041
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.492262763414033
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.36418935894608856
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.783704199770578
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.25830168659260216
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 34.52465501425108
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 142.65195083209616
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.471234798853892
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.33885993069820525
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.043573599004352974
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.1755860911682112
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9591658320536834
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.1411100791044523
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5682340139997284
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 219.08624808641488
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "round": 4,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "5bfb0e680daa12e2598f68e3e03f3a3bc3a3cecc2067d0e347cc32ae865454d0",
+        "schemas_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 86.77479925205361
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.19590184189412352
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 33.3239865242053
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.32658527692912
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6316738423564211
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12192449929739185
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.62862462036118
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.21412454451749385
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.639837470695166
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.35481012009889334
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.600681306358597
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.25637938189349957
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 35.1179081961956
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 141.43686565103178
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.515883224399772
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.3330065311347568
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04347838534025951
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.2415793892857967
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9443507925753435
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.14142701467347898
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5681182320863979
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 220.6520939888649
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "round": 5,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "5bfb0e680daa12e2598f68e3e03f3a3bc3a3cecc2067d0e347cc32ae865454d0",
+        "schemas_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.844792803930796
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.34150488689915426
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 9.013056246606732
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6352701388507669
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 141.10540720124283
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.32720481040139
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 32.796707670838146
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9762374901049301
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 34.92003936876761
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 32.94737748558259
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.550444047183127
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5626094003175773
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 85.34924854560698
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.14103760653487812
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.21498924189389804
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.20230827868626075
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.3785122581038055
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04385808094918222
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12410606579194283
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.26087500558236676
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.305007084514981
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 225.7926688525416
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "round": 5,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "be55102472e43cf43dff469d1bde716efe630c600ee970928980cfaf82840ea4",
+        "schemas_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.65476542474707
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.3399705411756721
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.654477139424692
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6292429651064861
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 141.02842243771605
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.36140670548928
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.32686966007114
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9763903335971932
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 34.43481673176538
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 32.93092982737003
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.541702251973566
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5680147511700689
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 85.32876142974361
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.1404562049069456
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.21725925194920861
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.19052198421235997
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.35618884493517694
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04405625858176697
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12293833674041348
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.25521336411424067
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.212749778616051
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 224.66580109219728
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "round": 6,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "be55102472e43cf43dff469d1bde716efe630c600ee970928980cfaf82840ea4",
+        "schemas_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9719453624117319
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.33672890060333277
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 35.978215679587926
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.518416010268561
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 143.49457548514516
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.18760019768925348
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 219.13893442665218
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.557291397592855
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.1414444087303849
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 29.45751341120854
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12324949971484989
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.3663257887264283
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04494587735959085
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.1977129237798145
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5535529154260742
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 35.545912078865754
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.99313907725366
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.2610796030396355
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.214980240279306
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 86.61878304230379
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6245332261519874
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.053041627606163
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "round": 6,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "5bfb0e680daa12e2598f68e3e03f3a3bc3a3cecc2067d0e347cc32ae865454d0",
+        "schemas_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9969745475579216
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.336617853298014
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 35.146982351783286
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.524994677483937
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 146.887927284375
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.19427830591483944
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 219.8911661193439
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.530709109333651
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.14206685938447766
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 29.428595772613217
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12310229069741374
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.36312045899886813
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.043471651956350964
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.2193277356831507
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5722303972090673
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 33.41492752688977
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.691565794408776
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.2577280894158032
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.21458915817349952
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 86.64872527037895
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6344869687119215
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.666920018712126
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "round": 7,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "5bfb0e680daa12e2598f68e3e03f3a3bc3a3cecc2067d0e347cc32ae865454d0",
+        "schemas_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.18922808191265902
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 34.89930137430858
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.947596977007064
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.558800042690206
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12128065811129411
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 226.7472218581198
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 85.29138944267879
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.254353110950029
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.639848650016955
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 141.2460761770026
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.625539365560476
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.26040381368764054
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.14000174490178977
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.362357186765373
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.3390694145852179
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6231057853562366
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 34.327711585969205
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04317081344055487
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 30.413890962238046
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 33.46422528843106
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.21610730267161862
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5588749714608798
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "round": 7,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "be55102472e43cf43dff469d1bde716efe630c600ee970928980cfaf82840ea4",
+        "schemas_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.19110753918372145
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 36.85932462235923
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9657972365896554
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.599177090552375
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12159370893026565
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 218.30327868933313
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 85.04850748090519
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.1745533908235792
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.764415276468602
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 142.7028801936355
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.705233851466934
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.2717970652752197
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.139623903347941
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.35971941118040535
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.35698790954555637
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6238941268394063
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 32.92392506179493
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04471157087677252
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 29.422090670358884
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.38282148400476
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.21642814080273567
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5741113019917913
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "round": 8,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "be55102472e43cf43dff469d1bde716efe630c600ee970928980cfaf82840ea4",
+        "schemas_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.26781883772132553
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.2136458176247618
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12662769015063005
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.593522461177514
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9714981451535526
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.564100732822755
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.629682362340634
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.2223144821539914
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.33156673309239026
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04375873795610754
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.486533364424137
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.14327871261287936
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.84609664268868
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 34.928531138837386
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.36088808989701354
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 222.76211256823564
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 85.52632294317026
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 141.24368074683383
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 32.73325801139522
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.555307994028574
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.23896982500514
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.19140960256265271
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "round": 8,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "5bfb0e680daa12e2598f68e3e03f3a3bc3a3cecc2067d0e347cc32ae865454d0",
+        "schemas_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.2679533044699444
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.2651899045571047
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12254302331974702
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.589766531770419
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9405141346196726
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5442787937332891
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.637883811411665
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.21057391276283038
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.3333374234743599
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04284919514243291
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 32.14128593687778
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.14092170900232537
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.566061322159747
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 35.16344255882489
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.3596649260918058
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 228.6068305991529
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 86.18911055711604
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 142.42154362903236
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 33.242063763384586
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.4600621164543375
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.484444752160417
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.18869473424041405
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "round": 9,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "5bfb0e680daa12e2598f68e3e03f3a3bc3a3cecc2067d0e347cc32ae865454d0",
+        "schemas_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04260221577944586
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6319411654300923
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 145.02510387922123
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 216.78852458908148
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.14157485824397376
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.45996398516283
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.302526676355498
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12106865293875213
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.18647378194725203
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 34.89319260135589
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.226060590157445
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.36089597543895674
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.454734700642145
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.644308452156126
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9575451378039822
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 34.166132621380065
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5823518702063024
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.2100410889616465
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.3314074237686893
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 85.62823857048997
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.25981702951951036
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.618237152464965
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "round": 9,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "be55102472e43cf43dff469d1bde716efe630c600ee970928980cfaf82840ea4",
+        "schemas_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04354993840880881
+        },
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6509552170561625
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 144.00155817149772
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 218.49084699423372
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.1407200044523346
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.92089569696609
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.881930175028458
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12375187114995227
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.19198413636857337
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 35.664623281847945
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.2168760317952008
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.3605125672033762
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.933357948204048
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.657643176509257
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9528451037463429
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 33.550417748505716
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5683238045642145
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.21707176155821056
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.33580071037557385
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 89.93651288465502
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.2715359464844506
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.6518101552899545
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "round": 10,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "be55102472e43cf43dff469d1bde716efe630c600ee970928980cfaf82840ea4",
+        "schemas_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6358999037167749
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.22039937011654653
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 148.34727008240603
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.259348540991577
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5479455894058844
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9873867343570134
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.81767691472096
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 33.64448085473774
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.2706351960236937
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 34.99490208712687
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.725388775315405
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 32.41448394134832
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 221.11703060073407
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.14788545984537912
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.572430955908471
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.630295346598499
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 86.95194305850265
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04442721393326091
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12432880413367935
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.355889585042611
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.18863913419580752
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.3408831872347892
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "round": 10,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "5bfb0e680daa12e2598f68e3e03f3a3bc3a3cecc2067d0e347cc32ae865454d0",
+        "schemas_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6586351481485093
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.21498201442485687
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 141.20264889210364
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.283804541537538
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5760806079740307
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9769497394890712
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.843449681727622
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 33.153745439707095
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.26209493511658016
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 34.78002867817638
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 29.378140233276355
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.844981135034818
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 218.79234972616337
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.13972542283312953
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.594313732179149
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.547530097650492
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 86.18130008273702
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.04326235304580841
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12148125928634705
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.36325221753788267
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.19247942615271968
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.33658758626260166
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "round": 11,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "5bfb0e680daa12e2598f68e3e03f3a3bc3a3cecc2067d0e347cc32ae865454d0",
+        "schemas_path": "<run-root>/after/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.6406122888916022
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.14132700284630512
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 143.0384349030072
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 34.73389343293958
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.587980495224141
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.719891836801317
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12268737433184845
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.35788673020043305
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.2607293195563265
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.215076668508549
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.772583225864182
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 223.20095628404243
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.520961975730131
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 86.90033624250279
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.832092609895668
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.202614057535572
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 33.588954971303735
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.1894639441709132
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9511580536476288
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5692231302097734
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.34266594189302335
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.043005036874303064
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "round": 11,
+      "metadata": {
+        "python": "3.14.3 (main, Mar 25 2026, 03:28:18) [Clang 22.1.1 ]",
+        "base_executable": "/Users/apavlov/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "gil_enabled": true,
+        "native_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/_native.abi3.so",
+        "native_sha256": "be55102472e43cf43dff469d1bde716efe630c600ee970928980cfaf82840ea4",
+        "schemas_path": "<run-root>/before/venv/lib/python3.14/site-packages/zodish/schemas.py",
+        "schemas_sha256": "6ca008348f87c8bac77c3376ad36f95871f2e98472b780c72a1970adf063c16a",
+        "harness_sha256": {
+          "bench_parse.py": "1b03b812e304968a09be8931d96c9f39fd4cf67189e7591a4937ac9af87613c8",
+          "bench_async.py": "3710113fb8c82137ccce69d3205e3ab75338535f58f3cfea097ec84af0bb7c9c",
+          "bench_compare.py": "cae9f3e2f60f46eef499d4f442ca4a9daf30f8093fc13e24267fd2d6699e1a2c"
+        },
+        "classes": {
+          "NativeSchema": {
+            "module": "zodish._native",
+            "qualname": "NativeSchema",
+            "signature": "(kind, children, args)",
+            "weakref_offset": 0
+          },
+          "AsyncSession": {
+            "module": "zodish._native",
+            "qualname": "AsyncSession",
+            "signature": "(node, value, missing, issue_type, error_type)",
+            "weakref_offset": 192
+          }
+        }
+      },
+      "samples": [
+        {
+          "name": "sync/union_last",
+          "iterations": 330282,
+          "microseconds_per_operation": 0.624982085009192
+        },
+        {
+          "name": "sync/refine_callback",
+          "iterations": 1437330,
+          "microseconds_per_operation": 0.14089576436894355
+        },
+        {
+          "name": "async/sequential_callbacks",
+          "iterations": 1444,
+          "microseconds_per_operation": 144.04651384964612
+        },
+        {
+          "name": "async/nested_failures_issues",
+          "iterations": 5893,
+          "microseconds_per_operation": 34.966676565256954
+        },
+        {
+          "name": "sync/array_1000",
+          "iterations": 37478,
+          "microseconds_per_operation": 5.5663767276711695
+        },
+        {
+          "name": "async/sync_graph",
+          "iterations": 6860,
+          "microseconds_per_operation": 28.584900437556406
+        },
+        {
+          "name": "sync/string_success",
+          "iterations": 1677044,
+          "microseconds_per_operation": 0.12295575369486851
+        },
+        {
+          "name": "async/sync_baseline",
+          "iterations": 575864,
+          "microseconds_per_operation": 0.3648220326338882
+        },
+        {
+          "name": "extra/discriminated_last",
+          "iterations": 783651,
+          "microseconds_per_operation": 0.27244807701491275
+        },
+        {
+          "name": "extra/discriminated_first",
+          "iterations": 962716,
+          "microseconds_per_operation": 0.2179946276977278
+        },
+        {
+          "name": "sync/recursive_tree",
+          "iterations": 24037,
+          "microseconds_per_operation": 8.709309273165125
+        },
+        {
+          "name": "async/concurrent_parses",
+          "iterations": 915,
+          "microseconds_per_operation": 224.6997715860619
+        },
+        {
+          "name": "extra/schema_build",
+          "iterations": 23485,
+          "microseconds_per_operation": 8.524893549031157
+        },
+        {
+          "name": "async/sleep_zero",
+          "iterations": 2406,
+          "microseconds_per_operation": 85.84493640887426
+        },
+        {
+          "name": "async/immediate_coroutine",
+          "iterations": 6414,
+          "microseconds_per_operation": 31.299604926593048
+        },
+        {
+          "name": "sync/object_failure_issues",
+          "iterations": 91467,
+          "microseconds_per_operation": 2.236840882513621
+        },
+        {
+          "name": "async/nested_failures",
+          "iterations": 6085,
+          "microseconds_per_operation": 33.09676795400346
+        },
+        {
+          "name": "sync/union_first",
+          "iterations": 1092625,
+          "microseconds_per_operation": 0.18933954925201543
+        },
+        {
+          "name": "sync/object_failure",
+          "iterations": 217268,
+          "microseconds_per_operation": 0.9470231833433488
+        },
+        {
+          "name": "extra/json_object",
+          "iterations": 359158,
+          "microseconds_per_operation": 0.5700345196260506
+        },
+        {
+          "name": "sync/object_success",
+          "iterations": 611226,
+          "microseconds_per_operation": 0.5464862162272712
+        },
+        {
+          "name": "extra/error_string",
+          "iterations": 4671945,
+          "microseconds_per_operation": 0.05535859968418181
+        }
+      ]
+    }
+  ],
+  "worker_source": "from __future__ import annotations\nimport hashlib\nimport importlib.util\nimport inspect\nimport json\nimport math\nimport platform\nimport random\nimport sys\nfrom pathlib import Path\nfrom types import SimpleNamespace\nimport zodish._native as native\nimport zodish.schemas as schemas\n\nroot = Path(__file__).parent\nharness = root / \"after/source/benchmarks\"\ndef load(name, path):\n    spec = importlib.util.spec_from_file_location(name, path)\n    module = importlib.util.module_from_spec(spec)\n    sys.modules[name] = module\n    spec.loader.exec_module(module)\n    return module\nparse = load(\"refactor_bench_parse\", harness / \"bench_parse.py\")\nasync_bench = load(\"refactor_bench_async\", harness / \"bench_async.py\")\ncompare = load(\"refactor_bench_compare\", harness / \"bench_compare.py\")\nadapter = compare.zodish_adapter()\ncompare.conformance(adapter)\nentries = [(\"sync/\" + s.name, parse, s) for s in parse.scenarios()]\nentries += [(\"async/\" + s.name, async_bench, s) for s in async_bench.scenarios()]\nextra_names = {\"json_object\", \"discriminated_first\", \"discriminated_last\", \"error_string\", \"schema_build\"}\nfor case in compare.cases(adapter):\n    if case.name in extra_names:\n        scenario = SimpleNamespace(name=case.name, call=case.call, check=case.check, expect_failure=False, inspect_issues=False, items_per_operation=1)\n        entries.append((\"extra/\" + case.name, parse, scenario))\n\ndef measure(module, scenario, iterations):\n    kwargs = {\"iterations\": iterations, \"repeat\": 1}\n    if module is async_bench:\n        kwargs[\"memory\"] = False\n    return module.measure(scenario, **kwargs)[\"microseconds_per_operation\"]\n\ndef digest(path):\n    return hashlib.sha256(Path(path).read_bytes()).hexdigest()\nmetadata = {\n    \"python\": sys.version,\n    \"base_executable\": sys._base_executable,\n    \"platform\": platform.platform(),\n    \"gil_enabled\": sys._is_gil_enabled(),\n    \"native_path\": native.__file__,\n    \"native_sha256\": digest(native.__file__),\n    \"schemas_path\": schemas.__file__,\n    \"schemas_sha256\": digest(schemas.__file__),\n    \"harness_sha256\": {p.name: digest(p) for p in [harness / \"bench_parse.py\", harness / \"bench_async.py\", harness / \"bench_compare.py\"]},\n    \"classes\": {cls.__name__: {\"module\": cls.__module__, \"qualname\": cls.__qualname__, \"signature\": str(inspect.signature(cls)), \"weakref_offset\": cls.__weakrefoffset__} for cls in [native.NativeSchema, native.AsyncSession]},\n}\nmode = sys.argv[1]\nif mode == \"calibrate\":\n    counts = {}\n    for name, module, scenario in entries:\n        iterations = min(getattr(scenario, \"iterations\", 1000), 1000)\n        for _ in range(5):\n            micros = measure(module, scenario, iterations)\n            elapsed = micros * iterations / 1e6\n            if elapsed >= 0.1:\n                break\n            iterations = max(iterations + 1, math.ceil(iterations * 0.2 / max(elapsed, 1e-6)))\n        counts[name] = max(1, math.ceil(200000 / micros))\n    print(json.dumps({\"counts\": counts, \"metadata\": metadata}))\nelse:\n    config = json.loads((root / \"benchmark-config.json\").read_text())\n    round_index = int(sys.argv[2])\n    random.Random(4731 + round_index).shuffle(entries)\n    samples = []\n    for name, module, scenario in entries:\n        iterations = config[\"iterations\"][name]\n        micros = measure(module, scenario, iterations)\n        samples.append({\"name\": name, \"iterations\": iterations, \"microseconds_per_operation\": micros})\n    print(json.dumps({\"round\": round_index, \"metadata\": metadata, \"samples\": samples}))\n",
+  "finished_utc": "2026-10-21T18:25:11.869599+00:00",
+  "runner_source": "import datetime\nimport hashlib\nimport json\nimport os\nfrom pathlib import Path\nimport statistics\nimport subprocess\nimport time\n\nroot = Path(__file__).parent\nenv = os.environ.copy()\nenv.pop(\"PYTHONPATH\", None)\nenv[\"PYTHONHASHSEED\"] = \"0\"\nworker = root / \"benchmark-worker.py\"\npython = {v: root / v / \"venv/bin/python\" for v in [\"before\", \"after\"]}\ndef run(variant, *args):\n    return json.loads(subprocess.check_output([str(python[variant]), str(worker), *map(str, args)], cwd=root, env=env, text=True))\ncalibrations = {v: run(v, \"calibrate\") for v in [\"before\", \"after\"]}\nconfig = {\"target_seconds_per_sample\": 0.2, \"rounds\": 12, \"iterations\": {name: max(calibrations[v][\"counts\"][name] for v in [\"before\", \"after\"]) for name in calibrations[\"before\"][\"counts\"]}}\n(root / \"benchmark-config.json\").write_text(json.dumps(config, indent=2) + \"\\n\")\nassert calibrations[\"before\"][\"metadata\"][\"schemas_sha256\"] == calibrations[\"after\"][\"metadata\"][\"schemas_sha256\"]\nassert calibrations[\"before\"][\"metadata\"][\"classes\"] == calibrations[\"after\"][\"metadata\"][\"classes\"]\nresult = {\"format_version\": 1, \"started_utc\": datetime.datetime.now(datetime.timezone.utc).isoformat(), \"revisions\": json.loads((root / \"revisions.json\").read_text()), \"config\": config, \"calibrations\": calibrations, \"runs\": [], \"worker_source\": worker.read_text()}\nfor round_index in range(config[\"rounds\"]):\n    order = [\"before\", \"after\"] if round_index % 2 == 0 else [\"after\", \"before\"]\n    for variant in order:\n        run_result = run(variant, \"sample\", round_index)\n        result[\"runs\"].append({\"variant\": variant, **run_result})\n        (root / \"benchmark-raw.json\").write_text(json.dumps(result, indent=2) + \"\\n\")\n    print(f\"Completed paired round {round_index + 1}/{config['rounds']} ({len(config['iterations'])} scenarios).\", flush=True)\nresult[\"finished_utc\"] = datetime.datetime.now(datetime.timezone.utc).isoformat()\nresult[\"runner_source\"] = Path(__file__).read_text()\n(root / \"benchmark-raw.json\").write_text(json.dumps(result, indent=2) + \"\\n\")\nprint(\"Paired release benchmark comparison complete.\", flush=True)\n",
+  "summary": [
+    {
+      "name": "async/concurrent_parses",
+      "before": {
+        "median_us": 219.11259125653353,
+        "mean_us": 220.03003169415956,
+        "sample_stdev_us": 3.2822289858131297,
+        "min_us": 215.0171672142253,
+        "max_us": 224.6997715860619,
+        "cv_percent": 1.4917186351976754
+      },
+      "after": {
+        "median_us": 221.28772732267845,
+        "mean_us": 221.94636457158688,
+        "sample_stdev_us": 4.562277192199467,
+        "min_us": 215.38633879716573,
+        "max_us": 228.6068305991529,
+        "cv_percent": 2.0555764456903027
+      },
+      "paired_latency_change_percent": 0.42242107040371124,
+      "paired_latency_ratios": [
+        0.9841852344136737,
+        1.0110320788308222,
+        0.9948437314695651,
+        1.0605478416872671,
+        1.0071471665434353,
+        1.0050157511951803,
+        1.003432670212894,
+        1.038679873337144,
+        1.0262374869924387,
+        0.9922087243993467,
+        0.9894866493627607,
+        0.9933296981503811
+      ]
+    },
+    {
+      "name": "async/immediate_coroutine",
+      "before": {
+        "median_us": 31.478884081639016,
+        "mean_us": 31.561705306041187,
+        "sample_stdev_us": 0.40002909824454813,
+        "min_us": 31.053041627606163,
+        "max_us": 32.41448394134832,
+        "cv_percent": 1.2674508375438733
+      },
+      "after": {
+        "median_us": 31.722595728051715,
+        "mean_us": 31.888191625115134,
+        "sample_stdev_us": 0.6430167762143083,
+        "min_us": 31.24747302776753,
+        "max_us": 33.46422528843106,
+        "cv_percent": 2.016473005975881
+      },
+      "paired_latency_change_percent": 0.3714557509763461,
+      "paired_latency_ratios": [
+        0.9887486421211142,
+        0.9937247991904397,
+        0.9975566119075084,
+        1.006010409149508,
+        1.001418705870019,
+        1.0469194026315514,
+        1.019768704092427,
+        1.0663230297979152,
+        1.0207946859336834,
+        0.9855601886557629,
+        0.98243060702913,
+        1.0170126007836668
+      ]
+    },
+    {
+      "name": "async/nested_failures",
+      "before": {
+        "median_us": 33.10640575172917,
+        "mean_us": 33.346001657099514,
+        "sample_stdev_us": 0.8049842744471795,
+        "min_us": 32.466776171091645,
+        "max_us": 35.545912078865754,
+        "cv_percent": 2.4140353698920745
+      },
+      "after": {
+        "median_us": 33.283025143794944,
+        "mean_us": 33.37988505895646,
+        "sample_stdev_us": 0.5624126339482207,
+        "min_us": 32.5453505341258,
+        "max_us": 34.327711585969205,
+        "cv_percent": 1.6848848728953747
+      },
+      "paired_latency_change_percent": 0.3496735196126366,
+      "paired_latency_ratios": [
+        0.9808099353173625,
+        0.9922837313833549,
+        1.0273950929593378,
+        1.006494011121021,
+        0.9932919682990956,
+        1.0004994592712317,
+        0.9400497996155517,
+        1.0426372773458663,
+        1.0155439996780105,
+        1.0183519286552483,
+        0.9854140886539628,
+        1.0148711504997798
+      ]
+    },
+    {
+      "name": "async/nested_failures_issues",
+      "before": {
+        "median_us": 34.98078932619191,
+        "mean_us": 35.21624350925115,
+        "sample_stdev_us": 0.7140667186518391,
+        "min_us": 34.43481673176538,
+        "max_us": 36.85932462235923,
+        "cv_percent": 2.0276629404389963
+      },
+      "after": {
+        "median_us": 34.961515102570324,
+        "mean_us": 34.97455671979175,
+        "sample_stdev_us": 0.13899966064359245,
+        "min_us": 34.73389343293958,
+        "max_us": 35.16344255882489,
+        "cv_percent": 0.3974308002163583
+      },
+      "paired_latency_change_percent": -0.6398709810602865,
+      "paired_latency_ratios": [
+        0.9831012283885407,
+        1.0117668268764644,
+        0.9922204894034895,
+        1.0076811982833649,
+        1.017183464445905,
+        1.0140910474646037,
+        0.9768962047699259,
+        0.9468242224150335,
+        1.0067254880846193,
+        0.9783698632004145,
+        0.9938598654050947,
+        0.9933427149736996
+      ]
+    },
+    {
+      "name": "async/sequential_callbacks",
+      "before": {
+        "median_us": 142.26765928018864,
+        "mean_us": 142.3398402007189,
+        "sample_stdev_us": 2.517877648505486,
+        "min_us": 139.33347783999645,
+        "max_us": 148.34727008240603,
+        "cv_percent": 1.7689198224157971
+      },
+      "after": {
+        "median_us": 141.92920464003208,
+        "mean_us": 142.39225784851294,
+        "sample_stdev_us": 2.4791728974621727,
+        "min_us": 138.49258448821288,
+        "max_us": 146.887927284375,
+        "cv_percent": 1.741086864497713
+      },
+      "paired_latency_change_percent": -0.3226203255223936,
+      "paired_latency_ratios": [
+        0.9920630409563683,
+        1.0370932129550912,
+        0.9802121619917504,
+        1.0323962257864618,
+        0.9914821691958874,
+        1.0005458811932806,
+        1.023647944793433,
+        0.989791348186833,
+        1.0083392253442456,
+        1.0071078793918642,
+        0.9518385394868838,
+        0.9930017122962715
+      ]
+    },
+    {
+      "name": "async/sleep_zero",
+      "before": {
+        "median_us": 85.79615211971472,
+        "mean_us": 86.27746179686612,
+        "sample_stdev_us": 1.4252567964725038,
+        "min_us": 84.54261928527528,
+        "max_us": 89.93651288465502,
+        "cv_percent": 1.6519456724725687
+      },
+      "after": {
+        "median_us": 86.18520531992652,
+        "mean_us": 86.85469776944998,
+        "sample_stdev_us": 2.829594356240952,
+        "min_us": 84.38111305100031,
+        "max_us": 95.14806733161204,
+        "cv_percent": 3.257848370795005
+      },
+      "paired_latency_change_percent": 0.160074166983315,
+      "paired_latency_ratios": [
+        1.125444990183595,
+        1.0334499603150626,
+        0.9702429766233018,
+        0.9759118918747745,
+        1.014143541114051,
+        1.0002400962526596,
+        1.000345678235407,
+        1.0028558051042593,
+        1.00774951606871,
+        0.9520964936711469,
+        0.9911371391062863,
+        1.0122942584359516
+      ]
+    },
+    {
+      "name": "async/sync_baseline",
+      "before": {
+        "median_us": 0.35795412805779114,
+        "mean_us": 0.35866597495266106,
+        "sample_stdev_us": 0.004849625652507771,
+        "min_us": 0.35060817311032194,
+        "max_us": 0.3663257887264283,
+        "cv_percent": 1.3521287189697473
+      },
+      "after": {
+        "median_us": 0.36014207173813356,
+        "mean_us": 0.3609973269152239,
+        "sample_stdev_us": 0.006182072687627902,
+        "min_us": 0.35481012009889334,
+        "max_us": 0.3785122581038055,
+        "cv_percent": 1.7124981895169797
+      },
+      "paired_latency_change_percent": 0.33286825126332964,
+      "paired_latency_ratios": [
+        1.0285533682381938,
+        1.005593856369924,
+        1.000451308815339,
+        1.0108838997636524,
+        0.9742462578414225,
+        1.0626729710546978,
+        0.9912500571179992,
+        1.0073328697395336,
+        0.9966106839226619,
+        1.0010635086553425,
+        1.0206879684169183,
+        0.9809899024371289
+      ]
+    },
+    {
+      "name": "async/sync_graph",
+      "before": {
+        "median_us": 28.655144606435904,
+        "mean_us": 28.728877150154627,
+        "sample_stdev_us": 0.42075275068687523,
+        "min_us": 28.172175655900972,
+        "max_us": 29.45751341120854,
+        "cv_percent": 1.4645638549942792
+      },
+      "after": {
+        "median_us": 28.57940655990298,
+        "mean_us": 28.818729239580744,
+        "sample_stdev_us": 0.6669993292421341,
+        "min_us": 28.089528717319112,
+        "max_us": 30.413890962238046,
+        "cv_percent": 2.3144647485915226
+      },
+      "paired_latency_change_percent": 0.30007025946252597,
+      "paired_latency_ratios": [
+        0.9841471515675789,
+        1.016158836917098,
+        1.0136515505636672,
+        1.001278932933669,
+        0.9746531485084327,
+        0.9987940691573218,
+        0.9990183272365304,
+        1.0337093751423432,
+        1.0086927720336991,
+        0.9799388927553769,
+        1.0227238511223171,
+        1.0047224722555812
+      ]
+    },
+    {
+      "name": "extra/discriminated_first",
+      "before": {
+        "median_us": 0.2171655067537096,
+        "mean_us": 0.21692484327356565,
+        "sample_stdev_us": 0.003161237102129844,
+        "min_us": 0.2115379385002041,
+        "max_us": 0.2223144821539914,
+        "cv_percent": 1.45729601756272
+      },
+      "after": {
+        "median_us": 0.21427805967693828,
+        "mean_us": 0.21321162151303794,
+        "sample_stdev_us": 0.002266271719090459,
+        "min_us": 0.20937318586077053,
+        "max_us": 0.21610730267161862,
+        "cv_percent": 1.0629212905976027
+      },
+      "paired_latency_change_percent": -1.4412260602030824,
+      "paired_latency_ratios": [
+        0.9688892715469751,
+        0.9845609425571133,
+        1.0012839057043077,
+        0.966994844515687,
+        1.0122276223150735,
+        0.989551606962905,
+        0.9981808462708089,
+        0.9985175766426351,
+        0.9471893631156757,
+        0.9676112980053433,
+        0.9754202759798044,
+        0.986614536238825
+      ]
+    },
+    {
+      "name": "extra/discriminated_last",
+      "before": {
+        "median_us": 0.2608722135248196,
+        "mean_us": 0.26334282916335877,
+        "sample_stdev_us": 0.006950107133508505,
+        "min_us": 0.2546872472563747,
+        "max_us": 0.27244807701491275,
+        "cv_percent": 2.6391860205911146
+      },
+      "after": {
+        "median_us": 0.2605665666219835,
+        "mean_us": 0.26128638949808425,
+        "sample_stdev_us": 0.004334180429722417,
+        "min_us": 0.2549862221823709,
+        "max_us": 0.2679533044699444,
+        "cv_percent": 1.6587853803055423
+      },
+      "paired_latency_change_percent": -0.3470005083673122,
+      "paired_latency_ratios": [
+        1.027560102362152,
+        1.001173890444916,
+        1.0349861734734864,
+        1.0064248508475748,
+        0.992557908837295,
+        1.022183953758753,
+        0.9871628668620142,
+        0.9580817711330237,
+        1.0005020809953586,
+        0.9568421156879451,
+        0.9684436428351106,
+        0.9569871896803852
+      ]
+    },
+    {
+      "name": "extra/error_string",
+      "before": {
+        "median_us": 0.04366616848023026,
+        "mean_us": 0.04459183725051546,
+        "sample_stdev_us": 0.003506581625839806,
+        "min_us": 0.041844822445578536,
+        "max_us": 0.05535859968418181,
+        "cv_percent": 7.863729870872885
+      },
+      "after": {
+        "median_us": 0.04318912315959187,
+        "mean_us": 0.0432375751426937,
+        "sample_stdev_us": 0.000660847847117616,
+        "min_us": 0.04236843541630573,
+        "max_us": 0.0448677156947013,
+        "cv_percent": 1.528410982661886
+      },
+      "paired_latency_change_percent": -2.127357154689169,
+      "paired_latency_ratios": [
+        1.0325634177280232,
+        0.994865383074002,
+        0.97445223744154,
+        1.056551677870067,
+        0.9978148772130585,
+        0.9955017144223235,
+        0.9671999860755792,
+        0.9655400737213179,
+        0.9792146013308942,
+        0.9782382555753224,
+        0.9737804650725482,
+        0.7768447381191859
+      ]
+    },
+    {
+      "name": "extra/json_object",
+      "before": {
+        "median_us": 0.5650539484034225,
+        "mean_us": 0.5624486936578849,
+        "sample_stdev_us": 0.009792927116463028,
+        "min_us": 0.5411316189541954,
+        "max_us": 0.5741113019917913,
+        "cv_percent": 1.7411236308106133
+      },
+      "after": {
+        "median_us": 0.5660899938163485,
+        "mean_us": 0.5629888071541856,
+        "sample_stdev_us": 0.01672944565837543,
+        "min_us": 0.5252750878457908,
+        "max_us": 0.5832343759608541,
+        "cv_percent": 2.971541431336794
+      },
+      "paired_latency_change_percent": -0.12531652944228755,
+      "paired_latency_ratios": [
+        0.9706974596327428,
+        0.9989170734127389,
+        0.9746374131002575,
+        1.0314797380149758,
+        0.9997962425506429,
+        0.9904837843711682,
+        1.0337410954987327,
+        0.9734610162209814,
+        0.9648609939039132,
+        1.024683227289493,
+        1.0513463729102226,
+        0.9985765959984153
+      ]
+    },
+    {
+      "name": "extra/schema_build",
+      "before": {
+        "median_us": 8.581464232485715,
+        "mean_us": 8.583767266348715,
+        "sample_stdev_us": 0.08764403018356082,
+        "min_us": 8.468282946562608,
+        "max_us": 8.731410134155078,
+        "cv_percent": 1.0210438781018119
+      },
+      "after": {
+        "median_us": 8.592040131974784,
+        "mean_us": 8.584633670423026,
+        "sample_stdev_us": 0.11193398556086744,
+        "min_us": 8.389032020505761,
+        "max_us": 8.844792803930796,
+        "cv_percent": 1.3038877354373077
+      },
+      "paired_latency_change_percent": -0.044912627685689266,
+      "paired_latency_ratios": [
+        0.9765478671817724,
+        1.0097297782214714,
+        0.9990477812606869,
+        0.9853307151164458,
+        1.0173775484099372,
+        1.0219563870142996,
+        1.0007722876186658,
+        0.9908452217061315,
+        0.9995629348239836,
+        0.9984597743194924,
+        1.0025526920407093,
+        0.9995388126223027
+      ]
+    },
+    {
+      "name": "sync/array_1000",
+      "before": {
+        "median_us": 5.561834062632013,
+        "mean_us": 5.58360154845697,
+        "sample_stdev_us": 0.09840014712713974,
+        "min_us": 5.417584983201156,
+        "max_us": 5.783704199770578,
+        "cv_percent": 1.762306036223746
+      },
+      "after": {
+        "median_us": 5.54898707241681,
+        "mean_us": 5.556653325505227,
+        "sample_stdev_us": 0.08412854661986785,
+        "min_us": 5.457749639758765,
+        "max_us": 5.768030577920712,
+        "cv_percent": 1.514014671991772
+      },
+      "paired_latency_change_percent": -0.50970396541139,
+      "paired_latency_ratios": [
+        0.9963806991188222,
+        1.0163930944745672,
+        1.012061208433761,
+        0.9945892380234346,
+        0.9683554194525991,
+        1.0015774566752387,
+        0.9952166826683377,
+        0.9927887532026273,
+        0.9828549780360303,
+        0.9940597787429987,
+        0.9853000164550856,
+        1.0038811184743526
+      ]
+    },
+    {
+      "name": "sync/object_failure",
+      "before": {
+        "median_us": 0.9565995889846388,
+        "mean_us": 0.9596695609409159,
+        "sample_stdev_us": 0.014851379351623081,
+        "min_us": 0.9417660446999111,
+        "max_us": 0.9873867343570134,
+        "cv_percent": 1.5475513610186744
+      },
+      "after": {
+        "median_us": 0.9631877450901445,
+        "mean_us": 0.9630690034896595,
+        "sample_stdev_us": 0.01683415631715978,
+        "min_us": 0.9405141346196726,
+        "max_us": 0.9969745475579216,
+        "cv_percent": 1.7479699020694865
+      },
+      "paired_latency_change_percent": 0.46494041154954147,
+      "paired_latency_ratios": [
+        1.006761842364906,
+        1.0280601659140445,
+        1.0348533598103224,
+        1.0166197547254756,
+        0.9845542460091398,
+        0.999843460666289,
+        1.0257516380180915,
+        0.9811551960462647,
+        0.9681069792171525,
+        1.0049326317983478,
+        0.9894296788636331,
+        1.0043661764326428
+      ]
+    },
+    {
+      "name": "sync/object_failure_issues",
+      "before": {
+        "median_us": 2.2131977981204063,
+        "mean_us": 2.2141560161932192,
+        "sample_stdev_us": 0.03252130722312843,
+        "min_us": 2.1745533908235792,
+        "max_us": 2.2649165819250356,
+        "cv_percent": 1.468790229111409
+      },
+      "after": {
+        "median_us": 2.2348078159335563,
+        "mean_us": 2.2429439488185654,
+        "sample_stdev_us": 0.029383555606948403,
+        "min_us": 2.202614057535572,
+        "max_us": 2.305007084514981,
+        "cv_percent": 1.3100441329541792
+      },
+      "paired_latency_change_percent": 1.4160645634963442,
+      "paired_latency_ratios": [
+        1.0174969319016163,
+        0.9896542898892169,
+        1.0224769019296023,
+        0.9871153506189205,
+        1.030333572358035,
+        1.0416935103962057,
+        1.0098351389162152,
+        1.0366970617797648,
+        1.0232847036874444,
+        1.0041430184775857,
+        1.0108243593683106,
+        0.9846985875277875
+      ]
+    },
+    {
+      "name": "sync/object_success",
+      "before": {
+        "median_us": 0.337794415650769,
+        "mean_us": 0.35519956380063716,
+        "sample_stdev_us": 0.060722787409693016,
+        "min_us": 0.32909669909294786,
+        "max_us": 0.5464862162272712,
+        "cv_percent": 17.095400332128474
+      },
+      "after": {
+        "median_us": 0.3360529697703174,
+        "mean_us": 0.3361173782966167,
+        "sample_stdev_us": 0.003533993846083435,
+        "min_us": 0.3314074237686893,
+        "max_us": 0.34266594189302335,
+        "cv_percent": 1.0514165807174534
+      },
+      "paired_latency_change_percent": -0.6465584771688015,
+      "paired_latency_ratios": [
+        1.0210567846004643,
+        1.0104558301144628,
+        1.0058623826138666,
+        0.9760960031976299,
+        0.9827261973660096,
+        1.0045131725771772,
+        0.9996702174802348,
+        0.949806437469693,
+        1.0053403740642348,
+        0.9869169823912198,
+        0.9873986129763892,
+        0.6270349218662019
+      ]
+    },
+    {
+      "name": "sync/recursive_tree",
+      "before": {
+        "median_us": 8.75943684738788,
+        "mean_us": 8.770385676251582,
+        "sample_stdev_us": 0.12218348558863779,
+        "min_us": 8.54611120349777,
+        "max_us": 8.99313907725366,
+        "cv_percent": 1.393136973662239
+      },
+      "after": {
+        "median_us": 8.634236635189067,
+        "mean_us": 8.684000038133915,
+        "sample_stdev_us": 0.16165885492137605,
+        "min_us": 8.454734700642145,
+        "max_us": 9.013056246606732,
+        "cv_percent": 1.8615713290129667
+      },
+      "paired_latency_change_percent": -0.9926084022310544,
+      "paired_latency_ratios": [
+        0.9966096375641643,
+        1.0053871810175734,
+        0.983408051196972,
+        0.9900109073582182,
+        0.9901369245971607,
+        1.0414327869154065,
+        0.9664662938875643,
+        0.9857872290937544,
+        0.9683436286262617,
+        0.9464229184213844,
+        1.002922852272307,
+        1.007265094247372
+      ]
+    },
+    {
+      "name": "sync/refine_callback",
+      "before": {
+        "median_us": 0.14092192641909887,
+        "mean_us": 0.14143399677387578,
+        "sample_stdev_us": 0.0023959075370003193,
+        "min_us": 0.13825777100571526,
+        "max_us": 0.14788545984537912,
+        "cv_percent": 1.6940110522584528
+      },
+      "after": {
+        "median_us": 0.14097965776860175,
+        "mean_us": 0.14060498064702398,
+        "sample_stdev_us": 0.0011689917127328203,
+        "min_us": 0.13789772842637074,
+        "max_us": 0.14206685938447766,
+        "cv_percent": 0.8314013538876462
+      },
+      "paired_latency_change_percent": 0.24760772725618274,
+      "paired_latency_ratios": [
+        0.9973958600899935,
+        0.9781002777726692,
+        0.9989373011980927,
+        1.0072301949255598,
+        1.002246016521556,
+        1.0041393801599416,
+        1.0044006734495898,
+        1.0027061380235673,
+        0.9835495199002638,
+        1.0060748562009088,
+        0.9448219113577407,
+        1.003060691563675
+      ]
+    },
+    {
+      "name": "sync/string_success",
+      "before": {
+        "median_us": 0.12281512888187257,
+        "mean_us": 0.12297231274191922,
+        "sample_stdev_us": 0.0015608746979066076,
+        "min_us": 0.12012507841117903,
+        "max_us": 0.12662769015063005,
+        "cv_percent": 1.2692895360782552
+      },
+      "after": {
+        "median_us": 0.12180730410187945,
+        "mean_us": 0.12203933836362342,
+        "sample_stdev_us": 0.0009604608044197353,
+        "min_us": 0.12094253818037923,
+        "max_us": 0.12410606579194283,
+        "cv_percent": 0.7870091867902343
+      },
+      "paired_latency_change_percent": -0.43428646966909845,
+      "paired_latency_ratios": [
+        1.0130283410915333,
+        0.9884932183842161,
+        0.990238543154716,
+        0.9981072148422127,
+        0.9938888348807537,
+        1.0094984939807266,
+        0.9988056015012091,
+        0.9974254357258642,
+        0.9677427044114592,
+        0.9783177564406372,
+        0.977096660205381,
+        0.9978172687738869
+      ]
+    },
+    {
+      "name": "sync/union_first",
+      "before": {
+        "median_us": 0.18909299119206424,
+        "mean_us": 0.18915940838215686,
+        "sample_stdev_us": 0.0018921130387683513,
+        "min_us": 0.18646154078493155,
+        "max_us": 0.19198413636857337,
+        "cv_percent": 1.0002743479434733
+      },
+      "after": {
+        "median_us": 0.19013806566766078,
+        "mean_us": 0.19135318224462555,
+        "sample_stdev_us": 0.004608758620894841,
+        "min_us": 0.1856916059955831,
+        "max_us": 0.20230827868626075,
+        "cv_percent": 2.408509002480561
+      },
+      "paired_latency_change_percent": 1.3584408358574551,
+      "paired_latency_ratios": [
+        0.9768605552057542,
+        1.020440964982606,
+        1.0068109414900186,
+        1.0204599209391507,
+        1.0506286769349429,
+        1.061863173022403,
+        1.035597554308806,
+        0.9901654467474692,
+        0.9858164465842302,
+        0.971297865930222,
+        1.0203578752271305,
+        1.00065699384724
+      ]
+    },
+    {
+      "name": "sync/union_last",
+      "before": {
+        "median_us": 0.6275115522508758,
+        "mean_us": 0.6338436419488306,
+        "sample_stdev_us": 0.019575417320716788,
+        "min_us": 0.6123309020783887,
+        "max_us": 0.6879877135295069,
+        "cv_percent": 3.088366913412549
+      },
+      "after": {
+        "median_us": 0.6349228341220654,
+        "mean_us": 0.6360274139476216,
+        "sample_stdev_us": 0.009195188285424942,
+        "min_us": 0.6231057853562366,
+        "max_us": 0.6586351481485093,
+        "cv_percent": 1.4457220056527607
+      },
+      "paired_latency_change_percent": 1.353991007616706,
+      "paired_latency_ratios": [
+        0.9068284209289872,
+        0.999795912444869,
+        1.0140550801222263,
+        1.0481729315427688,
+        1.015102467888489,
+        1.0095784523284432,
+        1.015937891121123,
+        0.9987364178483883,
+        1.0130247400301078,
+        0.9707905380771689,
+        1.0357528666050255,
+        1.025009043070699
+      ]
+    }
+  ],
+  "source_review": {
+    "matching_items": {
+      "functions": 118,
+      "types": 35,
+      "constants_aliases": 5,
+      "attributes": 23
+    },
+    "normalization": "Rust lexical tokens; comments/whitespace, pub(crate)/pub(super), and trailing commas before closing delimiters ignored. Functions compared with their impl owners."
+  },
+  "review": {
+    "findings": [],
+    "rust_sources_required_in_sdist": 15,
+    "source_body_changes_found": false,
+    "native_registration_changed": false,
+    "python_tests_per_snapshot_per_interpreter": 132,
+    "tested_interpreters": [
+      "CPython 3.14.3",
+      "CPython 3.15.0"
+    ],
+    "cross_platform_checked": false
+  },
+  "build": {
+    "command": "python -m maturin build --release --locked --interpreter <same CPython 3.14.3> --out <variant>/dist",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1",
+    "maturin": "1.15.0",
+    "target": "aarch64-apple-darwin",
+    "macos_deployment_target": "11.0",
+    "profile": {
+      "lto": "thin",
+      "codegen-units": 1
+    },
+    "pyo3": "=0.30.1",
+    "abi": "abi3-py314",
+    "cargo_toml_sha256": "2f92a518e84331e5dd061b99a3418ad934fe8c85949c5a91a170d274dc30fcf8",
+    "cargo_lock_sha256": "2daec1616df319204f6c0aa13da00856d711d7c90c7f1b7a356e650bd5810e76"
+  },
+  "hardware": {
+    "cpu": "Apple M4 Max",
+    "logical_cpus": 16,
+    "physical_cpus": 16,
+    "memory_bytes": 51539607552
+  },
+  "method": {
+    "timing": "existing stdlib measure functions; no pyperf workers",
+    "hash_seed": "0",
+    "process_order": "before/after in even rounds, after/before in odd rounds",
+    "scenario_order": "same per-pair deterministic shuffle, seed 4731 + round",
+    "target_sample_seconds": 0.2,
+    "warmup": "existing harness: up to 100 sync calls or 50 async calls before timing; event loops created outside timed iterations",
+    "extra_cases": "bench_compare.zodish_adapter and Case.check/Case.call; timed through bench_parse.measure",
+    "samples_removed": 0,
+    "cpu_affinity_or_frequency_control": false,
+    "interpretation": "Exploratory local comparison, no pass/fail performance threshold or equivalence claim."
+  }
+}

@@ -147,6 +147,11 @@ does not establish a performance improvement.
 
 ## Recorded local results
 
+The [Rust module decomposition review](results/2026-10-21-macos-arm64-rust-decomposition.md)
+compares installed release wheels before and after the file split on CPython
+3.14.3. It records 12 paired rounds across 22 scenarios, all raw samples,
+variation, build hashes, and replay drivers.
+
 The latest [post-optimization rerun](results/2026-10-20-macos-arm64-rerun.md)
 and its [raw pyperf data](results/2026-10-20-macos-arm64-rerun.json) use the same
 interpreter and pinned dependency versions as the
