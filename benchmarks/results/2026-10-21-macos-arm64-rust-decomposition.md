@@ -153,6 +153,7 @@ raw = json.loads(Path("benchmarks/results/2026-10-21-macos-arm64-rust-decomposit
 run_dir = Path("/path/to/temporary/run")
 (run_dir / "benchmark-worker.py").write_text(raw["worker_source"])
 (run_dir / "run-benchmarks.py").write_text(raw["runner_source"])
+(run_dir / "revisions.json").write_text(json.dumps(raw["revisions"]))
 ```
 
 Run `python run-benchmarks.py` from that directory. The runner recalibrates,
