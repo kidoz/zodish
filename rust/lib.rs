@@ -4946,12 +4946,15 @@ fn is_multiple_of(value: &Bound<'_, PyAny>, divisor: &Bound<'_, PyAny>) -> PyRes
     }
     if value.is_exact_instance_of::<PyInt>() && divisor.is_exact_instance_of::<PyFloat>() {
         let divisor_float: f64 = divisor.extract()?;
-        if divisor_float.is_finite()
-            && divisor_float > 0.0
-            && divisor_float.fract() == 0.0
-            && divisor_float <= i64::MAX as f64
-        {
-            let divisor_int = (divisor_float as i64).into_pyobject(value.py())?.into_any();
+        if divisor_float.is_finite() && divisor_float > 0.0 && divisor_float.fract() == 0.0 {
+            // `i64::MAX as f64` rounds up to 2**63, so values at or above it
+            // must use an exact Python integer conversion instead of `as i64`.
+            if divisor_float < i64::MAX as f64 {
+                let divisor_int = (divisor_float as i64).into_pyobject(value.py())?.into_any();
+                return Ok(!value.rem(&divisor_int)?.is_truthy()?);
+            }
+            let ratio = divisor.call_method0("as_integer_ratio")?;
+            let divisor_int = ratio.get_item(0)?;
             return Ok(!value.rem(&divisor_int)?.is_truthy()?);
         }
     }

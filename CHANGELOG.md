@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `record`, array, union, and tuple codecs) and dataclass codecs now validate
   encoded and decoded values once, so input/output transforms and refinement
   callbacks run exactly once per value as they do for direct and async codecs.
+- Integer `multiple_of` checks with integral float divisors at or above
+  `2**63` now use exact arithmetic instead of saturating the divisor to
+  `i64::MAX`.
 
 ## [0.5.0] - 2026-10-21
 

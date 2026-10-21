@@ -180,6 +180,18 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(z.integer().multiple_of(2.0).parse(huge), huge)
         self.assertIsInstance(z.integer().multiple_of(3).safe_parse(huge + 1), Failure)
 
+        at_i64_limit = z.integer().multiple_of(float(2**63))
+        self.assertEqual(at_i64_limit.parse(2**63), 2**63)
+        self.assertEqual(at_i64_limit.parse(2 * 2**63), 2 * 2**63)
+        for bad in (2**63 - 1, 2**63 + 1024, 3 * 2**63 + 1):
+            self.assertIsInstance(at_i64_limit.safe_parse(bad), Failure)
+        float_divisor = int(1e300)
+        beyond_i64 = z.integer().multiple_of(1e300)
+        self.assertEqual(beyond_i64.parse(2 * float_divisor), 2 * float_divisor)
+        self.assertIsInstance(
+            beyond_i64.safe_parse(2 * float_divisor + 1), Failure,
+        )
+
     def test_structured_issues_and_params(self):
         cases = [
             (z.string().min(3), "ab", "too_small",
