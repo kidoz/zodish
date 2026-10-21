@@ -18,13 +18,16 @@ Its continuation methods are visible within the session module; its path
 helper stays private. `rust/session/composition.rs` contains union/intersection
 continuations, outcome storage/restoration, and intersection result combination.
 Its six dispatch entry points have session visibility; outcome helpers stay
-private. Frame and stored-outcome types remain in `session.rs` with GC traversal.
+private. Frame and stored-outcome types remain in `session.rs`.
 `rust/session/callbacks.rs` contains callback resumption, awaitability checking,
 pending-request creation, and callback-result interpretation. Its entry points
 have session visibility; dispatch imports the shared awaitability checker
 directly. Pending/frame storage, the token counter, Python lifecycle methods,
-and GC helpers remain in `session.rs`. Wrapper dispatch arms retain their
-existing callback behavior.
+and GC hooks remain in `session.rs`. Wrapper dispatch arms retain their
+existing callback behavior. `rust/session/gc.rs` visits references held by
+suspended frames, including issues, stored exceptions, and tracebacks. Its
+visitor is visible only within the session module; Python GC hooks delegate
+frame traversal to it. Terminal-state cleanup stays with the session lifecycle.
 Paths, issue/error types, and the GC-aware native issue bundle live in
 `rust/errors.rs`.
 `rust/runtime.rs` holds the per-parse `Context`, callback-error normalization,
