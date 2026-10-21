@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-21
+
 ### Added
 
 - `z.set(item)` validates Python sets with native element traversal and async
@@ -16,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the native record evaluator, with validated key and value issue paths.
 - `z.string()` format checks for ULID, CUID, CUID2, Nano ID, JWT, E.164,
   base64, and base64url.
+
+### Changed
+
+- Split the Rust core into focused modules for errors, schema definitions,
+  values, synchronous evaluation, JSON handling, runtime state, and async
+  sessions. Native behavior, public APIs, and Python-visible classes are
+  unchanged. A paired 22-scenario release comparison recorded median changes
+  from 2.13% faster to 1.42% slower.
 
 ## [0.5.1] - 2026-10-21
 
