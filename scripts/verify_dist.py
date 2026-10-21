@@ -72,6 +72,22 @@ def _wheel_version(wheel: Path) -> str:
     return parts[1]
 
 
+def _verify_wheel_tag(wheel: Path) -> None:
+    parts = wheel.stem.split("-")
+    if len(parts) >= 5 and "abi3" in parts:
+        return
+    if len(parts) >= 5:
+        python_tag, abi_tag = parts[-3], parts[-2]
+        if (
+            python_tag.startswith("cp3")
+            and abi_tag == f"{python_tag}t"
+        ):
+            return
+    raise SystemExit(
+        f"{wheel.name} is not tagged with the stable or free-threaded ABI"
+    )
+
+
 def verify_wheel(wheel: Path) -> str:
     with zipfile.ZipFile(wheel) as archive:
         names = set(archive.namelist())
@@ -85,8 +101,7 @@ def verify_wheel(wheel: Path) -> str:
         raise SystemExit(
             f"{wheel.name} must contain exactly one native extension, found {sorted(natives)}"
         )
-    if "abi3" not in wheel.stem.split("-"):
-        raise SystemExit(f"{wheel.name} is not tagged with the stable ABI (abi3)")
+    _verify_wheel_tag(wheel)
     print(f"wheel ok: {wheel.name} ({natives.pop()})")
     return _wheel_version(wheel)
 

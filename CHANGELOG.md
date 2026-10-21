@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Free-threaded CPython support: version-specific `cp314t`/`cp315t` wheels for
+  Linux x86_64/aarch64 glibc, macOS x86_64/arm64, and Windows x64, with CI
+  source tests, on-platform wheel smoke tests, and artifact verification.
+  Free-threaded musllinux wheels are not published.
+
 ## [0.8.0] - 2026-10-21
 
 ### Added
