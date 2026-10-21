@@ -2,6 +2,7 @@
 
 mod checks;
 mod evaluate;
+mod json;
 mod kind;
 
 use std::collections::HashSet;
@@ -12,10 +13,10 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyString, PyTuple, PyType};
 
 use crate::errors::ErrorTemplate;
-use crate::parse_json_value;
 use crate::runtime::Context;
 
 use checks::build_error_template;
+use json::parse_json_value;
 
 pub(crate) use evaluate::is_primitive_kind;
 pub(crate) use kind::Kind;
