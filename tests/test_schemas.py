@@ -500,6 +500,135 @@ class SchemaTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             z.bytes().length(1.5)  # type: ignore[arg-type]
 
+    def test_wire_names(self):
+        schema = z.object({
+            "user_name": z.string().min(1).wire("userName"),
+            "created_at": z.codecs.iso_datetime().wire("createdAt"),
+        }).strict()
+        value = schema.parse({
+            "userName": "Alex", "createdAt": "2026-10-21T12:00:00",
+        })
+        self.assertEqual(value, {
+            "user_name": "Alex",
+            "created_at": dt.datetime(2026, 10, 21, 12, 0),
+        })
+        self.assertEqual(schema.encode(value), {
+            "userName": "Alex", "createdAt": "2026-10-21T12:00:00",
+        })
+        self.assertEqual(
+            schema.parse_json('{"userName": "Alex", "createdAt": "2026-10-21T12:00:00"}'),
+            value,
+        )
+        wrong = schema.safe_parse({
+            "user_name": "Alex", "createdAt": "2026-10-21T12:00:00",
+        })
+        self.assertIsInstance(wrong, Failure)
+        self.assertIn(
+            "unrecognized_key", [issue.code for issue in wrong.error.issues],
+        )
+        path_failure = z.object({
+            "user_name": z.string().min(3).wire("userName"),
+        }).safe_parse({"userName": "x"})
+        self.assertIsInstance(path_failure, Failure)
+        self.assertEqual(path_failure.error.issues[0].path, ("userName",))
+
+        stripped = z.object({"name": z.string().wire("displayName")})
+        self.assertEqual(stripped.parse({"displayName": "Alex", "name": "x"}), {
+            "name": "Alex",
+        })
+        passthrough = stripped.passthrough()
+        self.assertEqual(
+            passthrough.parse({"displayName": "Alex", "name": "shadow"}),
+            {"name": "Alex"},
+        )
+        self.assertEqual(
+            passthrough.parse({"displayName": "Alex", "extra": 1}),
+            {"name": "Alex", "extra": 1},
+        )
+        catchall = z.object({
+            "name": z.string().wire("displayName"),
+        }).catchall(z.integer())
+        self.assertEqual(
+            catchall.parse({"displayName": "Alex", "extra": 1}),
+            {"name": "Alex", "extra": 1},
+        )
+        self.assertEqual(
+            catchall.parse({"displayName": "Alex", "name": 2}),
+            {"name": "Alex"},
+        )
+
+        optional = z.object({
+            "name": z.string().wire("displayName").optional(),
+        })
+        self.assertEqual(optional.parse({}), {})
+        self.assertEqual(optional.parse({"displayName": "Alex"}), {"name": "Alex"})
+        self.assertEqual(
+            z.object({
+                "name": z.string().optional().wire("displayName"),
+            }).parse({"displayName": "Alex"}),
+            {"name": "Alex"},
+        )
+        partial = z.object({
+            "name": z.string().min(2).wire("displayName"),
+        }).partial()
+        self.assertEqual(partial.parse({}), {})
+        self.assertEqual(partial.parse({"displayName": "Alex"}), {"name": "Alex"})
+        self.assertEqual(partial.keyof().parse("name"), "name")
+        self.assertIsInstance(partial.keyof().safe_parse("displayName"), Failure)
+
+        with self.assertRaises(TypeError):
+            z.string().wire(1)  # type: ignore[arg-type]
+        with self.assertRaises(ValueError):
+            z.string().wire("a").wire("b")
+        with self.assertRaises(ValueError):
+            z.object({
+                "a": z.string().wire("x"), "b": z.string().wire("x"),
+            })
+        with self.assertRaises(ValueError):
+            z.object({"a": z.string().wire("b"), "b": z.string()})
+        with self.assertRaises(ValueError):
+            z.discriminated_union("kind", {
+                "a": z.object({"kind": z.string().wire("type")}),
+            })
+
+        codec = z.codec(z.string().min(1), z.integer(), decode=int, encode=str)
+        wired_codec = z.object({"count": codec.wire("countValue")})
+        self.assertEqual(wired_codec.parse({"countValue": "3"}), {"count": 3})
+        self.assertEqual(wired_codec.encode({"count": 3}), {"countValue": "3"})
+
+        plain = z.object({
+            "user_name": z.string().wire("userName"),
+            "age": z.integer().wire("userAge"),
+        })
+        self.assertEqual(plain.to_json_schema(io="input"), {
+            "type": "object",
+            "properties": {
+                "userName": {"type": "string"},
+                "userAge": {"type": "integer"},
+            },
+            "required": ["userName", "userAge"],
+        })
+        self.assertEqual(plain.to_json_schema(io="output"), {
+            "type": "object",
+            "properties": {
+                "user_name": {"type": "string"},
+                "age": {"type": "integer"},
+            },
+            "required": ["user_name", "age"],
+            "additionalProperties": False,
+        })
+
+        class User(TypedDict):
+            user_name: str
+
+        typed = z.typed_object(User, {
+            "user_name": z.string().optional().wire("userName"),
+        })
+        required = typed.safe_parse({})
+        self.assertIsInstance(required, Failure)
+        self.assertEqual(required.error.issues[0].code, "required")
+        self.assertEqual(required.error.issues[0].path, ("user_name",))
+
     def test_typed_object_and_brand(self):
         class User(TypedDict):
             name: str

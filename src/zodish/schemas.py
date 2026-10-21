@@ -170,6 +170,34 @@ def _brand_argument(newtype: Any) -> None:
         raise TypeError("Brand must be a typing.NewType")
 
 
+_WIRE_WRAPPER_KINDS = frozenset({
+    "optional", "nonoptional", "nullable", "required_output", "default",
+    "default_factory", "refine", "super_refine", "transform", "overwrite",
+    "coerce", "string_bool", "preprocess", "catch",
+    "length_min", "length_max", "min", "max", "exclusive_min", "exclusive_max",
+    "multiple_of", "positive", "integral", "regex", "starts_with", "ends_with",
+    "includes", "ipv6", "cidrv4", "cidrv6", "trim", "lower", "upper",
+    "async_refine", "async_super_refine", "async_transform", "async_overwrite",
+    "async_preprocess", "async_default_factory", "async_catch",
+})
+
+
+def _field_wire(node: NativeSchema) -> str | None:
+    """Return the wire name carried by a field schema, if one is set."""
+    while True:
+        kind = node.kind
+        if kind == "wire":
+            name = node.args[0]
+            return name if isinstance(name, str) else None
+        if kind == "pipe":
+            node = node.children[0]
+            continue
+        if kind in _WIRE_WRAPPER_KINDS and len(node.children) == 1:
+            node = node.children[0]
+            continue
+        return None
+
+
 def _string_values(values: Sequence[str], role: str) -> builtins.tuple[str, ...]:
     result = builtins.tuple(values)
     if not result:
@@ -565,6 +593,18 @@ class Schema[Out, In = Out]:
         """Apply a typing-only ``NewType`` brand to parsed output."""
         _brand_argument(newtype)
         return Schema[Brand, In](self._node, _inner=self, _meta=self._meta)
+
+    def wire(self, name: str) -> Schema[Out, In]:
+        """Use ``name`` for this field's input key in an object shape."""
+        if not isinstance(name, str):
+            raise TypeError("Wire name must be a string")
+        if _field_wire(self._node) is not None:
+            raise ValueError("Schema already has a wire name")
+        return Schema[Out, In](
+            NativeSchema("wire", (self._node,), (name,)),
+            _inner=self,
+            _meta=self._meta,
+        )
 
     def parse(
         self, value: In | Missing = MISSING, *, error: ErrorMap | None = None,
@@ -2057,6 +2097,12 @@ def object(
     if not all(isinstance(k, str) and isinstance(v, Schema) for k, v in shape.items()):
         raise TypeError("Object shape must map strings to schemas")
     frozen = MappingProxyType(dict(shape))
+    input_keys = builtins.tuple(
+        key if (wire := _field_wire(child._node)) is None else wire
+        for key, child in frozen.items()
+    )
+    if len(builtins.set(input_keys)) != len(input_keys):
+        raise ValueError("Object wire names must be unique")
 
     node = NativeSchema(
         "object", builtins.tuple(child._node for child in frozen.values()),
@@ -2064,6 +2110,7 @@ def object(
             builtins.tuple(frozen),
             policy,
             catchall._node if catchall is not None else None,
+            input_keys,
         ),
     )
     return ObjectSchema(node, frozen, policy, catchall)
@@ -2189,6 +2236,14 @@ def discriminated_union(
         for option_key, schema in items
     ):
         raise TypeError("Discriminated union options must map strings to schemas")
+    for _, option in items:
+        if not isinstance(option, ObjectSchema):
+            continue
+        field = option.shape.get(key)
+        if field is not None and _field_wire(field._node) is not None:
+            raise ValueError(
+                "Discriminator fields cannot have a wire name",
+            )
     return DiscriminatedUnionSchema(
         NativeSchema(
             "discriminated_union",
@@ -3145,10 +3200,19 @@ def _encode_node_for(schema: Schema[Any, Any]) -> NativeSchema | None:
             catchall_node = _encode_node_for(schema._catchall)
             if catchall_node is None:
                 return None
+        output_keys = builtins.tuple(
+            key if (wire := _field_wire(prop._node)) is None else wire
+            for key, prop in schema.shape.items()
+        )
         return NativeSchema(
             "object",
             builtins.tuple(property_nodes),
-            (builtins.tuple(schema.shape), schema.unknown_keys, catchall_node),
+            (
+                output_keys,
+                schema.unknown_keys,
+                catchall_node,
+                builtins.tuple(schema.shape),
+            ),
         )
     if isinstance(schema, KeyedRecordSchema):
         key_node = _encode_node_for(schema.key_schema)
@@ -3204,6 +3268,10 @@ def _encode_node_for(schema: Schema[Any, Any]) -> NativeSchema | None:
 
     node = schema._node
     kind = node.kind
+    if kind == "wire":
+        if schema._inner is None:
+            return None
+        return _encode_node_for(schema._inner)
     if kind in ("optional", "nullable", "nonoptional", "required_output"):
         if schema._inner is None:
             return None
@@ -3255,6 +3323,8 @@ def _inner_schema(schema: Schema[Any, Any], node: NativeSchema) -> Schema[Any, A
 
 def _node_accepts_missing(node: NativeSchema, io: JSONSchemaIO) -> bool:
     kind = node.kind
+    if kind == "wire":
+        return _node_accepts_missing(node.children[0], io)
     if kind == "optional":
         return True
     if kind == "nonoptional":
@@ -3308,7 +3378,7 @@ def _node_missing_output(node: NativeSchema) -> bool | None:
         result = _node_missing_output(node.children[0])
         return _node_missing_output(node.children[1]) if result is False else result
     if kind in _CONSTRAINT_KINDS or kind in (
-        "nullable", "coerce", "string_bool", "refine", "super_refine",
+        "wire", "nullable", "coerce", "string_bool", "refine", "super_refine",
         "transform", "overwrite", "async_refine", "async_super_refine",
         "async_transform", "async_overwrite",
     ):
@@ -3349,7 +3419,10 @@ def _node_outputs_string(node: NativeSchema) -> bool:
         return _node_outputs_string(node.children[0])
     if kind == "union":
         return all(_node_outputs_string(child) for child in node.children)
-    if kind in ("optional", "nonoptional", "required_output", "default", "default_factory"):
+    if kind in (
+        "wire", "optional", "nonoptional", "required_output", "default",
+        "default_factory",
+    ):
         return _node_outputs_string(node.children[0])
     return False
 
@@ -3363,7 +3436,8 @@ def _node_outputs_dict(node: NativeSchema) -> bool:
     if kind == "union":
         return all(_node_outputs_dict(child) for child in node.children)
     if kind in (
-        "optional", "nonoptional", "required_output", "default", "default_factory", "coerce",
+        "wire", "optional", "nonoptional", "required_output", "default",
+        "default_factory", "coerce",
     ):
         return _node_outputs_dict(node.children[0])
     return False
@@ -3445,7 +3519,8 @@ def _export_node(
         )
     node = schema._node
     if node.kind in (
-        "optional", "nonoptional", "required_output", "nullable", "default", "default_factory",
+        "optional", "nonoptional", "required_output", "nullable", "default",
+        "default_factory", "wire",
     ):
         return _export_wrapper(
             schema, node, path, target, io, unrepresentable, relax_strip,
@@ -3479,7 +3554,7 @@ def _export_wrapper(
 ) -> JSONSchema:
     kind = node.kind
     child = _inner_schema(schema, node)
-    if kind in ("optional", "required_output"):
+    if kind in ("optional", "required_output", "wire"):
         return _export_schema(
             child, path, target, io, unrepresentable, relax_strip,
         )
@@ -3737,22 +3812,22 @@ def _export_object(
         catchall = (
             None if node.args[2] is None else Schema[Any, Any](node.args[2])
         )
-    properties = {
-        key: _export_schema(
+    properties: JSONSchema = {}
+    required: list[str] = []
+    for key, prop in shape.items():
+        wire = _field_wire(prop._node)
+        name = wire if io == "input" and wire is not None else key
+        properties[name] = _export_schema(
             prop,
-            (*path, "properties", key),
+            (*path, "properties", name),
             target,
             io,
             unrepresentable,
             relax_strip,
         )
-        for key, prop in shape.items()
-    }
+        if not _schema_accepts_missing(prop, io):
+            required.append(name)
     result: JSONSchema = {"type": "object", "properties": properties}
-    required = [
-        key for key, prop in shape.items()
-        if not _schema_accepts_missing(prop, io)
-    ]
     if required:
         result["required"] = required
     if catchall is not None:

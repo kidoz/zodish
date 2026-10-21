@@ -121,7 +121,9 @@ impl NativeSchema {
                     self.child_json_fast(py, value, depth)
                 }
             }
-            Kind::NonOptional | Kind::RequiredOutput => self.child_json_fast(py, value, depth),
+            Kind::NonOptional | Kind::RequiredOutput | Kind::Wire => {
+                self.child_json_fast(py, value, depth)
+            }
             Kind::LengthMin | Kind::LengthMax => {
                 let Ok(bound) = self.args[0].bind(py).extract::<usize>() else {
                     return Ok(None);
@@ -162,10 +164,16 @@ impl NativeSchema {
                     .bind(py)
                     .cast::<PyTuple>()
                     .map_err(PyErr::from)?;
+                let input_keys = self.args[3]
+                    .bind(py)
+                    .cast::<PyTuple>()
+                    .map_err(PyErr::from)?;
                 let result = PyDict::new(py);
                 let mut present = 0;
                 for (index, key) in keys.iter().enumerate() {
-                    let Ok(key_text) = key.cast::<PyString>().map_err(PyErr::from)?.to_str() else {
+                    let input_key = input_keys.get_item(index)?;
+                    let Ok(key_text) = input_key.cast::<PyString>().map_err(PyErr::from)?.to_str()
+                    else {
                         return Ok(None);
                     };
                     let child = self.children[index].try_borrow(py).map_err(PyErr::from)?;

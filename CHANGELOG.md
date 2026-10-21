@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Object fields accept `.wire(name)` to use a separate input key. Parsing
+  accepts the wire name, output and encoding use the shape key, and JSON Schema
+  input/output modes follow the same split.
 - String checks for ISO 8601 durations, HTTP/HTTPS URLs, hexadecimal strings,
   and IPv4/IPv6 CIDR notation, plus `z.codecs.iso_duration()` for
   ISO duration strings ↔ `timedelta`.

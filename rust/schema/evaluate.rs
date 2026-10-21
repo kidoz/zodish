@@ -66,7 +66,7 @@ impl NativeSchema {
             .into()),
             Kind::Optional if missing => keep(),
             Kind::Nullable if value.is_none() => keep(),
-            Kind::Optional | Kind::Nullable => self.child(0, ctx, value, path, depth),
+            Kind::Optional | Kind::Nullable | Kind::Wire => self.child(0, ctx, value, path, depth),
             Kind::NonOptional => {
                 if missing {
                     ctx.fail("required", "Required", path)
@@ -535,15 +535,25 @@ impl NativeSchema {
                         .bind(py)
                         .cast::<PyTuple>()
                         .map_err(PyErr::from)?;
+                    let input_keys = self.args[3]
+                        .bind(py)
+                        .cast::<PyTuple>()
+                        .map_err(PyErr::from)?;
                     const INLINE_VALUES: usize = 4;
                     let policy = self.unknown_keys;
+                    let output_names =
+                        if matches!(policy, UnknownKeys::Passthrough | UnknownKeys::Catchall,) {
+                            Some(PySet::new(py, keys.iter())?)
+                        } else {
+                            None
+                        };
                     let mut inline_values: [Option<Bound<'_, PyAny>>; INLINE_VALUES] =
                         std::array::from_fn(|_| None);
                     let mut heap_values =
                         Vec::with_capacity(keys.len().saturating_sub(INLINE_VALUES));
                     let mut present = 0;
-                    for (index, key) in keys.iter().enumerate() {
-                        let value = dict.get_item(&key)?;
+                    for (index, input_key) in input_keys.iter().enumerate() {
+                        let value = dict.get_item(&input_key)?;
                         if value.is_some() {
                             present += 1;
                         }
@@ -559,6 +569,7 @@ impl NativeSchema {
                         Some(dict.copy()?)
                     };
                     for (index, key) in keys.iter().enumerate() {
+                        let input_key = input_keys.get_item(index)?;
                         let value = if index < INLINE_VALUES {
                             inline_values[index].take()
                         } else {
@@ -575,7 +586,12 @@ impl NativeSchema {
                             result.set_item(&key, &raw)?;
                             continue;
                         }
-                        path.push(PathPart::Value(key.clone().unbind()));
+                        let path_key = if matches!(child.kind, Kind::RequiredOutput) {
+                            key.clone().unbind()
+                        } else {
+                            input_key.clone().unbind()
+                        };
+                        path.push(PathPart::Value(path_key));
                         let parsed = child.validate(ctx, &raw, path, depth + 1);
                         path.pop();
                         match parsed {
@@ -589,8 +605,8 @@ impl NativeSchema {
                     }
                     if let Some(snapshot) = snapshot {
                         let known = PyDict::new(py);
-                        for key in keys.iter() {
-                            known.set_item(&key, true)?;
+                        for input_key in input_keys.iter() {
+                            known.set_item(&input_key, true)?;
                         }
                         for (key, raw) in snapshot.iter() {
                             if !key.is_instance_of::<PyString>() {
@@ -620,8 +636,21 @@ impl NativeSchema {
                                     ));
                                     path.pop();
                                 } else if policy == UnknownKeys::Passthrough {
-                                    result.set_item(key, deepcopy(&raw)?)?;
+                                    let collides = match &output_names {
+                                        Some(names) => names.contains(&key)?,
+                                        None => false,
+                                    };
+                                    if !collides {
+                                        result.set_item(key, deepcopy(&raw)?)?;
+                                    }
                                 } else if policy == UnknownKeys::Catchall {
+                                    let collides = match &output_names {
+                                        Some(names) => names.contains(&key)?,
+                                        None => false,
+                                    };
+                                    if collides {
+                                        continue;
+                                    }
                                     let catchall = self.args[2].bind(py);
                                     let node: PyRef<'_, Self> =
                                         catchall.extract().map_err(PyErr::from)?;

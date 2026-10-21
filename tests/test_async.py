@@ -171,6 +171,31 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
             codec_result.error.issues[0].message, "translated:invalid_format",
         )
 
+    async def test_wire_names(self):
+        schema = z.object({
+            "user_name": z.string().min(1).wire("userName"),
+            "count": z.codec(
+                z.string(), z.integer(), decode=int, encode=str,
+            ).wire("countValue"),
+        }).strict()
+        value = await schema.parse_async({"userName": "Alex", "countValue": "2"})
+        self.assertEqual(value, {"user_name": "Alex", "count": 2})
+        self.assertEqual(
+            await schema.encode_async(value),
+            {"userName": "Alex", "countValue": "2"},
+        )
+        self.assertEqual(
+            await schema.parse_json_async(
+                '{"userName": "Alex", "countValue": "2"}',
+            ),
+            value,
+        )
+        failure = await schema.safe_parse_async({
+            "userName": "", "countValue": "2",
+        })
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(failure.error.issues[0].path, ("userName",))
+
     async def test_set_and_bytes_lengths(self):
         set_result = await z.set(z.integer()).min(2).safe_parse_async({1})
         self.assertIsInstance(set_result, Failure)

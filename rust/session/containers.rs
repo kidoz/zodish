@@ -45,15 +45,30 @@ impl AsyncSession {
         };
         let build = (|| -> PyResult<ObjectFrame> {
             let keys = node.args[0].bind(py).cast::<PyTuple>()?;
+            let input_keys = node.args[3].bind(py).cast::<PyTuple>()?;
+            let output_names = if matches!(
+                node.unknown_keys,
+                UnknownKeys::Passthrough | UnknownKeys::Catchall,
+            ) {
+                Some(PySet::new(py, keys.iter())?.unbind())
+            } else {
+                None
+            };
             let result = PyDict::new(py);
             let mut values = Vec::with_capacity(keys.len());
             let mut fast = Vec::with_capacity(keys.len());
+            let mut path_keys = Vec::with_capacity(keys.len());
             let mut present = 0;
-            for (index, key) in keys.iter().enumerate() {
-                let found = dict.get_item(&key)?;
+            for (index, input_key) in input_keys.iter().enumerate() {
+                let found = dict.get_item(&input_key)?;
+                let child = node.children[index].try_borrow(py)?;
+                path_keys.push(if matches!(child.kind, Kind::RequiredOutput) {
+                    keys.get_item(index)?.unbind()
+                } else {
+                    input_key.clone().unbind()
+                });
                 if let Some(raw) = found {
                     present += 1;
-                    let child = node.children[index].try_borrow(py)?;
                     let is_fast = depth + 1 < MAX_DEPTH
                         && is_primitive_kind(child.kind)
                         && primitive_matches(&raw, child.kind)?;
@@ -77,6 +92,9 @@ impl AsyncSession {
                 node: node_py,
                 depth,
                 keys: keys.iter().map(Bound::unbind).collect(),
+                input_keys: input_keys.iter().map(Bound::unbind).collect(),
+                path_keys,
+                output_names,
                 values,
                 fast,
                 cursor: 0,
@@ -125,7 +143,7 @@ impl AsyncSession {
                 }
                 if frame.cursor < frame.values.len() {
                     let index = frame.cursor;
-                    let key = frame.keys[index].clone_ref(py);
+                    let path_key = frame.path_keys[index].clone_ref(py);
                     let raw = frame.values[index].take().expect("non-fast object field");
                     frame.cursor += 1;
                     let child = frame
@@ -135,7 +153,7 @@ impl AsyncSession {
                         .map_err(PyErr::from)?
                         .children[index]
                         .clone_ref(py);
-                    let child_path = child_path(py, &frame.path, PathPart::Value(key));
+                    let child_path = child_path(py, &frame.path, PathPart::Value(path_key));
                     let depth = frame.depth;
                     self.frames.push(AsyncFrame::Object(frame));
                     return Ok(AsyncNext::Task(AsyncTask::Eval {
@@ -174,7 +192,7 @@ impl AsyncSession {
                 continue;
             }
             let mut known = false;
-            for candidate in &frame.keys {
+            for candidate in &frame.input_keys {
                 if key_bound.eq(candidate.bind(py))? {
                     known = true;
                     break;
@@ -198,6 +216,13 @@ impl AsyncSession {
                     ));
                 }
                 UnknownKeys::Passthrough => {
+                    let collides = match &frame.output_names {
+                        Some(names) => names.bind(py).contains(&key)?,
+                        None => false,
+                    };
+                    if collides {
+                        continue;
+                    }
                     let value = match deepcopy(raw.bind(py)) {
                         Ok(value) => value,
                         Err(error) => {
@@ -209,6 +234,13 @@ impl AsyncSession {
                     }
                 }
                 UnknownKeys::Catchall => {
+                    let collides = match &frame.output_names {
+                        Some(names) => names.bind(py).contains(&key)?,
+                        None => false,
+                    };
+                    if collides {
+                        continue;
+                    }
                     let catchall_node = match catchall.bind(py).extract::<Py<NativeSchema>>() {
                         Ok(node) => node,
                         Err(error) => {

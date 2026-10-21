@@ -19,6 +19,29 @@ user.safe_parse({"name": "Alex", "age": 30, "admin": True}).success
 Objects accept dictionaries with string keys. The default policy strips extra
 keys; `.strict()` rejects them and `.passthrough()` preserves them.
 
+## Accept wire names
+
+Use `.wire()` on a field when the boundary uses a different key than your
+parsed output:
+
+```python
+user = z.object({
+    "user_name": z.string().min(1).wire("userName"),
+    "created_at": z.codecs.iso_datetime().wire("createdAt"),
+}).strict()
+
+user.parse({"userName": "Alex", "createdAt": "2026-10-21T12:00:00"})
+# {"user_name": "Alex", "created_at": datetime(2026, 10, 21, 12, 0)}
+user.encode({"user_name": "Alex", "created_at": datetime(2026, 10, 21, 12, 0)})
+# {"userName": "Alex", "createdAt": "2026-10-21T12:00:00"}
+```
+
+Input accepts the wire name, not the shape key. Missing, `None`, defaults, and
+optional behavior come from the field schema. Wire names must be unique;
+`.keyof()`, `.pick()`, `.omit()`, and `.extend()` use shape keys. JSON Schema
+uses wire names for `io="input"` and shape keys for `io="output"`. The
+discriminator key of a discriminated union cannot be aliased.
+
 ## Validate JSON text
 
 `parse_json`, `safe_parse_json`, and `validate_json` accept `str`, `bytes`, or

@@ -75,6 +75,18 @@ them exactly.
 | `.partial(*keys)` | Make all or selected fields optional |
 | `.required()` | Make every field reject missing input |
 | `.keyof()` | Enum schema of the shape keys |
+| `.wire(name)` | Field marker: accept `name` on input, emit the shape key |
+
+`.wire(name)` applies to a field schema inside `z.object()` or
+`z.typed_object()`. The shape key is the output name; the wire name is the
+input name. Wire names must be unique and must not collide with another field's
+input name. Input validation issue paths use the wire name; typed-object
+required-output issues use the shape key. `.keyof()`, `.pick()`, `.omit()`,
+`.extend()`, and typed-object keys use shape keys. Encoding and `io="input"`
+JSON Schema use wire names; `io="output"` uses shape keys. With
+`.passthrough()` or `.catchall()`, an unknown input key that equals a shape key
+does not overwrite the validated field. A discriminated-union discriminator
+cannot have a wire name.
 
 ## Collection methods
 

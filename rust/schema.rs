@@ -56,10 +56,15 @@ impl NativeSchema {
         let mut unknown_keys = UnknownKeys::Strip;
         if matches!(kind, Kind::Object) {
             let keys = args[0].bind(py).cast::<PyTuple>()?;
+            let input_keys = args[3].bind(py).cast::<PyTuple>()?;
             let policy: String = args[1].bind(py).extract()?;
             let catchall = args[2].bind(py);
             if keys.len() != children.len()
+                || input_keys.len() != children.len()
                 || keys.iter().any(|key| !key.is_instance_of::<PyString>())
+                || input_keys
+                    .iter()
+                    .any(|key| !key.is_instance_of::<PyString>())
                 || !matches!(
                     policy.as_str(),
                     "strip" | "strict" | "passthrough" | "catchall"
@@ -152,6 +157,7 @@ impl NativeSchema {
             | Kind::ExclusiveMax
             | Kind::MultipleOf
             | Kind::Nullable
+            | Kind::Wire
             | Kind::Optional
             | Kind::NonOptional
             | Kind::RequiredOutput => children

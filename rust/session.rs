@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex};
 use pyo3::class::{PyTraverseError, PyVisit};
 use pyo3::exceptions::{PyException, PyRuntimeError};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyTraceback};
+use pyo3::types::{PyDict, PySet, PyTraceback};
 
 use crate::errors::{Error, Issue, Path, Result};
 use crate::runtime::{Context, LazyHandle, LazyState};
@@ -135,6 +135,9 @@ struct ObjectFrame {
     path: Path,
     depth: usize,
     keys: Vec<Py<PyAny>>,
+    input_keys: Vec<Py<PyAny>>,
+    path_keys: Vec<Py<PyAny>>,
+    output_names: Option<Py<PySet>>,
     values: Vec<Option<Py<PyAny>>>,
     fast: Vec<bool>,
     cursor: usize,

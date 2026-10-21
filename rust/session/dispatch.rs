@@ -228,7 +228,7 @@ impl AsyncSession {
                     path,
                 }))
             }
-            Kind::Optional | Kind::Nullable => {
+            Kind::Optional | Kind::Nullable | Kind::Wire => {
                 let child = node_ref.children[0].clone_ref(py);
                 drop(node_ref);
                 Ok(AsyncNext::Task(AsyncTask::Eval {

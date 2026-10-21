@@ -81,6 +81,15 @@ pub(super) fn visit_async_frame(
             for key in &frame.keys {
                 visit.call(key)?;
             }
+            for key in &frame.input_keys {
+                visit.call(key)?;
+            }
+            for key in &frame.path_keys {
+                visit.call(key)?;
+            }
+            if let Some(names) = &frame.output_names {
+                visit.call(names)?;
+            }
             for value in frame.values.iter().flatten() {
                 visit.call(value)?;
             }

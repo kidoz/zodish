@@ -55,6 +55,8 @@ schema.to_json_schema(...)
 - Output mode uses `additionalProperties: false` for stripping objects.
 - Input mode omits `additionalProperties`, matching which input keys are
   accepted.
+- Object fields with `.wire(name)` use wire names for input properties and
+  `required` entries; output mode uses shape keys.
 - `optional` is represented through object `required` lists; it has no standalone
   JSON Schema equivalent.
 - Defaults are emitted as `default`; output mode requires a field whose default
