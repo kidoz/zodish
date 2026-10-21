@@ -6,13 +6,80 @@ import threading
 import unittest
 import weakref
 from dataclasses import dataclass
-from typing import NewType
+from typing import Annotated, NewType
 
 from zodish import MISSING, Failure, Issue, Success, ValidationError, z
 from zodish._native import AsyncSession
 
 
 class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_dataclass_annotated_async_fields(self):
+        events = []
+
+        async def decode(value):
+            events.append(("decode", value))
+            return int(value)
+
+        async def encode(value):
+            events.append(("encode", value))
+            return str(value)
+
+        async def is_positive(value):
+            return value > 0
+
+        field_codec = z.codec_async(
+            z.string(), z.integer().min(0), decode=decode, encode=encode,
+        )
+        type Count = Annotated[int, field_codec]
+        type Items[T] = list[T]
+        type Counts[T = Count] = Items[T]
+
+        @dataclass(frozen=True)
+        class Payload:
+            counts: Counts
+            positive: Annotated[int, z.integer().refine_async(is_positive)] = 1
+
+        codec = z.codecs.dataclass(Payload)
+        value = await codec.decode_async({"counts": ["2"]})
+        self.assertEqual(value, Payload([2]))
+        self.assertEqual(events, [("decode", "2")])
+        self.assertEqual(
+            await codec.encode_async(value), {"counts": ["2"], "positive": 1},
+        )
+        self.assertEqual(events, [("decode", "2"), ("encode", 2)])
+        # Plain fields validate before the codec conversion callback runs.
+        failure = await codec.safe_parse_async({"counts": [0], "positive": 0})
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(
+            [issue.path for issue in failure.error.issues], [("positive",)],
+        )
+        self.assertEqual(events, [("decode", "2"), ("encode", 2)])
+        failure = await codec.safe_parse_async({"counts": ["-1"]})
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(failure.error.issues[0].path, ("counts", 0))
+        failure = await codec.safe_encode_async(Payload([-1], 0))
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(
+            [issue.path for issue in failure.error.issues],
+            [("counts", 0), ("positive",)],
+        )
+        with self.assertRaisesRegex(TypeError, "parse_async"):
+            codec.parse({"counts": ["2"]})
+
+        @dataclass(frozen=True)
+        class Nested:
+            counts: Items[Items[Count]]
+
+        nested = z.codecs.dataclass(Nested)
+        self.assertEqual(await nested.parse_async({"counts": [["3"]]}), Nested([[3]]))
+        self.assertEqual(await nested.encode_async(Nested([[3]])), {"counts": [["3"]]})
+        failure = await nested.safe_parse_async({"counts": [["-1"]]})
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(failure.error.issues[0].path, ("counts", 0, 0))
+        failure = await nested.safe_encode_async(Nested([[-1]]))
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(failure.error.issues[0].path, ("counts", 0, 0))
+
     async def test_sync_schema_through_async_parser(self):
         schema = z.object({"value": z.integer().positive()})
         self.assertEqual(await schema.parse_async({"value": 1}), {"value": 1})

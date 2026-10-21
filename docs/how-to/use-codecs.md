@@ -76,16 +76,17 @@ instance and back:
 ```python
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Annotated
 from zodish import z
+
+type Name = Annotated[str, z.string().min(1)]
 
 @dataclass(frozen=True)
 class User:
-    name: str
-    created: datetime
+    name: Name
+    created: Annotated[datetime, z.codecs.iso_datetime()]
 
-user_codec = z.codecs.dataclass(User, fields={
-    "created": z.codecs.iso_datetime(),
-})
+user_codec = z.codecs.dataclass(User)
 
 user = user_codec.parse({
     "name": "Alex", "created": "2026-10-20T12:30:00Z",
@@ -112,6 +113,55 @@ object; output mode describes the decoded object, so Python-only field values
 remain unrepresentable. Async field codecs are supported through
 `.decode_async()`/`.encode_async()`; field issue paths and dataclass defaults are
 preserved.
+
+`Annotated[T, schema]` uses that schema as the complete field definition, just
+like a `fields=` entry. A plain schema validates the field; a codec converts
+between its encoded and decoded forms. `T` must describe the schema's decoded
+output, including any transforms; this correspondence is the caller's
+responsibility. `fields=` takes precedence over annotation metadata. Metadata
+that is not a Zodish schema is ignored. Multiple schema entries, including
+entries combined through nested annotations or aliases, raise `TypeError`;
+combine constraints into one schema chain instead.
+
+PEP 695 aliases (`type Name = ...`) and traditional assignment aliases work in
+supported annotations, including container items, unions, and nested
+dataclasses. Generic PEP 695 aliases accept ordinary type parameters and their
+defaults:
+
+```python
+from dataclasses import dataclass
+from typing import Annotated
+from zodish import z
+
+type Age = Annotated[int, z.integer().min(0)]
+type Items[T] = list[T]
+type Pair[T, U = T] = tuple[T, U]
+
+@dataclass(frozen=True)
+class Batch:
+    values: Items[Age]
+    nested: Items[Items[Age]]
+    pair: Pair[Age]
+
+batch_codec = z.codecs.dataclass(Batch)
+batch = batch_codec.parse({"values": [1], "nested": [[2]], "pair": [3, 4]})
+# Batch(values=[1], nested=[[2]], pair=(3, 4))
+```
+
+Type arguments retain their `Annotated` schemas and codecs. Defaults may
+reference earlier parameters, as `U = T` does above, and all-default aliases may
+be used without subscription. Parameters without defaults require explicit
+arguments; missing or excess arguments raise `TypeError`. Type-parameter bounds
+and constraints remain the type checker's responsibility; runtime validation
+comes from the substituted annotations and schemas.
+
+Recursive or unresolved aliases and variadic parameters (`TypeVarTuple` and
+`ParamSpec`) raise `TypeError`; use `fields=` for an explicit schema in those
+cases. Finite nesting such as `Items[Items[Age]]` is supported. This resolves
+aliases; parameterized dataclass classes such as `Box[int]` remain unsupported.
+An alias remains a Python type annotation. Validation happens through the
+dataclass codec; calling `User(...)` directly uses the ordinary dataclass
+constructor and does not validate its arguments.
 
 ## Compose codecs
 

@@ -399,7 +399,14 @@ z.codecs.dataclass(User, fields={
 `fields=` to override selected fields. Supported annotations include primitives,
 `bytes`, date/time/datetime/timedelta, `Decimal`, `Path`, `Enum`, `Literal`,
 `list`/`Sequence`, `dict`/`Mapping` with string keys, fixed tuples, unions and
-`Optional`, `Any`/`object`, and `Annotated`. Inference describes Python values; override date/time, `Decimal`,
+`Optional`, `Any`/`object`, and `Annotated`. `Annotated[T, schema]` supplies an
+inline field schema or codec, with `fields=` taking precedence. Non-schema
+metadata is ignored; multiple schema entries are rejected. PEP 695 type aliases
+are resolved, including generic aliases with ordinary type parameters and
+defaults, nested containers, and unions. Recursive aliases and variadic type
+parameters require explicit field schemas. See the
+[dataclass codec guide](docs/how-to/use-codecs.md) for examples.
+Inference describes Python values; override date/time, `Decimal`,
 `Path`, or enum fields with codecs when the encoded form is a string or raw
 value. Plain schemas act as validators; codec overrides supply encoded and
 decoded forms. Nested dataclasses and collections or unions containing them are

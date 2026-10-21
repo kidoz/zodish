@@ -1348,6 +1348,290 @@ class SchemaTests(unittest.TestCase):
             },
         )
 
+    def test_dataclass_annotated_schemas(self):
+        name_schema = z.string().trim().min(1)
+
+        @dataclasses.dataclass(frozen=True)
+        class User:
+            name: Annotated[str, "label", name_schema]
+            age: Annotated[int, z.integer().min(0)]
+            nickname: Annotated[str | None, z.string().nullable()] = None
+            count: Annotated[int, z.integer().default(9)] = 3
+            ignored: Annotated[int, {"description": "metadata"}] = 1
+
+        codec = z.codecs.dataclass(User)
+        user = codec.parse({"name": " Alex ", "age": 0})
+        self.assertEqual(user, User("Alex", 0))
+        self.assertEqual(codec.encode(user), {
+            "name": "Alex", "age": 0, "nickname": None,
+            "count": 3, "ignored": 1,
+        })
+        # Construction remains ordinary dataclass construction.
+        self.assertEqual(User("", -1).age, -1)
+        failure = codec.safe_parse({"name": "  ", "age": -1})
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(
+            [issue.path for issue in failure.error.issues],
+            [("name",), ("age",)],
+        )
+        self.assertEqual(
+            [issue.code for issue in failure.error.issues],
+            ["too_small", "too_small"],
+        )
+        self.assertIsInstance(codec.safe_parse({"name": "x"}), Failure)
+        self.assertIsInstance(codec.safe_parse({"name": "x", "age": None}), Failure)
+        self.assertTrue(name_schema.validate("x"))
+        self.assertEqual(
+            codec.to_json_schema(
+                io="input", unrepresentable="any",
+            )["properties"]["age"],
+            {"type": "integer", "minimum": 0},
+        )
+        overridden = z.codecs.dataclass(User, fields={"age": z.integer().min(-5)})
+        self.assertEqual(overridden.parse({"name": "x", "age": -1}).age, -1)
+
+        @dataclasses.dataclass
+        class MissingDefault:
+            value: Annotated[int, z.integer().optional()]
+
+        with self.assertRaisesRegex(ValueError, "no default"):
+            z.codecs.dataclass(MissingDefault)
+
+    def test_dataclass_type_aliases_and_inline_codecs(self):
+        count_codec = z.codec(
+            z.string(), z.integer().min(0), decode=int, encode=str,
+        )
+        type Count = Annotated[int, count_codec]
+        type CountAlias = Annotated[Count, "count label"]
+        type Counts = list[CountAlias]
+        type Key = str
+        type MaybeCount = Count | None
+
+        @dataclasses.dataclass(frozen=True)
+        class Inner:
+            value: Count
+
+        type InnerAlias = Inner
+
+        @dataclasses.dataclass(frozen=True)
+        class Payload:
+            counts: Counts
+            mapping: dict[Key, Count]
+            pair: tuple[Count, str]
+            inner: InnerAlias
+            maybe: MaybeCount = None
+
+        codec = z.codecs.dataclass(Payload)
+        encoded = {
+            "counts": ["1", "2"], "mapping": {"a": "3"},
+            "pair": ("4", "x"), "inner": {"value": "5"}, "maybe": "6",
+        }
+        value = Payload([1, 2], {"a": 3}, (4, "x"), Inner(5), 6)
+        self.assertEqual(codec.parse(encoded), value)
+        self.assertEqual(codec.encode(value), encoded)
+        self.assertIsNone(codec.parse({**encoded, "maybe": None}).maybe)
+        without_maybe = {k: v for k, v in encoded.items() if k != "maybe"}
+        self.assertIsNone(codec.parse(without_maybe).maybe)
+        self.assertEqual(
+            codec.to_json_schema(io="input")["properties"]["counts"]["items"],
+            {"type": "string"},
+        )
+        self.assertEqual(
+            codec.to_json_schema(io="output")["properties"]["counts"]["items"],
+            {"type": "integer", "minimum": 0},
+        )
+        failure = codec.safe_parse({
+            **encoded, "counts": ["-1"], "mapping": {"a": "-2"},
+        })
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(
+            [issue.path for issue in failure.error.issues],
+            [("counts", 0), ("mapping", "a")],
+        )
+        failure = codec.safe_encode(dataclasses.replace(value, counts=[-1]))
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(failure.error.issues[0].path, ("counts", 0))
+
+    def test_dataclass_generic_aliases(self):
+        type Age = Annotated[int, z.integer().min(0)]
+        type Items[T] = list[T]
+        type Matrix[T] = Items[Items[T]]
+        type Pair[L, R] = tuple[L, R]
+        type Swapped[A, B] = Pair[B, A]
+        type Record[K, V] = dict[K, V]
+        type Maybe[T] = T | None
+        type Labeled[T] = Annotated[T, "label"]
+        type Constrained[T] = Annotated[T, z.integer().max(100)]
+
+        @dataclasses.dataclass(frozen=True)
+        class Batch:
+            values: Items[Age]
+            nested: Items[Items[Age]]
+            matrix: Matrix[Age]
+            pair: Swapped[str, int]
+            mapping: Record[str, Age]
+            labeled: Labeled[Age]
+            constrained: Constrained[int]
+            maybe: Maybe[Age] = None
+
+        data = {
+            "values": [0, 1], "nested": [[2]], "matrix": [[3]],
+            "pair": (4, "x"), "mapping": {"a": 5},
+            "labeled": 6, "constrained": 7,
+        }
+        codec = z.codecs.dataclass(Batch)
+        value = Batch([0, 1], [[2]], [[3]], (4, "x"), {"a": 5}, 6, 7)
+        self.assertEqual(codec.parse(data), value)
+        self.assertEqual(codec.encode(value), {**data, "maybe": None})
+        self.assertEqual(codec.parse({**data, "maybe": 8}).maybe, 8)
+        self.assertIsNone(codec.parse({**data, "maybe": None}).maybe)
+        failure = codec.safe_parse({**data, "nested": [[-1]], "labeled": -2})
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in failure.error.issues],
+            [("too_small", ("nested", 0, 0)), ("too_small", ("labeled",))],
+        )
+        json.dumps(failure.error.to_dict())
+        for invalid in (None, [True], [-1]):
+            with self.subTest(invalid=invalid):
+                self.assertIsInstance(codec.safe_parse({**data, "values": invalid}), Failure)
+        without_values = {k: v for k, v in data.items() if k != "values"}
+        self.assertIsInstance(codec.safe_parse(without_values), Failure)
+        self.assertIsInstance(codec.safe_parse({**data, "constrained": 101}), Failure)
+        self.assertEqual(
+            codec.to_json_schema(io="input")["properties"]["values"]["items"],
+            {"type": "integer", "minimum": 0},
+        )
+        overridden = z.codecs.dataclass(Batch, fields={"values": z.array(z.string())})
+        self.assertEqual(overridden.parse({**data, "values": ["x"]}).values, ["x"])
+
+    def test_dataclass_generic_alias_defaults(self):
+        type Age = Annotated[int, z.integer().min(0)]
+        type Items[T = Age] = list[T]
+        type Pair[T, U = T] = tuple[T, U]
+        type Bundle[T = Age, U = Items[T], V = Pair[T, U]] = tuple[T, U, V]
+
+        @dataclasses.dataclass(frozen=True)
+        class Defaults:
+            ages: Items
+            names: Items[str]
+            pair: Pair[Age]
+            bundle: Bundle
+            override: Bundle[str, int, bool]
+
+        codec = z.codecs.dataclass(Defaults)
+        data = {
+            "ages": [1], "names": ["x"], "pair": (2, 3),
+            "bundle": (4, [5], (6, [7])), "override": ("x", 8, True),
+        }
+        value = Defaults([1], ["x"], (2, 3), (4, [5], (6, [7])), ("x", 8, True))
+        self.assertEqual(codec.parse(data), value)
+        self.assertEqual(codec.encode(value), data)
+        failure = codec.safe_parse({**data, "bundle": (4, [-5], (6, [7]))})
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(failure.error.issues[0].path, ("bundle", 1, 0))
+
+    def test_dataclass_generic_alias_codecs(self):
+        calls = []
+
+        def decode(value):
+            calls.append(("decode", value))
+            return int(value)
+
+        def encode(value):
+            calls.append(("encode", value))
+            return str(value)
+
+        type Count = Annotated[int, z.codec(
+            z.string(), z.integer().min(0), decode=decode, encode=encode,
+        )]
+        type Items[T] = list[T]
+        type Maybe[T] = T | None
+        type Choice[T] = T | bool
+
+        @dataclasses.dataclass(frozen=True)
+        class Inner:
+            count: Count
+
+        @dataclasses.dataclass(frozen=True)
+        class Payload:
+            values: Items[Items[Count]]
+            children: Items[Inner]
+            maybe: Maybe[Count]
+            choice: Choice[Count]
+
+        codec = z.codecs.dataclass(Payload)
+        data = {
+            "values": [["1"]], "children": [{"count": "2"}],
+            "maybe": "3", "choice": True,
+        }
+        value = Payload([[1]], [Inner(2)], 3, True)
+        self.assertEqual(codec.parse(data), value)
+        self.assertEqual(calls, [("decode", "1"), ("decode", "2"), ("decode", "3")])
+        self.assertEqual(codec.encode(value), data)
+        self.assertEqual(calls[-3:], [("encode", 1), ("encode", 2), ("encode", 3)])
+        self.assertIsNone(codec.parse({**data, "maybe": None}).maybe)
+        self.assertEqual(codec.parse({**data, "choice": "4"}).choice, 4)
+        for io, expected in (
+            ("input", {"type": "string"}),
+            ("output", {"type": "integer", "minimum": 0}),
+        ):
+            self.assertEqual(
+                codec.to_json_schema(io=io)["properties"]["values"]["items"]["items"],
+                expected,
+            )
+        failure = codec.safe_encode(dataclasses.replace(value, values=[[-1]]))
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(failure.error.issues[0].path, ("values", 0, 0))
+
+    def test_dataclass_annotated_configuration_errors(self):
+        first = z.integer().min(0)
+        second = z.integer().max(10)
+        type Count = Annotated[int, first]
+        type Recursive = list[Recursive]
+        type Mutual = list[Other]
+        type Other = Mutual | None
+        type Unresolved = MissingAliasName  # noqa: F821 - lazy unresolved alias
+        type Generic[T] = list[T]
+        type Two[T, U] = tuple[T, U]
+        type Variadic[*Ts] = tuple[*Ts]
+        type Parameters[**P] = int
+        type GenericRecursive[T] = list[GenericRecursive[T]]
+        type Growing[T] = list[Growing[list[T]]]
+        type GenericMutual[T] = list[GenericOther[T]]
+        type GenericOther[T] = GenericMutual[T] | None
+        type Constrained[T] = Annotated[T, second]
+        type BadDefault[T = MissingDefaultName] = list[T]  # noqa: F821
+
+        cases = (
+            (Annotated[int, first, second], "multiple Annotated schemas"),
+            (Annotated[Annotated[int, first], second], "multiple Annotated schemas"),
+            (Annotated[Count, second], "multiple Annotated schemas"),
+            (Recursive, "Recursive type aliases"),
+            (Mutual, "Recursive type aliases"),
+            (Unresolved, "Cannot resolve type alias"),
+            (Generic, "Missing type argument"),
+            (Generic[()], "Missing type argument"),
+            (Two[int], "Missing type argument"),
+            (Generic[int, str], "Too many type arguments"),
+            (Generic[Generic.__type_params__[0]], "Unbound type parameter"),
+            (Variadic[int, str], "Variadic type alias parameters"),
+            (Parameters[[int]], "Variadic type alias parameters"),
+            (GenericRecursive[int], "Recursive type aliases"),
+            (Growing[int], "Recursive type aliases"),
+            (GenericMutual[int], "Recursive type aliases"),
+            (Constrained[Count], "multiple Annotated schemas"),
+            (BadDefault, "Cannot resolve type alias"),
+        )
+        for annotation, message in cases:
+            with self.subTest(annotation=annotation):
+                cls = dataclasses.make_dataclass("Example", [("value", annotation)])
+                with self.assertRaisesRegex(TypeError, message):
+                    z.codecs.dataclass(cls)
+                # An explicit definition bypasses annotation inference entirely.
+                codec = z.codecs.dataclass(cls, fields={"value": z.integer()})
+                self.assertEqual(codec.parse({"value": 1}), cls(1))
+
     def test_dataclass_annotation_inference(self):
         class Color(enum.Enum):
             RED = "red"

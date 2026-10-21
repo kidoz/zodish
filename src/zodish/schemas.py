@@ -13,7 +13,6 @@ import json as _json
 import math
 import pathlib as _pathlib
 import re
-import types
 import typing
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -2588,10 +2587,14 @@ class _Codecs:
         """Build an encoded-dictionary ↔ dataclass codec.
 
         Missing field schemas are inferred from type annotations. Explicit
-        entries override inference. Plain schemas act as validators; codec field
-        schemas supply the encoded and decoded forms. Fields with ``init=False``
-        are ignored.
+        entries override inference, including ``Annotated[T, schema]`` metadata.
+        Type aliases with ordinary type parameters and defaults are resolved
+        recursively. Plain schemas act as validators; codec field schemas supply
+        the encoded and decoded forms. Fields with ``init=False`` are ignored.
         """
+        # Inference uses the schema builders, so import it after they exist.
+        from ._annotations import dataclass_type_hints, infer_dataclass_field
+
         if not isinstance(cls, type) or not dataclasses.is_dataclass(cls):
             raise TypeError("dataclass codec expects a dataclass type")
         if cls in _stack:
@@ -2635,135 +2638,7 @@ class _Codecs:
                 + ", ".join(sorted(builtins.map(repr, unknown_fields)))
             )
         missing = expected - provided
-        hints: dict[str, Any] = {}
-        if missing:
-            try:
-                hints = typing.get_type_hints(cls)
-            except (NameError, TypeError) as error:
-                raise TypeError(
-                    "Cannot resolve dataclass annotations",
-                ) from error
-
-        def infer(annotation: Any, name: str) -> Schema[Any, Any]:
-            if annotation is Any or annotation is builtins.object:
-                return unknown()
-            if annotation is None or annotation is type(None):
-                return none()
-            origin = typing.get_origin(annotation)
-            args = typing.get_args(annotation)
-            if origin is typing.Annotated:
-                return infer(args[0], name)
-            if origin is typing.Literal:
-                choices = builtins.tuple(args)
-                return (
-                    literal(choices[0]) if len(choices) == 1 else enum(choices)
-                )
-            if origin in (types.UnionType, typing.Union):
-                non_none = [
-                    item for item in args if item is not type(None)
-                ]
-                options = [infer(item, name) for item in non_none]
-                if not options:
-                    return none()
-                if len(options) == 1:
-                    combined: Schema[Any, Any] = options[0]
-                elif any(isinstance(item, CodecSchema) for item in options):
-                    combined = _union_codec(options)
-                else:
-                    combined = union(*options)
-                if len(non_none) != len(args):
-                    combined = (
-                        _nullable_codec(combined)
-                        if isinstance(combined, CodecSchema)
-                        else combined.nullable()
-                    )
-                return combined
-            if origin is list or origin is Sequence:
-                item = infer(args[0], name) if args else unknown()
-                return (
-                    _array_codec(item)
-                    if isinstance(item, CodecSchema)
-                    else array(item)
-                )
-            if origin is dict or origin is Mapping:
-                if not args:
-                    return record(unknown())
-                key_type, value_type = args[0], args[1]
-                if key_type is not str:
-                    raise TypeError(
-                        f"Field {name!r} must use string dictionary keys",
-                    )
-                value = infer(value_type, name)
-                return (
-                    _record_codec(value)
-                    if isinstance(value, CodecSchema)
-                    else record(value)
-                )
-            if origin is builtins.tuple:
-                if annotation is builtins.tuple:
-                    raise TypeError(
-                        f"Field {name!r} uses a bare tuple annotation; "
-                        "use fixed-length tuple[...] syntax",
-                    )
-                if args and args[-1] is Ellipsis:
-                    raise TypeError(
-                        f"Field {name!r} uses a variable-length tuple; "
-                        "use a fixed-length tuple[...] annotation",
-                    )
-                if not args:
-                    return tuple()
-                items = [infer(item, name) for item in args]
-                return (
-                    _tuple_codec(items)
-                    if any(isinstance(item, CodecSchema) for item in items)
-                    else tuple(*items)
-                )
-            if annotation is list or annotation is Sequence:
-                return array(unknown())
-            if annotation is dict or annotation is Mapping:
-                return record(unknown())
-            if annotation is builtins.tuple:
-                raise TypeError(
-                    f"Field {name!r} uses a bare tuple annotation; "
-                    "use fixed-length tuple[...] syntax",
-                )
-            if not isinstance(annotation, type):
-                supertype = getattr(annotation, "__supertype__", None)
-                if supertype is not None:
-                    return infer(supertype, name)
-                raise TypeError(
-                    f"Cannot infer a schema for field {name!r}: "
-                    f"{annotation!r}",
-                )
-            if dataclasses.is_dataclass(annotation):
-                return _Codecs.dataclass(annotation, _stack=stack)
-            if issubclass(annotation, Enum):
-                return native_enum(annotation)
-            if issubclass(annotation, bool):
-                return boolean()
-            if issubclass(annotation, int):
-                return integer()
-            if issubclass(annotation, float):
-                return number()
-            if issubclass(annotation, str):
-                return string()
-            if issubclass(annotation, builtins.bytes):
-                return bytes()
-            if issubclass(annotation, _datetime.datetime):
-                return datetime()
-            if issubclass(annotation, _datetime.date):
-                return date()
-            if issubclass(annotation, _datetime.time):
-                return time()
-            if issubclass(annotation, _datetime.timedelta):
-                return timedelta()
-            if issubclass(annotation, _decimal.Decimal):
-                return decimal()
-            if issubclass(annotation, _pathlib.PurePath):
-                return path()
-            raise TypeError(
-                f"Cannot infer a schema for field {name!r}: {annotation!r}",
-            )
+        hints = dataclass_type_hints(cls) if missing else {}
 
         schemas_by_name: dict[str, Schema[Any, Any]] = {}
         for name in names:
@@ -2775,7 +2650,7 @@ class _Codecs:
                     raise TypeError(
                         f"Cannot infer a schema for field {name!r}",
                     )
-                schema = infer(annotation, name)
+                schema = infer_dataclass_field(annotation, name, stack=stack)
             if not isinstance(schema, Schema):
                 raise TypeError(f"Field {name!r} must be a schema")
             schemas_by_name[name] = schema

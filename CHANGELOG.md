@@ -9,11 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Dataclass codecs accept `Annotated[T, schema]` field definitions, including
+  codecs and async schemas, and resolve PEP 695 type aliases inside supported
+  annotations. Generic aliases support ordinary type parameters, nested
+  substitutions, and defaults referring to earlier parameters. Explicit
+  `fields=` entries take precedence.
 - `z.typed_object(TypedDictClass, shape)` produces a statically typed
   `TypedDict` result while preserving ordinary object policies and runtime
   behavior.
 - `.brand(NewType)` applies a typing-only branded output type without changing
   runtime validation.
+
+### Changed
+
+- Move dataclass annotation resolution and schema inference into a private
+  module, preserving validation, typing, and codec behavior.
+- Dataclass inference now enforces Zodish schema metadata in `Annotated`, which
+  was previously ignored. Multiple schema entries raise `TypeError`; unrelated
+  annotation metadata remains ignored.
 
 ## [0.6.0] - 2026-10-21
 

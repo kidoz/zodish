@@ -163,21 +163,31 @@ Use a dataclass codec for a statically typed result that also encodes back:
 
 ```python
 from dataclasses import dataclass
+from typing import Annotated
 from zodish import z
+
+type Age = Annotated[int, z.integer().min(0)]
 
 @dataclass(frozen=True)
 class User:
     name: str
-    age: int
+    age: Age
 
-user_codec = z.codecs.dataclass(User, fields={
-    "name": z.string(),
-    "age": z.integer(),
-})
+user_codec = z.codecs.dataclass(User)
 
 user: User = user_codec.parse({"name": "Alex", "age": 30})
 encoded = user_codec.encode(user)
 ```
+
+Static tools see `Age` as `int`; the dataclass codec reads its schema metadata
+and enforces the non-negative constraint. Aliases can be reused in containers
+and unions, including generic aliases such as `type Items[T] = list[T]` used as
+`Items[Age]`. Ordinary type-parameter defaults are supported; parameters without
+defaults require explicit arguments. Bounds and constraints remain static type
+checks. Schema instances remain runtime values: use
+`Annotated[T, schema]` rather than using a schema instance as a type annotation.
+When metadata contains a codec, `T` describes its decoded output. Validation
+occurs through the codec; an ordinary `User(...)` call does not validate.
 
 A one-way transform can also produce a dataclass, but it has no reverse path:
 

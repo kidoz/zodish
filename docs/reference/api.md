@@ -187,7 +187,7 @@ complete status and limitations.
 | `z.codecs.iso_date()`, `iso_time()`, `iso_datetime()` | ISO strings ↔ `date`, `time`, `datetime` |
 | `z.codecs.decimal()`, `json_text()` | String ↔ `Decimal` or JSON-compatible values |
 | `z.codecs.path()`, `bytes_base64(urlsafe=False)` | String ↔ `Path` or `bytes` |
-| `z.codecs.dataclass(Cls, fields=None)` | Encoded dictionary ↔ dataclass instance; field schemas inferred from annotations, with optional overrides |
+| `z.codecs.dataclass(Cls, fields=None)` | Encoded dictionary ↔ dataclass instance; infers annotations, `Annotated[T, schema]`, and aliases with ordinary type parameters and defaults; `fields=` overrides inference |
 | `.decode(value)`, `.safe_decode(value)` | Decode; equivalent to `.parse()` and `.safe_parse()` |
 | `.decode_async(value)`, `.safe_decode_async(value)` | Await decoding, including async codecs |
 | `.encode(value)`, `.safe_encode(value)` | Reverse-validate decoded input and produce encoded output |
@@ -206,6 +206,18 @@ returning awaitables are accepted. Async codecs preserve the same input/output
 schemas, wrappers, records, arrays, unions, tuples, and dataclass codecs.
 Synchronous codec entry points reject async field codecs; use
 `.decode_async()`/`.encode_async()` instead.
+
+Dataclass `Annotated` metadata accepts one schema or codec; other metadata is
+ignored. Multiple schemas raise `TypeError`, including across alias boundaries.
+The annotated type describes decoded output; its agreement with the schema is
+the caller's responsibility. Generic aliases substitute ordinary type
+parameters, including defaults that refer to earlier parameters. Missing
+arguments without defaults and excess arguments raise `TypeError`. Bounds and
+constraints are checked statically. Recursive and unresolved aliases and
+variadic parameters require explicit field definitions. Parameterized dataclass
+classes such as `Box[int]` remain unsupported. Dataclass construction itself does
+not validate. See
+[Use codecs](../how-to/use-codecs.md).
 
 Encoding is available only for reversible schema trees. Primitives, constraints,
 codecs, optional/nullable/nonoptional wrappers, and structural containers are

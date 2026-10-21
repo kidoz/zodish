@@ -9,7 +9,7 @@ from datetime import timedelta as TimeDelta
 from decimal import Decimal
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, NewType, TypedDict, assert_type
+from typing import Annotated, Any, NewType, TypedDict, assert_type
 
 from zodish import Failure, Issue, Missing, Schema, Success, to_json_schema, z
 
@@ -298,6 +298,52 @@ class CodecUser:
     name: str
     age: int
 
+
+type NonNegativeAge = Annotated[int, z.integer().min(0)]
+type EncodedDateTime = Annotated[DateTime, z.codecs.iso_datetime()]
+type Items[T] = list[T]
+type Pair[T, U = T] = tuple[T, U]
+type AgeHistory[T = NonNegativeAge] = Items[T]
+
+
+@dataclass(frozen=True)
+class AnnotatedUser:
+    age: NonNegativeAge
+    created: EncodedDateTime
+    history: AgeHistory
+
+
+annotated_user_codec = z.codecs.dataclass(AnnotatedUser)
+assert_type(annotated_user_codec, z.CodecSchema[AnnotatedUser, dict[str, Any]])
+annotated_user = annotated_user_codec.parse({
+    "age": 30, "created": "2026-10-21T12:00:00Z", "history": [20, 25],
+})
+assert_type(annotated_user, AnnotatedUser)
+assert_type(annotated_user.age, int)
+assert_type(annotated_user.created, DateTime)
+assert_type(annotated_user.history, list[int])
+assert_type(annotated_user_codec.encode(annotated_user), dict[str, Any])
+
+
+@dataclass(frozen=True)
+class GenericAliasBatch:
+    ages: Items[NonNegativeAge]
+    nested: Items[Items[NonNegativeAge]]
+    dates: Items[EncodedDateTime]
+    pair: Pair[NonNegativeAge]
+
+
+generic_alias_codec = z.codecs.dataclass(GenericAliasBatch)
+assert_type(generic_alias_codec, z.CodecSchema[GenericAliasBatch, dict[str, Any]])
+generic_batch = generic_alias_codec.parse({
+    "ages": [1], "nested": [[2]], "dates": ["2026-10-21T12:00:00Z"], "pair": [3, 4],
+})
+assert_type(generic_batch, GenericAliasBatch)
+assert_type(generic_batch.ages, list[int])
+assert_type(generic_batch.nested, list[list[int]])
+assert_type(generic_batch.dates, list[DateTime])
+assert_type(generic_batch.pair, tuple[int, int])
+assert_type(generic_alias_codec.encode(generic_batch), dict[str, Any])
 
 codec_user = z.codecs.dataclass(CodecUser)
 assert_type(codec_user, z.CodecSchema[CodecUser, dict[str, Any]])
