@@ -7,8 +7,12 @@ what it buys, and what it costs.
 
 `rust/lib.rs` declares the modules, shares the native depth limit, and registers
 the Python module. `rust/session.rs` owns `AsyncSession`, its frame/state types,
-token counter, Python methods, and GC lifecycle. Its fields and helpers stay
-private; suspended frames retain snapshots, callbacks, issues, and tracebacks.
+token counter, Python methods, and GC lifecycle. Its fields stay private;
+suspended frames retain snapshots, callbacks, issues, and tracebacks.
+`rust/session/dispatch.rs` contains the execution loop, node evaluation, and
+frame dispatch, including wrapper continuations. Only its `run` and `advance`
+entry points are visible to the session parent. Container, composition,
+callback, and GC helpers remain in `session.rs` during extraction.
 Paths, issue/error types, and the GC-aware native issue bundle live in
 `rust/errors.rs`.
 `rust/runtime.rs` holds the per-parse `Context`, callback-error normalization,
