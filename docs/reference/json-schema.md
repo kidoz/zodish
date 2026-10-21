@@ -38,6 +38,7 @@ schema.to_json_schema(...)
 | `z.tuple(*items).rest(schema)` | Draft only: `prefixItems` plus `items` |
 | `z.record(value_schema)` | `type: object` with `additionalProperties` |
 | `z.record(key_schema, value_schema)` | Draft only, and only when keys produce strings |
+| `z.map(key_schema, value_schema)` | Same representation and limits as a keyed record |
 | `z.object(shape)` | `type: object` with `properties` and `required` |
 | Object `.catchall(schema)` | Object with `additionalProperties` schema |
 | `z.union(...)` | `anyOf` |
@@ -86,6 +87,7 @@ These constructs raise `UnrepresentableError` unless `unrepresentable="any"`:
   `async_overwrite`;
 - `default_factory`;
 - `instance_of`;
+- `z.set(item)`;
 - `trim`, `lower`, and `upper`;
 - regexes with non-default flags;
 - Python object schemas: `z.date()`, `z.datetime()`, `z.time()`, `z.timedelta()`,

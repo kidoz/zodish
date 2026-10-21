@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `z.set(item)` validates Python sets with native element traversal and async
+  callback composition. Sets are not representable in JSON Schema or reverse
+  encoding.
+- `z.map(key_schema, value_schema)` validates dictionary keys and values using
+  the native record evaluator, with validated key and value issue paths.
+- `z.string()` format checks for ULID, CUID, CUID2, Nano ID, JWT, E.164,
+  base64, and base64url.
+
 ## [0.5.1] - 2026-10-21
 
 ### Fixed

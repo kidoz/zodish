@@ -11,7 +11,7 @@ validation remains the default and is unchanged.
 | Is there `await schema.parse_async(value)`? | Yes. |
 | Is there `await schema.safe_parse_async(value)`? | Yes. |
 | Can async callbacks be used? | Through `refine_async`, `super_refine_async`, `transform_async`, `overwrite_async`, `default_factory_async`, `catch_async`, and `z.preprocess_async`. |
-| Can async operations be nested in objects, arrays, records, tuples, unions, intersections, discriminated unions, pipes, or wrappers? | Yes. |
+| Can async operations be nested in objects, arrays, sets, maps, records, tuples, unions, intersections, discriminated unions, pipes, or wrappers? | Yes. |
 | Can synchronous builders such as `refine`, `overwrite`, `default_factory`, `catch`, `preprocess`, lazy, or codec callbacks be async? | No. |
 | Does `parse_json_async` exist? | Yes, with `safe_parse_json_async`. |
 | Does `validate_async` exist? | Yes. |
@@ -77,7 +77,7 @@ callback's current location and are prefixed with that path; a callback-raised
 Async callbacks can appear anywhere a schema can appear. Validation keeps the
 usual declaration order:
 
-- object fields, array items, tuple items, and record values run sequentially;
+- object fields, array items, set items, map entries, tuple items, and record values run sequentially;
 - sibling validation failures aggregate in order and include nested paths;
 - unions try branches in order and stop at the first success;
 - discriminated unions evaluate only the selected branch;

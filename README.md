@@ -7,7 +7,7 @@
 
 A validation library (written in Rust via PyO3) for **CPython 3.14+** (tested on 3.14 and 3.15), with a typed Python API inspired by [Zod](https://zod.dev/). Synchronous parsing is the default; composable async refinements and transforms are supported through explicit async entry points.
 
-Handles: **strings, numbers, integers, booleans, none, unknown, literals, enums, objects, arrays, tuples, records, unions, discriminated unions, intersections, optional/nullable/default wrappers, coercion, stringbool, bidirectional codecs, refinements, transforms, pipes, recursive schemas, metadata, and JSON Schema export** — with immutable schemas, ordered operations, aggregated issues, and native-only evaluation. Zodish is an independent implementation of a subset of Zod's API.
+Handles: **strings, numbers, integers, booleans, none, unknown, literals, enums, objects, arrays, sets, maps, tuples, records, unions, discriminated unions, intersections, optional/nullable/default wrappers, coercion, stringbool, bidirectional codecs, refinements, transforms, pipes, recursive schemas, metadata, and JSON Schema export** — with immutable schemas, ordered operations, aggregated issues, and native-only evaluation. Zodish is an independent implementation of a subset of Zod's API.
 
 ## Documentation
 
@@ -95,12 +95,12 @@ except ValidationError as error:
 
 | Schema | Constructors / methods |
 | --- | --- |
-| Strings | `z.string()`, `.min(n)`, `.max(n)`, `.length(n)`, `.regex(pattern)`, `.email()`, `.url()`, `.uuid()`, `.date()`, `.time()`, `.datetime()`, `.ipv4()`, `.ipv6()`, `.hostname()`, `.starts_with(s)`, `.ends_with(s)`, `.includes(s)`, `.trim()`, `.lower()`, `.upper()` |
+| Strings | `z.string()`, `.min(n)`, `.max(n)`, `.length(n)`, `.regex(pattern)`, `.email()`, `.url()`, `.uuid()`, `.ulid()`, `.cuid()`, `.cuid2()`, `.nanoid()`, `.jwt()`, `.e164()`, `.base64()`, `.base64url()`, `.date()`, `.time()`, `.datetime()`, `.ipv4()`, `.ipv6()`, `.hostname()`, `.starts_with(s)`, `.ends_with(s)`, `.includes(s)`, `.trim()`, `.lower()`, `.upper()` |
 | Numbers | `z.number()`, `z.integer()`, `.min(n)`, `.max(n)`, `.gt(n)`, `.gte(n)`, `.lt(n)`, `.lte(n)`, `.multiple_of(n)`, `.positive()`, `.nonnegative()`, `.int()` |
 | Other values | `z.boolean()`, `z.none()`, `z.unknown()`, `z.date()`, `z.datetime()`, `z.time()`, `z.timedelta()`, `z.decimal()`, `z.bytes()`, `z.path()`, `z.json()`, `z.native_enum(EnumClass)`, `z.instance_of(cls)` |
 | Choices | `z.literal(value)`, `z.enum(values)`, `z.union(*schemas)`, `z.discriminated_union(key, options)`, `schema.or_(other)` |
 | Objects | `z.object(shape)`, `.strict()`, `.strip()`, `.passthrough()`, `.catchall(schema)`, `.extend(shape)`, `.pick(*keys)`, `.omit(*keys)`, `.partial(*keys)`, `.required()`, `.keyof()` |
-| Collections | `z.array(item)` / `item.array()`, array `.min(n)`, `.max(n)`, `.length(n)`, `.nonempty()`, `z.tuple(*items)` / `.rest(schema)`, `z.record(value_schema)` / `z.record(key_schema, value_schema)` |
+| Collections | `z.array(item)` / `item.array()`, array `.min(n)`, `.max(n)`, `.length(n)`, `.nonempty()`, `z.set(item)`, `z.map(key_schema, value_schema)`, `z.tuple(*items)` / `.rest(schema)`, `z.record(value_schema)` / `z.record(key_schema, value_schema)` |
 | Every schema | `.parse(value)`, `.safe_parse(value)`, `.validate(value)`, `.parse_json(data)`, `.safe_parse_json(data)`, `.validate_json(data)`, `.parse_async(value)`, `.safe_parse_async(value)`, `.validate_async(value)`, `.parse_json_async(data)`, `.safe_parse_json_async(data)`, `.encode(value)`, `.safe_encode(value)`, `.optional()`, `.nonoptional()`, `.nullable()`, `.nullish()`, `.default(value)`, `.default_factory(fn)`, `.default_factory_async(fn)`, `.catch(value_or_factory)`, `.catch_async(factory)`, `.unwrap()`, `.refine(predicate, message, *, path=())`, `.refine_async(predicate, message, *, path=())`, `.super_refine(fn)`, `.super_refine_async(fn)`, `.transform(fn)`, `.transform_async(fn)`, `.overwrite(fn)`, `.overwrite_async(fn)`, `.pipe(schema)`, `.meta(metadata)`, `.describe(text)`, `.metadata`, `.to_json_schema(...)` |
 | Codecs | `z.codec(input_schema, output_schema, *, decode=fn, encode=fn)`, `z.codec_async(...)`, `.decode(value)`, `.safe_decode(value)`, `.decode_async(value)`, `.safe_decode_async(value)`, `.encode(value)`, `.safe_encode(value)`, `.encode_async(value)`, `.safe_encode_async(value)`, `.input_schema`, `.output_schema`, `.optional()`, `.nullable()`, `.nonoptional()`, `.nullish()`, `.record()`, `z.codecs.array(codec)`, `z.codecs.union(*schemas)`, `z.codecs.tuple(*schemas)` |
 | Built-in codecs | `z.codecs.iso_date()`, `iso_time()`, `iso_datetime()`, `decimal()`, `json_text()`, `path()`, `bytes_base64(urlsafe=False)`, `dataclass(Cls, fields=None)` |
@@ -181,10 +181,12 @@ user.parse({"name": "Alex", "age": 30})
 user.safe_parse({"name": "Alex", "age": 30, "admin": True}).success  # False
 ```
 
-Objects accept Python dictionaries with string keys. Extra keys are stripped by default; `.strict()` rejects them and `.passthrough()` preserves them. Arrays accept lists; tuple schemas accept lists or tuples and return tuples. Records accept dictionaries with string keys and validate every value.
+Objects accept Python dictionaries with string keys. Extra keys are stripped by default; `.strict()` rejects them and `.passthrough()` preserves them. Arrays accept lists; set schemas accept Python sets and return new sets; map schemas use dictionaries with a validated key schema and value schema. Tuple schemas accept lists or tuples and return tuples. Records accept dictionaries with string keys and validate every value.
 
 ```python
 z.array(z.integer()).nonempty()
+z.set(z.integer())
+z.map(z.string(), z.integer())  # dictionary with validated keys and values
 z.tuple(z.string(), z.integer()).rest(z.boolean())
 z.record(z.string())
 z.record(z.integer(), z.string())  # keyed record
@@ -273,6 +275,14 @@ Common string formats are syntax checks:
 ```python
 z.string().url()
 z.string().uuid()
+z.string().ulid()
+z.string().cuid()
+z.string().cuid2()
+z.string().nanoid()
+z.string().jwt()
+z.string().e164()
+z.string().base64()
+z.string().base64url()
 z.string().date()
 z.string().time()
 z.string().datetime()
@@ -481,7 +491,7 @@ credentials = z.object({
 ) if value["password"] != value["confirm"] else None)
 ```
 
-`Schema[Out, In]` tracks parsed output and accepted input types for primitives, homogeneous collections, transforms, preprocessors, and wrappers. `In` defaults to `Out`, so `Schema[T]` remains valid when input and output types match. `default()` and `default_factory()` accept input-typed values; after a transform, pass the pre-transform type or apply the default before the transform. Python type checkers cannot generally derive a new `TypedDict` from a dictionary of schema instances as TypeScript does with `z.infer`. Objects return `dict[str, Any]`; `z.tuple()` infers fixed-length tuple types for up to four items, while larger tuples and tuples with a rest schema return `tuple[Any, ...]`. Use `z.codecs.dataclass(Cls, fields=...)` or a transform to produce a statically typed dataclass result. Unions infer up to four alternatives; larger unions fall back to `Any`. There is no type-checker plugin or generated model API.
+`Schema[Out, In]` tracks parsed output and accepted input types for primitives, homogeneous collections (including sets and maps), transforms, preprocessors, and wrappers. `In` defaults to `Out`, so `Schema[T]` remains valid when input and output types match. `default()` and `default_factory()` accept input-typed values; after a transform, pass the pre-transform type or apply the default before the transform. Python type checkers cannot generally derive a new `TypedDict` from a dictionary of schema instances as TypeScript does with `z.infer`. Objects return `dict[str, Any]`; `z.tuple()` infers fixed-length tuple types for up to four items, while larger tuples and tuples with a rest schema return `tuple[Any, ...]`. Use `z.codecs.dataclass(Cls, fields=...)` or a transform to produce a statically typed dataclass result. Unions infer up to four alternatives; larger unions fall back to `Any`. There is no type-checker plugin or generated model API.
 
 `safe_parse` catches only `ValidationError`. Exceptions raised by callback code such as `int("bad")` propagate. Use `.refine()` to reject expected invalid values before a transform; use `z.preprocess` for intentional input conversion. Callbacks can raise `ValidationError` to contribute issues to the surrounding validation. Supplied issue paths are preserved as written. A callback raising `ValidationError([])` produces a `custom` issue at the current path with the message `Invalid value`, so the rejection still aggregates with sibling failures. Sync callbacks are used by default. Asynchronous checks are available through `refine_async`/`super_refine_async`/`transform_async`/`overwrite_async`/`default_factory_async`/`catch_async`/`z.preprocess_async` and `parse_async`/`safe_parse_async`/`validate_async`/`parse_json_async`/`safe_parse_json_async`, including inside objects, arrays, records, tuples, unions, intersections, pipes, and wrappers; async callbacks passed to synchronous builders are rejected. `z.codec_async` supports awaitable codec callbacks and `encode_async`/`safe_encode_async` support async reverse graphs, including async dataclass codecs. Lazy factories remain synchronous; a factory may return a schema containing async operations. See [Async support](docs/explanation/async-support.md) for details and limitations.
 
@@ -545,7 +555,7 @@ to_json_schema(schema, target="openapi-3.0", io="input")
 - Supported: strings with length/regex/format and starts/ends/includes constraints, numbers/integers with inclusive or exclusive bounds and multiple-of checks, booleans, null, unknown, JSON values, native enums, literals, enums, arrays, tuples with optional rest (draft only), objects with catchall, records, unions, discriminated unions, intersections with dictionary outputs, optional/nullable/default wrappers, coercion wrappers, stringbool, and codecs. Static defaults must be JSON-compatible.
 - Multiple string predicate patterns and multiple `multiple_of` constraints are emitted through `allOf`; multiple raw regex constraints on one string remain unrepresentable.
 - Not representable: `catch`, `refine`/`super_refine`, `transform`, `overwrite`, `preprocess`, `pipe`, `lazy`, `default_factory`, `instance_of`, `trim`/`lower`/`upper`, and regexes with non-default flags. Export raises `UnrepresentableError` by default; pass `unrepresentable="any"` to emit `{}` for those nodes instead.
-- Tuples, keyed records, and null-only schemas are not representable in OpenAPI 3.0. Use `.nullable()` for nullable fields; standalone null literals and enum values containing `None` are rejected.
+- Tuples, keyed records, and null-only schemas are not representable in OpenAPI 3.0. Set schemas are unrepresentable in both targets; use an array when JSON Schema output is required. Map schemas export as keyed records. Use `.nullable()` for nullable fields; standalone null literals and enum values containing `None` are rejected.
 - Keyed records in draft JSON Schema require keys that produce strings. Integer, transformed, or otherwise non-string key schemas are rejected; one-argument records keep the default string-key behavior.
 - String formats are JSON Schema annotations; validators enforce them only when format assertion is enabled. Python regex patterns are emitted as `pattern`, so Python-specific syntax may not be portable.
 - JSON Schema `multipleOf` uses exact numeric semantics. Runtime integer checks are exact, but float checks apply a small quotient tolerance, so results can differ for decimal values such as `0.3` with divisor `0.1`.

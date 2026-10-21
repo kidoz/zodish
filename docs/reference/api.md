@@ -19,7 +19,7 @@ in declaration order, and the order affects results.
 | Other values | `z.boolean()`, `z.none()`, `z.unknown()`, `z.date()`, `z.datetime()`, `z.time()`, `z.timedelta()`, `z.decimal()`, `z.bytes()`, `z.path()`, `z.json()`, `z.native_enum(EnumClass)`, `z.instance_of(cls)` |
 | Choices | `z.literal(value)`, `z.enum(values)`, `z.union(*schemas)`, `z.discriminated_union(key, options)` |
 | Objects | `z.object(shape)` |
-| Collections | `z.array(item)`, `z.tuple(*items)`, `z.record(value_schema)`, `z.record(key_schema, value_schema)` |
+| Collections | `z.array(item)`, `z.set(item)`, `z.map(key_schema, value_schema)`, `z.tuple(*items)`, `z.record(value_schema)`, `z.record(key_schema, value_schema)` |
 | Composition | `z.intersection(left, right)`, `z.preprocess(fn, schema)`, `z.preprocess_async(fn, schema)`, `z.lazy(factory)` |
 | Codecs | `z.codec(input_schema, output_schema, *, decode=fn, encode=fn)`, `z.codec_async(...)` |
 
@@ -35,6 +35,9 @@ formats.
 | `.min(n)`, `.max(n)`, `.length(n)` | Length bounds |
 | `.regex(pattern)` | Python `re.search` match |
 | `.email()`, `.url()`, `.uuid()` | Format checks |
+| `.ulid()`, `.cuid()`, `.cuid2()`, `.nanoid()` | Identifier format checks |
+| `.jwt()`, `.e164()` | Token and phone-number format checks |
+| `.base64()`, `.base64url()` | Base64 syntax checks |
 | `.date()`, `.time()`, `.datetime()` | String date/time format checks |
 | `.ipv4()`, `.ipv6()`, `.hostname()` | Format checks |
 | `.starts_with(s)`, `.ends_with(s)`, `.includes(s)` | Substring predicates |
@@ -75,6 +78,13 @@ formats.
 | `.nonempty()` | Arrays | At least one item |
 | `.rest(schema)` | Tuples | Trailing rest schema |
 | `.array()` | Any schema | Shorthand for `z.array(schema)` |
+
+`z.set(item)` validates a Python `set` and returns a new set. Element issues use
+the iteration index in their paths. Sets are not JSON-representable and cannot
+be encoded.
+
+`z.map(key_schema, value_schema)` validates a Python dictionary through the same
+native record evaluator as `z.record(key_schema, value_schema)`.
 
 ## Choice and composition methods
 
@@ -235,7 +245,8 @@ Container and composition schemas retain their children:
 ## Static typing
 
 `Schema[Out, In]` tracks parsed output and accepted input types for primitives,
-homogeneous collections, transforms, preprocessors, and wrappers. `In` defaults
+homogeneous collections (including sets and maps), transforms, preprocessors,
+and wrappers. `In` defaults
 to `Out`, so `Schema[T]` is valid when input and output types match.
 `CodecSchema[Out, In]` follows the same convention: `Out` is the decoded type and
 `In` is the encoded type.
