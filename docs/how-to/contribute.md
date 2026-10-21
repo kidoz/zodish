@@ -82,7 +82,8 @@ and 3.15. Its packaging job builds the wheel and sdist on Ubuntu, macOS, and
 Windows with Python 3.14, verifies both artifact contents, then installs each
 artifact and runs the test suite, quickstart, and native-extension check against
 it. The package job also re-runs the abi3 wheel smoke test under Python 3.15 on
-Linux. Free-threaded Python builds are not validated.
+Linux. Official artifacts target GIL-enabled CPython 3.14+; free-threaded wheels
+are not part of the release matrix.
 
 ## Related
 

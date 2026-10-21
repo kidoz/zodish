@@ -141,7 +141,7 @@ Synchronous parsing is the default: `parse`, `safe_parse`, `validate`,
 return directly.
 
 `parse_async`, `safe_parse_async`, `validate_async`, `parse_json_async`, and
-`safe_parse_json_async` add an experimental async path. `refine_async`,
+`safe_parse_json_async` provide the asynchronous path. `refine_async`,
 `super_refine_async`, `transform_async`, `overwrite_async`,
 `default_factory_async`, `catch_async`, and `z.preprocess_async` callbacks may
 be `async def` functions or ordinary callables returning awaitables. Async
@@ -150,10 +150,10 @@ discriminated unions, pipes, wrappers, and synchronous lazy factories.
 `z.codec_async` adds awaitable codec callbacks; `.decode_async()`,
 `.encode_async()`, and their safe variants use the same session protocol.
 Calling a synchronous parser or encoder on a reached async node raises
-`TypeError`; an optional, nullable, or earlier union branch may bypass it. Async
-lazy factories remain unsupported. See
-[Async support](../explanation/async-support.md) for the complete status and
-limitations.
+`TypeError`; an optional, nullable, or earlier union branch may bypass it. Lazy
+factories remain synchronous; a factory may return a schema containing async
+operations. See [Async support](../explanation/async-support.md) for the
+complete status and limitations.
 
 ## Coercion
 

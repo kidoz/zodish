@@ -1,12 +1,13 @@
 # Async support
 
-Zodish has an experimental asynchronous validation path for async callbacks.
-Synchronous validation remains the default and is unchanged.
+Zodish supports asynchronous validation for async callbacks. Synchronous
+validation remains the default and is unchanged.
 
 ## Status
 
 | Question | Answer |
 | --- | --- |
+| Is async validation stable? | Yes, as of 0.5.0. |
 | Is there `await schema.parse_async(value)`? | Yes. |
 | Is there `await schema.safe_parse_async(value)`? | Yes. |
 | Can async callbacks be used? | Through `refine_async`, `super_refine_async`, `transform_async`, `overwrite_async`, `default_factory_async`, `catch_async`, and `z.preprocess_async`. |
@@ -146,14 +147,17 @@ field issue prefixes and dataclass defaults.
 Each parse uses its own native session, so concurrent parses of one immutable
 schema keep independent validation state and lazy caches. A session is bound to
 the thread that starts it; resuming from another thread is a protocol error.
-Concurrent coroutine tasks on the same event-loop thread are supported. This is
-not a claim of free-threaded Python support.
+Concurrent coroutine tasks on the same event-loop thread are supported. The
+supported distribution target is GIL-enabled CPython 3.14+; free-threaded wheels
+are not part of the published compatibility matrix.
 
 ## Current limitations
 
 The following remain outside the current async surface:
 
-- lazy factories stay synchronous.
+- Lazy factories stay synchronous. A factory may still return a schema that
+  contains async operations, so recursive async schemas are supported. Async
+  schema construction itself is not.
 
 JSON Schema export still treats async callback nodes as unrepresentable
 (`unrepresentable="throw"` or `"any"`); async codecs export their input and

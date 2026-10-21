@@ -22,8 +22,7 @@ value falls outside that subset, the input is decoded with Python's `json` modul
 and validated through the same evaluator, so the fallback does not change
 validation semantics.
 
-Experimental async validation extends the boundary with a native resumable
-session. Rust owns a continuation frame stack for containers, wrappers, unions,
+Async validation extends the boundary with a native resumable session. Rust owns a continuation frame stack for containers, wrappers, unions,
 intersections, pipes, and lazy schemas, and retains snapshots, paths, issues, and
 the per-parse lazy cache. Synchronous subtrees without async descendants still
 use the ordinary native evaluator and its fast paths. The Python adapter only
@@ -124,9 +123,10 @@ native build profile; the harness has no pass/fail thresholds.
 ## Packaging consequences
 
 Python builders plus a native core require maturin and PyO3 at build time. Wheels
-use the CPython 3.14+ stable ABI and must match the operating system and
-architecture. Installing a compatible prebuilt wheel does not require Rust;
-building from source does. Free-threaded Python builds are not validated.
+use the GIL-enabled CPython 3.14+ stable ABI and must match the operating system
+and architecture. Installing a compatible prebuilt wheel does not require Rust;
+building from source does. Free-threaded wheels are not part of the published
+compatibility matrix.
 
 An editable install picks up Python edits but does not rebuild Rust. After
 changing `rust/lib.rs`, reinstall the package before testing.

@@ -45,7 +45,7 @@ published, or when the workflow is dispatched manually.
 
 1. Sync the `pyproject.toml` and `Cargo.toml` versions and update `CHANGELOG.md`.
 2. Create and publish a GitHub release whose tag matches the version, for
-   example `v0.4.0`.
+   example `v0.5.0`.
 3. The workflow verifies the manifest versions and release tag, builds the
    sdist, builds abi3 wheels for glibc and musllinux Linux (x86_64 and aarch64),
    macOS (x86_64 and arm64), and Windows x64, verifies every artifact, and
@@ -67,11 +67,12 @@ that does not match the manifest version.
 
 ## Know the artifact constraints
 
-- Wheels use the CPython 3.14+ stable ABI and must match the operating system and
-  architecture. An Apple Silicon macOS wheel cannot be used on Linux or Windows.
+- Wheels use the GIL-enabled CPython 3.14+ stable ABI and must match the
+  operating system and architecture. An Apple Silicon macOS wheel cannot be used
+  on Linux or Windows.
 - Installing a compatible prebuilt wheel does not require Rust. Building from
   source does.
-- Free-threaded Python builds are not validated.
+- Free-threaded wheels are not part of the published compatibility matrix.
 
 ## Related
 
