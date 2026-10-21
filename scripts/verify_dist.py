@@ -30,6 +30,7 @@ SDIST_REQUIRED = {
     "rust/schema/json.rs",
     "rust/schema/kind.rs",
     "rust/session.rs",
+    "rust/session/callbacks.rs",
     "rust/session/composition.rs",
     "rust/session/containers.rs",
     "rust/session/dispatch.rs",

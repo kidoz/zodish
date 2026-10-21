@@ -8,10 +8,11 @@ use pyo3::exceptions::{PyException, PyRecursionError, PyRuntimeError, PyTypeErro
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
+use super::callbacks::check_awaitable;
 use super::{
     ASYNC_TOKEN_COUNTER, AsyncCallbackFrame, AsyncFrame, AsyncNext, AsyncPending, AsyncPendingKind,
     AsyncSession, AsyncTask, CatchFrame, PipeFrame, PostChildFrame, RefineFrame, StringBoolFrame,
-    SuperRefineFrame, check_awaitable, clone_path, deliver_at,
+    SuperRefineFrame, clone_path, deliver_at,
 };
 use crate::MAX_DEPTH;
 use crate::errors::{Error, Issue, Path, PathPart, Result};
