@@ -70,15 +70,23 @@ _BASE64_PATTERN = (
     r"^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
 )
 _BASE64URL_PATTERN = (
-    r"^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-]{2}==|[A-Za-z0-9_-]{3}=)?$"
+    r"^(?:[A-Za-z0-9_-]{4})*"
+    r"(?:[A-Za-z0-9_-]{2}==|[A-Za-z0-9_-]{3}=|[A-Za-z0-9_-]{2,3})?$"
 )
 _HOSTNAME_PATTERN = (
     r"^(?=.{1,253}$)"
     r"(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)"
     r"(?:\.(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))*$"
 )
+_ULID_PATTERN = r"(?i)^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+_CUID_PATTERN = r"(?i)^c[^\s-]{8,}$"
+_CUID2_PATTERN = r"^[a-z][a-z0-9]{1,31}$"
+_NANOID_PATTERN = r"^[A-Za-z0-9_-]{21}$"
+_JWT_PATTERN = r"^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$"
+_E164_PATTERN = r"^\+[1-9][0-9]{1,14}$"
 _KNOWN_FORMATS = frozenset({
-    "email", "uri", "uuid", "date", "time", "date-time", "ipv4", "ipv6", "hostname",
+    "email", "uri", "uuid", "date", "time", "date-time", "ipv4", "ipv6",
+    "hostname", "ulid", "cuid", "cuid2", "nanoid", "jwt", "e164",
 })
 _PATTERN_FORMATS = frozenset({"regex", "decimal", "base64", "base64url"})
 
@@ -184,7 +192,7 @@ class UnrepresentableError(ValueError):
     def __init__(self, path: Path, reason: str):
         self.path = path
         self.reason = reason
-        location = ".".join(map(str, path)) or "<root>"
+        location = ".".join(builtins.map(str, path)) or "<root>"
         super().__init__(f"{location}: {reason}")
 
 
@@ -259,7 +267,7 @@ class ValidationError(ValueError):
                     builtins.tuple[builtins.tuple[Any, ...], ...],
                     self._raw_issues,
                 )
-            issues = builtins.tuple(map(_issue_from_raw, raw_issues))
+            issues = builtins.tuple(builtins.map(_issue_from_raw, raw_issues))
             self._issues = issues
             self._raw_issues = None
         return issues
@@ -272,12 +280,12 @@ class ValidationError(ValueError):
                 raw_issues = self._bundle.to_raw()
             if raw_issues is None:
                 cached = "; ".join(
-                    f"{'.'.join(map(str, issue.path)) or '<root>'}: {issue.message}"
+                    f"{'.'.join(builtins.map(str, issue.path)) or '<root>'}: {issue.message}"
                     for issue in self.issues
                 )
             else:
                 cached = "; ".join(
-                    f"{'.'.join(map(str, raw[2])) or '<root>'}: {raw[1]}"
+                    f"{'.'.join(builtins.map(str, raw[2])) or '<root>'}: {raw[1]}"
                     for raw in raw_issues
                 )
             self._message = cached
@@ -310,7 +318,7 @@ class ValidationError(ValueError):
 
     def prettify(self) -> str:
         return "\n".join(
-            f"{'.'.join(map(str, issue.path)) or '<root>'}: {issue.message}"
+            f"{'.'.join(builtins.map(str, issue.path)) or '<root>'}: {issue.message}"
             for issue in self.issues
         )
 
@@ -1117,6 +1125,30 @@ class StringSchema(Schema[str, str]):
     def hostname(self, *, message: str = "Invalid hostname") -> Self:
         return self._regex(_HOSTNAME_PATTERN, message, "hostname")
 
+    def ulid(self, *, message: str = "Invalid ULID") -> Self:
+        return self._regex(_ULID_PATTERN, message, "ulid")
+
+    def cuid(self, *, message: str = "Invalid CUID") -> Self:
+        return self._regex(_CUID_PATTERN, message, "cuid")
+
+    def cuid2(self, *, message: str = "Invalid CUID2") -> Self:
+        return self._regex(_CUID2_PATTERN, message, "cuid2")
+
+    def nanoid(self, *, message: str = "Invalid Nano ID") -> Self:
+        return self._regex(_NANOID_PATTERN, message, "nanoid")
+
+    def jwt(self, *, message: str = "Invalid JWT") -> Self:
+        return self._regex(_JWT_PATTERN, message, "jwt")
+
+    def e164(self, *, message: str = "Invalid E.164 number") -> Self:
+        return self._regex(_E164_PATTERN, message, "e164")
+
+    def base64(self, *, message: str = "Invalid base64") -> Self:
+        return self._regex(_BASE64_PATTERN, message, "base64")
+
+    def base64url(self, *, message: str = "Invalid base64url") -> Self:
+        return self._regex(_BASE64URL_PATTERN, message, "base64url")
+
     def starts_with(self, prefix: str, *, message: str | None = None) -> Self:
         prefix = _string_argument(prefix, "Prefix")
         return self._wrap(
@@ -1154,7 +1186,7 @@ class StringSchema(Schema[str, str]):
         if not isinstance(case_sensitive, bool):
             raise TypeError("case_sensitive must be a boolean")
         if case_sensitive:
-            overlap = set(truthy_values) & set(falsy_values)
+            overlap = builtins.set(truthy_values) & builtins.set(falsy_values)
         else:
             overlap = (
                 {value.lower() for value in truthy_values}
@@ -1289,6 +1321,16 @@ class ArraySchema[Out, In = Out](Schema[list[Out], list[In]]):
 
     def nonempty(self, *, message: str | None = None) -> Self:
         return self.min(1, message=message)
+
+
+@dataclass(frozen=True)
+class SetSchema[Out, In = Out](
+    Schema[builtins.set[Out], builtins.set[In]],
+):
+    item: Schema[Out, In]
+
+    def unwrap(self) -> Schema[Out, In]:
+        return self.item
 
 
 def _bound_text(value: int | float) -> str:
@@ -1457,6 +1499,15 @@ def array[Out, In](item: Schema[Out, In]) -> ArraySchema[Out, In]:
     )
 
 
+def set[Out, In](item: Schema[Out, In]) -> SetSchema[Out, In]:
+    if not isinstance(item, Schema):
+        raise TypeError("Set item must be a schema")
+    return SetSchema[Out, In](
+        NativeSchema("set", (item._node,), ()),
+        item,
+    )
+
+
 type UnknownKeys = Literal["strip", "strict", "passthrough"]
 
 
@@ -1513,7 +1564,7 @@ class ObjectSchema(Schema[dict[str, Any], dict[str, Any]]):
     def partial(self, *keys: str) -> ObjectSchema:
         if keys:
             _check_keys(self.shape, keys)
-            selected = set(keys)
+            selected = builtins.set(keys)
             return self._rebuild({
                 key: value.optional() if key in selected else value
                 for key, value in self.shape.items()
@@ -1540,6 +1591,17 @@ class RecordSchema[Out, In = Out](Schema[dict[str, Out], dict[str, In]]):
 
 @dataclass(frozen=True)
 class KeyedRecordSchema[Key, Out, In = Out](
+    Schema[dict[Key, Out], dict[Key, In]],
+):
+    key_schema: Schema[Key, Any]
+    value_schema: Schema[Out, In]
+
+    def unwrap(self) -> Schema[Out, In]:
+        return self.value_schema
+
+
+@dataclass(frozen=True)
+class MapSchema[Key, Out, In = Out](
     Schema[dict[Key, Out], dict[Key, In]],
 ):
     key_schema: Schema[Key, Any]
@@ -1744,6 +1806,20 @@ def record(
         NativeSchema("record", (second._node,), (first._node,)),
         first,
         second,
+    )
+
+
+def map[Key, Out, In](
+    key_schema: Schema[Key, Any],
+    value_schema: Schema[Out, In],
+    /,
+) -> MapSchema[Key, Out, In]:
+    if not isinstance(key_schema, Schema) or not isinstance(value_schema, Schema):
+        raise TypeError("Map schemas must be Schema instances")
+    return MapSchema[Key, Out, In](
+        NativeSchema("record", (value_schema._node,), (key_schema._node,)),
+        key_schema,
+        value_schema,
     )
 
 
@@ -2352,7 +2428,7 @@ class _Codecs:
             raise TypeError("Dataclass fields must be a mapping")
         init_fields = [item for item in dataclasses.fields(cls) if item.init]
         names = builtins.tuple(item.name for item in init_fields)
-        expected = set(names)
+        expected = builtins.set(names)
         parameters = {
             name
             for name, parameter in inspect.signature(cls).parameters.items()
@@ -2376,12 +2452,12 @@ class _Codecs:
             )
 
         overrides = {} if fields is None else dict(fields)
-        provided = set(overrides)
+        provided = builtins.set(overrides)
         unknown_fields = provided - expected
         if unknown_fields:
             raise ValueError(
                 "Unknown dataclass field schemas: "
-                + ", ".join(sorted(map(repr, unknown_fields)))
+                + ", ".join(sorted(builtins.map(repr, unknown_fields)))
             )
         missing = expected - provided
         hints: dict[str, Any] = {}

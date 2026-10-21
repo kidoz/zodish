@@ -12,7 +12,7 @@ use pyo3::class::{PyTraverseError, PyVisit};
 use pyo3::exceptions::{PyException, PyRecursionError, PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{
-    PyBool, PyBytes, PyDict, PyFloat, PyInt, PyList, PyString, PyTraceback, PyTuple, PyType,
+    PyBool, PyBytes, PyDict, PyFloat, PyInt, PyList, PySet, PyString, PyTraceback, PyTuple, PyType,
 };
 use serde_json::Value;
 
@@ -415,6 +415,7 @@ struct ArrayFrame {
     result: Vec<Py<PyAny>>,
     issues: Vec<Issue>,
     is_tuple: bool,
+    is_set: bool,
     fixed: usize,
     rest: Option<Py<NativeSchema>>,
 }
@@ -1367,7 +1368,7 @@ impl AsyncSession {
                     depth: depth + 1,
                 }))
             }
-            Kind::Array | Kind::Tuple => {
+            Kind::Array | Kind::Set | Kind::Tuple => {
                 self.start_array(py, &ctx, node, &node_ref, value, path, depth)
             }
             Kind::Object => self.start_object(py, &ctx, node, &node_ref, value, path, depth),
@@ -2180,12 +2181,22 @@ impl AsyncSession {
         depth: usize,
     ) -> PyResult<AsyncNext> {
         let is_tuple = matches!(node.kind, Kind::Tuple);
+        let is_set = matches!(node.kind, Kind::Set);
         let bound = value.bind(py);
         if bound.is(&ctx.missing) {
             let outcome = ctx.fail("required", "Required", &path);
             return Ok(deliver_at(outcome, path));
         }
-        if !bound.is_instance_of::<PyList>() && !(is_tuple && bound.is_instance_of::<PyTuple>()) {
+        if is_set {
+            if !bound.is_instance_of::<PySet>() {
+                let params = PyDict::new(py);
+                params.set_item("expected", "set")?;
+                let outcome = ctx.fail_with("invalid_type", "Expected set", &path, params);
+                return Ok(deliver_at(outcome, path));
+            }
+        } else if !bound.is_instance_of::<PyList>()
+            && !(is_tuple && bound.is_instance_of::<PyTuple>())
+        {
             let expected = if is_tuple { "tuple or list" } else { "list" };
             let params = PyDict::new(py);
             params.set_item("expected", expected)?;
@@ -2199,7 +2210,11 @@ impl AsyncSession {
         }
         let items = (|| -> PyResult<Vec<Py<PyAny>>> {
             let mut items = Vec::new();
-            if bound.is_exact_instance_of::<PyList>() {
+            if is_set {
+                for item in bound.try_iter()? {
+                    items.push(item?.unbind());
+                }
+            } else if bound.is_exact_instance_of::<PyList>() {
                 for item in bound.cast::<PyList>()?.iter() {
                     items.push(item.unbind());
                 }
@@ -2267,6 +2282,7 @@ impl AsyncSession {
             result: Vec::new(),
             issues: Vec::new(),
             is_tuple,
+            is_set,
             fixed,
             rest,
         }));
@@ -2278,7 +2294,13 @@ impl AsyncSession {
             if !frame.issues.is_empty() {
                 return Ok(deliver_at(Err(Error::Invalid(frame.issues)), frame.path));
             }
-            let outcome = if frame.is_tuple {
+            let outcome = if frame.is_set {
+                let set = PySet::empty(py)?;
+                for value in frame.result {
+                    set.add(value.bind(py))?;
+                }
+                Ok(set.into_any().unbind())
+            } else if frame.is_tuple {
                 Ok(PyTuple::new(py, frame.result)?.into_any().unbind())
             } else {
                 Ok(PyList::new(py, frame.result)?.into_any().unbind())
@@ -2982,6 +3004,7 @@ enum Kind {
     Enum,
     Instance,
     Array,
+    Set,
     Object,
     Union,
     DiscriminatedUnion,
@@ -3046,6 +3069,7 @@ impl Kind {
             Self::Enum => "enum",
             Self::Instance => "instance",
             Self::Array => "array",
+            Self::Set => "set",
             Self::Object => "object",
             Self::Union => "union",
             Self::DiscriminatedUnion => "discriminated_union",
@@ -3112,6 +3136,7 @@ impl Kind {
             "enum" => (Self::Enum, Some(0), 1),
             "instance" => (Self::Instance, Some(0), 1),
             "array" => (Self::Array, Some(1), 0),
+            "set" => (Self::Set, Some(1), 0),
             "object" => (Self::Object, None, 3),
             "union" if children > 0 => (Self::Union, None, 0),
             "discriminated_union" if children > 0 => (Self::DiscriminatedUnion, None, 2),
@@ -4230,9 +4255,16 @@ impl NativeSchema {
                     ctx.fail_with("invalid_type", &format!("Expected {name}"), path, params)
                 }
             }
-            Kind::Array | Kind::Tuple => {
+            Kind::Array | Kind::Set | Kind::Tuple => {
                 let is_tuple = matches!(self.kind, Kind::Tuple);
-                if !value.is_instance_of::<PyList>()
+                let is_set = matches!(self.kind, Kind::Set);
+                if is_set {
+                    if !value.is_instance_of::<PySet>() {
+                        let params = PyDict::new(py);
+                        params.set_item("expected", "set")?;
+                        return ctx.fail_with("invalid_type", "Expected set", path, params);
+                    }
+                } else if !value.is_instance_of::<PyList>()
                     && !(is_tuple && value.is_instance_of::<PyTuple>())
                 {
                     let expected = if is_tuple { "tuple or list" } else { "list" };
@@ -4245,7 +4277,7 @@ impl NativeSchema {
                         params,
                     );
                 }
-                let exact_list = if !is_tuple && value.is_exact_instance_of::<PyList>() {
+                let exact_list = if !is_tuple && !is_set && value.is_exact_instance_of::<PyList>() {
                     Some(value.cast::<PyList>().map_err(PyErr::from)?)
                 } else {
                     None
@@ -4341,7 +4373,13 @@ impl NativeSchema {
                 if !issues.is_empty() {
                     return Err(Error::Invalid(issues));
                 }
-                if is_tuple {
+                if is_set {
+                    let set = PySet::empty(py)?;
+                    for value in result {
+                        set.add(value.bind(py))?;
+                    }
+                    Ok(set.into_any().unbind())
+                } else if is_tuple {
                     Ok(PyTuple::new(py, result)?.into_any().unbind())
                 } else {
                     Ok(PyList::new(py, result)?.into_any().unbind())

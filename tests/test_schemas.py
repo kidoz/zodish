@@ -328,6 +328,131 @@ class SchemaTests(unittest.TestCase):
             "Bad URL",
         )
 
+    def test_additional_string_formats(self):
+        cases = (
+            (z.string().ulid(), "01ARZ3NDEKTSV4RRFFQ69G5FAV", "ulid"),
+            (z.string().cuid(), "cjld2cjxh0000qzrmn831i7rn", "cuid"),
+            (z.string().cuid2(), "tz4a98xxat96iws9zmbrgj3a", "cuid2"),
+            (z.string().nanoid(), "V1StGXR8_Z5jdHi6B-myT", "nanoid"),
+            (
+                z.string().jwt(),
+                "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.signature",
+                "jwt",
+            ),
+            (z.string().e164(), "+14155552671", "e164"),
+        )
+        for schema, value, format_name in cases:
+            with self.subTest(format=format_name):
+                self.assertEqual(schema.parse(value), value)
+                self.assertEqual(
+                    schema.to_json_schema(),
+                    {"type": "string", "format": format_name},
+                )
+
+        invalid = (
+            (z.string().ulid(), "01ARZ3NDEKTSV4RRFFQ69G5FA"),
+            (z.string().ulid(), "81ARZ3NDEKTSV4RRFFQ69G5FAV"),
+            (z.string().cuid(), "not-a-cuid"),
+            (z.string().cuid2(), "1notacuid2"),
+            (z.string().nanoid(), "short"),
+            (z.string().jwt(), "only.two"),
+            (z.string().e164(), "14155552671"),
+            (z.string().e164(), "+0123"),
+        )
+        for schema, value in invalid:
+            with self.subTest(value=value):
+                result = schema.safe_parse(value)
+                self.assertIsInstance(result, Failure)
+                self.assertEqual(result.error.issues[0].code, "invalid_format")
+
+        for schema, value in (
+            (z.string().base64(), "aGVsbG8="),
+            (z.string().base64url(), "aGVsbG8"),
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(schema.parse(value), value)
+                self.assertEqual(
+                    schema.to_json_schema(),
+                    {"type": "string", "pattern": schema._node.args[0].pattern},
+                )
+        for schema, value in (
+            (z.string().base64(), "not base64!"),
+            (z.string().base64url(), "a+b/"),
+        ):
+            with self.subTest(value=value):
+                self.assertIsInstance(schema.safe_parse(value), Failure)
+
+    def test_set_and_map(self):
+        values = z.set(z.integer().positive())
+        self.assertEqual(values.parse({1, 2}), {1, 2})
+        self.assertEqual(values.unwrap().parse(3), 3)
+
+        wrong_type = values.safe_parse([1, 2])
+        self.assertIsInstance(wrong_type, Failure)
+        self.assertEqual(wrong_type.error.issues[0].code, "invalid_type")
+        self.assertEqual(wrong_type.error.issues[0].params["expected"], "set")
+
+        bad_item = values.safe_parse({0})
+        self.assertIsInstance(bad_item, Failure)
+        self.assertEqual(bad_item.error.issues[0].path, (0,))
+
+        missing = values.safe_parse()
+        self.assertIsInstance(missing, Failure)
+        self.assertEqual(missing.error.issues[0].code, "required")
+
+        collapsed = z.set(z.integer().transform(lambda value: value % 2))
+        self.assertEqual(collapsed.parse({1, 3, 4}), {0, 1})
+        self.assertEqual(
+            z.object({"values": values}).parse({"values": {1, 2}}),
+            {"values": {1, 2}},
+        )
+        with self.assertRaises(TypeError):
+            z.set(z.integer().transform(lambda value: [value])).parse({1})
+
+        mutable = {1, 2}
+
+        def mutate(value):
+            mutable.clear()
+            return True
+
+        self.assertEqual(
+            z.set(z.integer().refine(mutate)).parse(mutable), {1, 2},
+        )
+
+        mapping = z.map(z.string().min(1), z.integer())
+        self.assertEqual(mapping.parse({"a": 1}), {"a": 1})
+        self.assertEqual(mapping.unwrap().parse(2), 2)
+        bad_key = mapping.safe_parse({"": 1})
+        self.assertIsInstance(bad_key, Failure)
+        self.assertEqual(bad_key.error.issues[0].code, "too_small")
+        bad_value = mapping.safe_parse({"a": "x"})
+        self.assertIsInstance(bad_value, Failure)
+        self.assertEqual(bad_value.error.issues[0].path, ("a",))
+        self.assertIsInstance(mapping.safe_parse([("a", 1)]), Failure)
+        self.assertIsInstance(mapping.safe_parse(), Failure)
+
+        with self.assertRaises(TypeError):
+            z.set("bad")
+        with self.assertRaises(TypeError):
+            z.map("bad", z.integer())
+        with self.assertRaises(TypeError):
+            z.map(z.string(), "bad")
+
+        with self.assertRaises(UnrepresentableError):
+            z.set(z.integer()).to_json_schema()
+        self.assertEqual(
+            z.map(z.string(), z.integer()).to_json_schema(),
+            {
+                "type": "object",
+                "propertyNames": {"type": "string"},
+                "additionalProperties": {"type": "integer"},
+            },
+        )
+        with self.assertRaises(TypeError):
+            z.set(z.integer()).encode({1})
+        with self.assertRaises(TypeError):
+            z.map(z.string(), z.integer()).encode({"a": 1})
+
     def test_string_predicates(self):
         schema = z.string().starts_with("ab").ends_with("yz").includes("cd")
         self.assertEqual(schema.parse("abcdyz"), "abcdyz")

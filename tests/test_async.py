@@ -127,6 +127,51 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(missing_object, Failure)
         self.assertEqual(missing_object.error.issues[0].code, "required")
 
+    async def test_async_set_and_map_composition(self):
+        async def positive(value):
+            await asyncio.sleep(0)
+            return value > 0
+
+        async def nonempty(value):
+            await asyncio.sleep(0)
+            return bool(value)
+
+        values = z.set(z.integer().refine_async(positive))
+        self.assertEqual(await values.parse_async({1, 2}), {1, 2})
+        self.assertEqual(
+            await z.object({"values": values}).parse_async({
+                "values": {1, 2},
+            }),
+            {"values": {1, 2}},
+        )
+        failure = await values.safe_parse_async({0, 1})
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in failure.error.issues],
+            [("custom", (0,))],
+        )
+
+        mutable = {1, 2}
+
+        async def mutate(value):
+            mutable.clear()
+            return True
+
+        snapshotted = z.set(z.integer().refine_async(mutate))
+        self.assertEqual(await snapshotted.parse_async(mutable), {1, 2})
+
+        mapping = z.map(
+            z.string().refine_async(nonempty),
+            z.integer().refine_async(positive),
+        )
+        self.assertEqual(await mapping.parse_async({"a": 1}), {"a": 1})
+        bad_key = await mapping.safe_parse_async({"": 1})
+        self.assertIsInstance(bad_key, Failure)
+        self.assertEqual(bad_key.error.issues[0].path, ())
+        bad_value = await mapping.safe_parse_async({"a": 0})
+        self.assertIsInstance(bad_value, Failure)
+        self.assertEqual(bad_value.error.issues[0].path, ("a",))
+
     async def test_async_matches_sync_across_schema_families(self):
         async def always(value):
             return True
