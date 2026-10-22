@@ -230,6 +230,9 @@ class Issue:
             self, "params", MappingProxyType(dict(self.params)),
         )
 
+    def __hash__(self) -> int:
+        return hash((self.code, self.message, self.path, self.branches))
+
     def to_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = dict(self.params)
         result.update({
@@ -1844,6 +1847,9 @@ class ObjectSchema(Schema[dict[str, Any], dict[str, Any]]):
     unknown_keys: UnknownKeys | Literal["catchall"] = "strip"
     _catchall: Schema[Any, Any] | None = field(default=None, repr=False)
 
+    def __hash__(self) -> int:
+        return hash(self._node)
+
     def _rebuild(
         self,
         shape: Mapping[str, Schema[Any, Any]],
@@ -1913,6 +1919,9 @@ class TypedObjectSchema[Shape](Schema[Shape, Shape]):
     shape: Mapping[str, Schema[Any, Any]]
     unknown_keys: UnknownKeys | Literal["catchall"] = "strip"
     _catchall: Schema[Any, Any] | None = field(default=None, repr=False)
+
+    def __hash__(self) -> int:
+        return hash(self._node)
 
     def _base_rebuild(
         self,
@@ -2071,6 +2080,9 @@ class UnionSchema[Out, In = Out](Schema[Out, In]):
 class DiscriminatedUnionSchema(Schema[Any, Any]):
     key: str
     options: Mapping[str, Schema[Any, Any]]
+
+    def __hash__(self) -> int:
+        return hash(self._node)
 
     def __post_init__(self) -> None:
         super().__post_init__()

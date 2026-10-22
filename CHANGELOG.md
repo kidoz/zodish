@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Native validation checks the remaining thread stack during evaluation, so
   recursive schemas and callbacks that re-enter `parse` raise `RecursionError`
   on small-stack threads instead of crashing the interpreter.
+- Issues and object, typed-object, and discriminated-union schemas are now
+  hashable. Issue hashing uses code, message, path, and branches; metadata
+  remains excluded from schema equality and hashing.
 
 ### Changed
 

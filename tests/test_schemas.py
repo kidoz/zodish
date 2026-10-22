@@ -38,6 +38,16 @@ class _RecursiveNode:
 
 
 class SchemaTests(unittest.TestCase):
+    def test_container_schemas_are_hashable(self):
+        schema = z.object({"name": z.string()})
+        self.assertIsInstance(hash(schema), int)
+        described = schema.describe("User")
+        self.assertEqual(schema, described)
+        self.assertEqual(hash(schema), hash(described))
+        self.assertIsInstance(
+            hash(z.discriminated_union("kind", {"a": z.string()})), int,
+        )
+
     def test_primitives_are_strict(self):
         cases = [
             (z.string(), "a", [1, True, None]),
@@ -201,6 +211,13 @@ class SchemaTests(unittest.TestCase):
         self.assertIsInstance(
             beyond_i64.safe_parse(2 * float_divisor + 1), Failure,
         )
+
+    def test_issue_hashing_uses_core_fields(self):
+        issue = Issue("custom", "x", params={"values": [1]})
+        same = Issue("custom", "x", params={"values": [1]})
+        self.assertEqual(issue, same)
+        self.assertEqual(hash(issue), hash(same))
+        self.assertIsInstance(hash(issue), int)
 
     def test_issue_path_and_branches_are_tuples(self):
         issue = Issue("custom", "x", path=["a", 1])
