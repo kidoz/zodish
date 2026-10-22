@@ -12,6 +12,7 @@ import builtins
 import dataclasses
 import functools
 import inspect
+import typing
 from collections.abc import Mapping
 from dataclasses import dataclass as _dataclass
 from typing import Any
@@ -187,6 +188,46 @@ def _guard_only_schema(
     )
 
 
+def _reject_unsupported_inheritance(cls: type[Any]) -> None:
+    direct_bases = [
+        base
+        for base in cls.__bases__
+        if dataclasses.is_dataclass(base) and dataclasses.fields(base)
+    ]
+    if len(direct_bases) > 1:
+        raise TypeError(
+            "Validated dataclasses support at most one dataclass base",
+        )
+    for base in cls.__mro__[1:]:
+        if base is object or not dataclasses.is_dataclass(base):
+            continue
+        base_params = getattr(base, "__dataclass_params__", None)
+        if base_params is not None and not base_params.init:
+            raise TypeError(
+                "Validated dataclasses do not support a dataclass base "
+                "with init=False",
+            )
+        if marker_for(base) is not None:
+            continue
+        init = base.__dict__.get("__init__")
+        if init is not None and not _is_generated_init(init):
+            raise TypeError(
+                "Validated dataclasses do not support a dataclass base "
+                "with a custom __init__",
+            )
+    if getattr(cls, "__parameters__", ()):
+        raise TypeError(
+            "Validated dataclasses do not support generic classes",
+        )
+    for base in getattr(cls, "__orig_bases__", ()):
+        origin = typing.get_origin(base)
+        if origin is not None and dataclasses.is_dataclass(origin):
+            raise TypeError(
+                "Validated dataclasses do not support parameterized "
+                "dataclass bases",
+            )
+
+
 def _reject_unsupported(cls: type[Any]) -> None:
     params = getattr(cls, "__dataclass_params__", None)
     if params is not None and not params.init:
@@ -202,13 +243,7 @@ def _reject_unsupported(cls: type[Any]) -> None:
             raise TypeError(
                 "Validated dataclasses do not support init=False fields",
             )
-    for base in cls.__mro__[1:]:
-        if base is object:
-            continue
-        if dataclasses.is_dataclass(base) and dataclasses.fields(base):
-            raise TypeError(
-                "Validated dataclasses do not support inherited dataclass fields",
-            )
+    _reject_unsupported_inheritance(cls)
     post_init = getattr(cls, "__post_init__", None)
     if post_init is not None:
         parameters = [

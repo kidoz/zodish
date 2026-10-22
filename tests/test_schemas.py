@@ -14,11 +14,13 @@ import weakref
 from typing import (
     Annotated,
     Any,
+    Generic,
     Literal,
     NewType,
     NotRequired,
     Required,
     TypedDict,
+    TypeVar,
     get_type_hints,
 )
 
@@ -3484,9 +3486,34 @@ class SchemaTests(unittest.TestCase):
         class Base:
             value: int
 
+        @dataclasses.dataclass
+        class OtherBase:
+            other: int
+
         with self.assertRaises(TypeError):
             @z.dataclass
-            class Child(Base):
+            class MultipleBases(Base, OtherBase):
+                extra: int
+
+        @dataclasses.dataclass
+        class CustomInitBase:
+            value: int
+
+            def __init__(self, value: int) -> None:
+                self.value = value
+
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class CustomInitChild(CustomInitBase):
+                extra: int
+
+        @dataclasses.dataclass(init=False)
+        class NoInitBase:
+            value: int
+
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class NoInitChild(NoInitBase):
                 extra: int
 
         with self.assertRaises(TypeError):
@@ -3885,6 +3912,126 @@ class SchemaTests(unittest.TestCase):
                 @z.dataclass
                 class Field:
                     value: Annotated[Any, schema]
+
+    def test_validated_dataclass_inheritance(self):
+        factory_calls: list[int] = []
+
+        @dataclasses.dataclass
+        class Base:
+            x: Annotated[int, z.integer().min(0)]
+            tags: list[str] = dataclasses.field(
+                default_factory=lambda: factory_calls.append(1) or [],
+            )
+
+        @z.dataclass
+        class Sub(Base):
+            y: str = "a"
+
+        sub = Sub(x=1)
+        self.assertEqual((sub.x, sub.tags, sub.y), (1, [], "a"))
+        self.assertEqual(factory_calls, [1])
+        with self.assertRaises(ValidationError):
+            Sub(x=-1)
+        self.assertEqual(
+            z.codecs.dataclass(Sub).parse({"x": 2}).x, 2,
+        )
+        self.assertEqual(
+            z.codecs.dataclass(Sub).encode(sub),
+            {"x": 1, "tags": [], "y": "a"},
+        )
+
+        @z.dataclass
+        class ValidatedBase:
+            x: Annotated[int, z.integer().min(0)]
+
+        @z.dataclass
+        class ValidatedSub(ValidatedBase):
+            y: str = "b"
+
+        self.assertEqual(ValidatedSub(x=1).y, "b")
+        with self.assertRaises(ValidationError):
+            ValidatedSub(x=-1)
+        self.assertEqual(
+            z.codecs.dataclass(ValidatedSub).parse(
+                {"x": 3, "y": "c"},
+            ).y,
+            "c",
+        )
+
+        @z.dataclass
+        class LevelOne:
+            x: int
+
+        @z.dataclass
+        class LevelTwo(LevelOne):
+            y: int = 0
+
+        @z.dataclass
+        class LevelThree(LevelTwo):
+            z: int = 0
+
+        self.assertEqual(LevelThree(x=1).z, 0)
+
+        @dataclasses.dataclass
+        class OverrideBase:
+            x: int = 0
+
+        @z.dataclass
+        class OverrideSub(OverrideBase):
+            x: Annotated[int, z.integer().min(5)] = 5
+
+        self.assertEqual(OverrideSub().x, 5)
+        with self.assertRaises(ValidationError):
+            OverrideSub(x=1)
+
+        post_calls: list[int] = []
+
+        @dataclasses.dataclass
+        class PostBase:
+            x: int
+
+            def __post_init__(self) -> None:
+                post_calls.append(self.x)
+
+        @z.dataclass
+        class PostSub(PostBase):
+            y: int = 0
+
+        PostSub(x=2)
+        self.assertEqual(post_calls, [2])
+        post_calls.clear()
+        z.codecs.dataclass(PostSub).parse({"x": 3})
+        self.assertEqual(post_calls, [3])
+
+        @z.dataclass(frozen=True)
+        class FrozenBase:
+            x: int
+
+        @z.dataclass(frozen=True, slots=True)
+        class FrozenSub(FrozenBase):
+            y: int = 0
+
+        self.assertEqual(FrozenSub(x=1, y=2).y, 2)
+
+        class Mixin:
+            pass
+
+        @z.dataclass
+        class Mixed(Mixin):
+            x: int
+
+        self.assertEqual(Mixed(x=1).x, 1)
+
+        type_var = TypeVar("T")
+
+        @dataclasses.dataclass
+        class GenericBase(Generic[type_var]):
+            value: type_var
+
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class GenericSub(GenericBase[int]):
+                extra: int = 0
 
     def test_public_annotations_resolve(self):
         self.assertIn("params", get_type_hints(z.Issue))
