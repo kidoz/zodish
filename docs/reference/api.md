@@ -273,6 +273,7 @@ the same session protocol.
 | `@z.dataclass` | Validate and normalize ordinary construction |
 | `@z.dataclass()` | Decorator form with default options |
 | `@z.dataclass(frozen=True, slots=True, kw_only=True, ...)` | Pass dataclass options through |
+| `@z.dataclass(validate_assignment=True)` | Validate later declared-field assignments |
 | `z.dataclass(ExistingDataclass)` | Wrap an existing supported dataclass |
 | `z.ValidatedModel` | Typed mixin for class-level codec methods |
 | `Cls.parse`, `safe_parse`, `validate` | Decode encoded input through the cached codec |
@@ -304,7 +305,8 @@ conversions.
 order, and are not stored or encoded. InitVar defaults are validated. An
 `init=False` field with a default or `default_factory` is validated and assigned
 before `__post_init__`; an `init=False` field without a default may be assigned
-by `__post_init__` and is not validated. Post-init mutations are not revalidated.
+by `__post_init__` and is not validated by default. Post-init mutations are not
+revalidated unless `validate_assignment=True`.
 Codec decode accepts InitVar input and applies `init=False` defaults; encode
 omits both. Because InitVar values are not stored, `dataclasses.replace()` on a
 class with a required InitVar follows stdlib behavior and cannot supply it.
@@ -320,9 +322,19 @@ validation. Decorate the subclass with `@z.dataclass`.
 
 Supported options include `frozen`, `slots`, `weakref_slot=True` with slots,
 `kw_only`, `repr`, `eq`, `order`, `unsafe_hash`, and `match_args`. A
-zero-argument `__post_init__` runs after validation; fields it mutates are not
-revalidated. `dataclasses.replace()` revalidates; assignment, `copy`, `pickle`,
-and direct `object.__new__` bypass validation.
+zero-argument `__post_init__` runs after validation.
+
+By default, `dataclasses.replace()` revalidates, while assignment, `copy`,
+`pickle`, and direct `object.__new__` bypass validation. Pass
+`validate_assignment=True` to validate and normalize assignments to declared
+stored fields, including post-init assignments and no-default `init=False`
+fields. Invalid assignments raise `ValidationError` with field-prefixed issue
+paths and do not change the stored value; explicit output/annotation mismatches
+raise `TypeError`. Assigning non-field attributes follows normal Python
+behavior. The option requires a non-frozen dataclass, is inherited by decorated
+subclasses, and can be disabled with `validate_assignment=False`. `copy`,
+`pickle`, and direct `object.__new__` remain outside the assignment-validation
+contract.
 
 `@z.dataclass` uses `dataclass_transform`, so constructor arguments and
 attributes are statically typed. Literal `frozen=True` and `kw_only=True` are

@@ -228,6 +228,8 @@ Error behavior:
 | Missing required, extra, or bad constructor arguments | `TypeError` |
 | Field or default validation failure | `ValidationError` with aggregated paths |
 | Output/annotation mismatch | `TypeError` |
+| Invalid assignment with `validate_assignment=True` | `ValidationError` with field-prefixed paths |
+| Assignment output/annotation mismatch | `TypeError` |
 | Optional field schema without a dataclass default | `ValueError` |
 | Async field schema in construction | `TypeError` |
 
@@ -245,8 +247,9 @@ known.
 order, and not stored or encoded. InitVar defaults are validated. `init=False`
 fields with a default or `default_factory` are validated and assigned before
 `__post_init__`; fields without a default may be assigned by `__post_init__` and
-are not validated. Post-init mutations are never revalidated. Codec decode
-accepts InitVar input and applies `init=False` defaults; codec encode omits both.
+are not validated by default. Post-init mutations are not revalidated unless
+`validate_assignment=True`. Codec decode accepts InitVar input and applies
+`init=False` defaults; codec encode omits both.
 Because InitVar values are not stored, `dataclasses.replace()` on a class with a
 required InitVar follows stdlib behavior and cannot supply it.
 
@@ -269,8 +272,43 @@ rejected. A plain outer `@dataclasses.dataclass` preserves the validating
 initializer, but reverse stacking and option combinations remain unsupported.
 
 `dataclasses.replace()` revalidates because it calls the initializer.
-Assignment, `copy`, `pickle`, and direct `object.__new__` bypass validation.
-Fields mutated by `__post_init__` are not revalidated.
+By default, assignment, `copy`, `pickle`, and direct `object.__new__` bypass
+validation, and fields mutated by `__post_init__` are not revalidated.
+
+### Assignment validation
+
+Pass `validate_assignment=True` to validate later assignments to declared
+stored fields:
+
+```python
+@z.dataclass(validate_assignment=True)
+class Account:
+    name: Annotated[str, z.string().trim().min(1)]
+    balance: Annotated[int, z.integer().min(0)] = 0
+
+
+account = Account(" Alex ")
+account.name = " Bob "   # stored as "Bob"
+account.balance = 10
+```
+
+The assigned value is decoded and normalized by the same field schema used by
+construction. An invalid assignment raises `ValidationError` with the field name
+prefixed to each issue path and leaves the previous value unchanged. An
+explicit output/annotation mismatch raises `TypeError`. Assigning a non-field
+attribute follows normal Python behavior.
+
+Construction and codec assembly still use the private assembler, so initial
+values are not validated twice. Assignments made by `__post_init__` are
+validated, including assignments to `init=False` fields; a no-default
+`init=False` field receives an assignment schema when the option is enabled.
+Assignment values are decoded values, as in the constructor.
+
+`validate_assignment` requires a mutable dataclass; combining it with
+`frozen=True` raises `TypeError`. The option is inherited by decorated
+subclasses and can be disabled with `validate_assignment=False`. `copy`,
+`pickle`, and direct `object.__new__` remain outside the assignment-validation
+contract.
 
 ### Class-level boundary methods
 

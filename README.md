@@ -448,8 +448,13 @@ are rejected. InitVar values are validated and passed to `__post_init__` but
 not stored or encoded; defaulted `init=False` fields are validated before
 post-init. Use `.overwrite()` for type-preserving normalization or a codec for
 type-changing conversions.
-`dataclasses.replace()` revalidates; assignment, `copy`, and `pickle` bypass
-validation. Decorated classes also expose class-level boundary methods:
+`dataclasses.replace()` revalidates; by default assignment, `copy`, and `pickle`
+bypass validation. Pass `validate_assignment=True` to validate declared-field
+assignments and post-init writes with the same field schemas; the option is
+inherited by decorated subclasses, requires a non-frozen dataclass, and leaves
+the previous value in place when validation fails. Assignment values are decoded
+values, like constructor arguments. `copy` and `pickle` remain outside that
+contract. Decorated classes also expose class-level boundary methods:
 `User.parse(...)`, `parse_json`, `safe_parse`, `validate`, their async variants,
 `encode`, `safe_encode`, async encode, and `to_json_schema`. They delegate to a
 cached `z.codecs.dataclass(User)`. Inherit `z.ValidatedModel` to expose these
