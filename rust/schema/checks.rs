@@ -3,13 +3,189 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyInt, PySet, PyString, PyTuple};
+use pyo3::types::{PyBytes, PyDict, PyInt, PyList, PySet, PyString, PyTuple};
 
 use super::{Kind, NativeSchema};
-use crate::errors::{ErrorTemplate, Path, Result};
+use crate::errors::{Error, ErrorTemplate, Issue, Path, PathPart, Result};
 use crate::runtime::Context;
 use crate::values::{enum_message, is_multiple_of, literal_description, safe_param};
+
+/// Interpret a `super_refine` or `super_refine_async` callback result.
+///
+/// The synchronous evaluator, session wrapper continuation, and awaited async
+/// callback path share this so Issue handling and path prefixing cannot drift.
+pub(crate) fn interpret_super_refine(
+    ctx: &Context<'_>,
+    parsed: Py<PyAny>,
+    result: &Bound<'_, PyAny>,
+    path: &Path,
+    callback: &str,
+) -> Result<Py<PyAny>> {
+    let py = ctx.py;
+    if result.is_none() {
+        return Ok(parsed);
+    }
+    let mut issues = Vec::new();
+    if result.is_instance(&ctx.issue_type)? {
+        issues.push(Issue::from_python(result)?);
+    } else if result.is_instance_of::<PyList>() || result.is_instance_of::<PyTuple>() {
+        for item in result.try_iter()? {
+            let item = item?;
+            if !item.is_instance(&ctx.issue_type)? {
+                return Err(PyTypeError::new_err(format!(
+                    "{callback} callback returned a non-Issue value"
+                ))
+                .into());
+            }
+            issues.push(Issue::from_python(&item)?);
+        }
+    } else {
+        return Err(PyTypeError::new_err(format!(
+            "{callback} callback must return Issue, a list or tuple of Issue, or None"
+        ))
+        .into());
+    }
+    if issues.is_empty() {
+        return Ok(parsed);
+    }
+    for issue in &mut issues {
+        let mut absolute = path
+            .iter()
+            .map(|part| part.clone_ref(py))
+            .collect::<Vec<_>>();
+        absolute.extend(issue.path.iter().map(|part| part.clone_ref(py)));
+        issue.path = absolute;
+    }
+    Err(Error::Invalid(issues))
+}
+
+/// Convert an already validated string through a `string_bool` node.
+///
+/// The synchronous evaluator and the async continuation share this so the
+/// accepted values and error payload cannot drift.
+pub(crate) fn evaluate_string_bool(
+    ctx: &Context<'_>,
+    node: &NativeSchema,
+    parsed: &Bound<'_, PyAny>,
+    path: &Path,
+) -> Result<Py<PyAny>> {
+    let py = ctx.py;
+    let text: String = parsed.extract()?;
+    let case_sensitive: bool = node.args[2].bind(py).extract()?;
+    let normalized = if case_sensitive {
+        text
+    } else {
+        text.to_lowercase()
+    };
+    for item in node.args[0].bind(py).try_iter()? {
+        let candidate: String = item?.extract()?;
+        let candidate = if case_sensitive {
+            candidate
+        } else {
+            candidate.to_lowercase()
+        };
+        if normalized == candidate {
+            return Ok(true.into_pyobject(py)?.to_owned().into_any().unbind());
+        }
+    }
+    for item in node.args[1].bind(py).try_iter()? {
+        let candidate: String = item?.extract()?;
+        let candidate = if case_sensitive {
+            candidate
+        } else {
+            candidate.to_lowercase()
+        };
+        if normalized == candidate {
+            return Ok(false.into_pyobject(py)?.to_owned().into_any().unbind());
+        }
+    }
+    let message: String = node.args[3].bind(py).extract()?;
+    let truthy = node.args[0]
+        .bind(py)
+        .cast::<PyTuple>()
+        .map_err(PyErr::from)?;
+    let falsy = node.args[1]
+        .bind(py)
+        .cast::<PyTuple>()
+        .map_err(PyErr::from)?;
+    let values = truthy
+        .iter()
+        .chain(falsy.iter())
+        .map(Bound::unbind)
+        .collect::<Vec<_>>();
+    let values = PyTuple::new(py, values)?;
+    let params = PyDict::new(py);
+    params.set_item("values", values)?;
+    ctx.fail_with("invalid_value", &message, path, params)
+}
+
+/// Select the branch index for a discriminated union.
+///
+/// The synchronous evaluator and the async node evaluator share this so
+/// discriminator lookup, exact type/value matching, and failure paths cannot
+/// drift between parsing modes.
+pub(crate) fn select_discriminated_branch(
+    ctx: &Context<'_>,
+    value: &Bound<'_, PyAny>,
+    key: &Bound<'_, PyAny>,
+    options: &Bound<'_, PyTuple>,
+    path: &Path,
+) -> Result<usize> {
+    let py = ctx.py;
+    if value.is(&ctx.missing) {
+        return Err(context_failure(ctx.fail("required", "Required", path)));
+    }
+    let Ok(dict) = value.cast::<PyDict>() else {
+        let params = PyDict::new(py);
+        params.set_item("expected", "dict with string keys")?;
+        return Err(context_failure(ctx.fail_with(
+            "invalid_type",
+            "Expected dict with string keys",
+            path,
+            params,
+        )));
+    };
+    let Some(raw) = dict.get_item(key)? else {
+        let mut issue_path = path
+            .iter()
+            .map(|part| part.clone_ref(py))
+            .collect::<Vec<_>>();
+        issue_path.push(PathPart::Value(key.clone().unbind()));
+        return Err(context_failure(ctx.fail(
+            "required",
+            "Required",
+            &issue_path,
+        )));
+    };
+    for (index, option) in options.iter().enumerate() {
+        if raw.get_type().is(option.get_type()) && raw.eq(&option)? {
+            return Ok(index);
+        }
+    }
+    let message = enum_message(options)?;
+    let params = PyDict::new(py);
+    params.set_item("values", options)?;
+    let mut issue_path = path
+        .iter()
+        .map(|part| part.clone_ref(py))
+        .collect::<Vec<_>>();
+    issue_path.push(PathPart::Value(key.clone().unbind()));
+    Err(context_failure(ctx.fail_with(
+        "invalid_value",
+        &message,
+        &issue_path,
+        params,
+    )))
+}
+
+fn context_failure(result: Result<Py<PyAny>>) -> Error {
+    match result {
+        Err(error) => error,
+        Ok(_) => unreachable!("context failures always return an error"),
+    }
+}
 
 impl NativeSchema {
     /// Apply a unary post-child operation to an already validated value.

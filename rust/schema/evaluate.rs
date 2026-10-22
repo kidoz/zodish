@@ -4,9 +4,11 @@ mod containers;
 
 use pyo3::exceptions::{PyRecursionError, PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
+use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyString, PyTuple};
 
-use super::{Kind, NativeSchema};
+use super::{
+    Kind, NativeSchema, evaluate_string_bool, interpret_super_refine, select_discriminated_branch,
+};
 use crate::MAX_DEPTH;
 use crate::errors::{Error, Issue, Path, PathPart, Result};
 use crate::runtime::{Context, LazyStore};
@@ -169,41 +171,7 @@ impl NativeSchema {
             Kind::SuperRefine => {
                 let parsed = self.child(0, ctx, value, path, depth)?;
                 let result = self.args[0].bind(py).call1((parsed.bind(py),))?;
-                if result.is_none() {
-                    return Ok(parsed);
-                }
-                let mut issues = Vec::new();
-                if result.is_instance(&ctx.issue_type)? {
-                    issues.push(Issue::from_python(&result)?);
-                } else if result.is_instance_of::<PyList>() || result.is_instance_of::<PyTuple>() {
-                    for item in result.try_iter()? {
-                        let item = item?;
-                        if !item.is_instance(&ctx.issue_type)? {
-                            return Err(PyTypeError::new_err(
-                                "super_refine callback returned a non-Issue value",
-                            )
-                            .into());
-                        }
-                        issues.push(Issue::from_python(&item)?);
-                    }
-                } else {
-                    return Err(PyTypeError::new_err(
-                        "super_refine callback must return Issue, a list or tuple of Issue, or None",
-                    )
-                    .into());
-                }
-                if issues.is_empty() {
-                    return Ok(parsed);
-                }
-                for issue in &mut issues {
-                    let mut absolute = path
-                        .iter()
-                        .map(|part| part.clone_ref(py))
-                        .collect::<Vec<_>>();
-                    absolute.extend(issue.path.iter().map(|part| part.clone_ref(py)));
-                    issue.path = absolute;
-                }
-                Err(Error::Invalid(issues))
+                interpret_super_refine(ctx, parsed, &result, path, "super_refine")
             }
             Kind::Transform
             | Kind::RequiredOutput
@@ -240,54 +208,7 @@ impl NativeSchema {
             }
             Kind::StringBool => {
                 let parsed = self.child(0, ctx, value, path, depth)?;
-                let parsed = parsed.bind(py);
-                let text: String = parsed.extract()?;
-                let case_sensitive: bool = self.args[2].bind(py).extract()?;
-                let normalized = if case_sensitive {
-                    text
-                } else {
-                    text.to_lowercase()
-                };
-                for item in self.args[0].bind(py).try_iter()? {
-                    let candidate: String = item?.extract()?;
-                    let candidate = if case_sensitive {
-                        candidate
-                    } else {
-                        candidate.to_lowercase()
-                    };
-                    if normalized == candidate {
-                        return Ok(true.into_pyobject(py)?.to_owned().into_any().unbind());
-                    }
-                }
-                for item in self.args[1].bind(py).try_iter()? {
-                    let candidate: String = item?.extract()?;
-                    let candidate = if case_sensitive {
-                        candidate
-                    } else {
-                        candidate.to_lowercase()
-                    };
-                    if normalized == candidate {
-                        return Ok(false.into_pyobject(py)?.to_owned().into_any().unbind());
-                    }
-                }
-                let message: String = self.args[3].bind(py).extract()?;
-                let truthy = self.args[0]
-                    .bind(py)
-                    .cast::<PyTuple>()
-                    .map_err(PyErr::from)?;
-                let falsy = self.args[1]
-                    .bind(py)
-                    .cast::<PyTuple>()
-                    .map_err(PyErr::from)?;
-                let values = truthy
-                    .iter()
-                    .chain(falsy.iter())
-                    .map(Bound::unbind)
-                    .collect::<Vec<_>>();
-                let values = PyTuple::new(py, values)?;
-                let params = PyDict::new(py);
-                params.set_item("values", values)?;
-                ctx.fail_with("invalid_value", &message, path, params)
+                evaluate_string_bool(ctx, self, parsed.bind(py), path)
             }
             Kind::ExactInstance | Kind::NativeEnum => {
                 let cls = self.args[0].bind(py);
@@ -391,43 +312,12 @@ impl NativeSchema {
             }
             Kind::Object | Kind::Record => self.evaluate_mapping(ctx, value, path, depth),
             Kind::DiscriminatedUnion => {
-                let Ok(dict) = value.cast::<PyDict>() else {
-                    let params = PyDict::new(py);
-                    params.set_item("expected", "dict with string keys")?;
-                    return ctx.fail_with(
-                        "invalid_type",
-                        "Expected dict with string keys",
-                        path,
-                        params,
-                    );
-                };
                 let key = self.args[0].bind(py);
                 let options = self.args[1]
                     .bind(py)
                     .cast::<PyTuple>()
                     .map_err(PyErr::from)?;
-                let Some(raw) = dict.get_item(key)? else {
-                    path.push(PathPart::Value(self.args[0].clone_ref(py)));
-                    let result = ctx.fail("required", "Required", path);
-                    path.pop();
-                    return result;
-                };
-                let mut selected = None;
-                for (index, option) in options.iter().enumerate() {
-                    if raw.get_type().is(option.get_type()) && raw.eq(&option)? {
-                        selected = Some(index);
-                        break;
-                    }
-                }
-                let Some(index) = selected else {
-                    let message = enum_message(options)?;
-                    let params = PyDict::new(py);
-                    params.set_item("values", options)?;
-                    path.push(PathPart::Value(self.args[0].clone_ref(py)));
-                    let result = ctx.fail_with("invalid_value", &message, path, params);
-                    path.pop();
-                    return result;
-                };
+                let index = select_discriminated_branch(ctx, value, key, options, path)?;
                 self.child(index, ctx, value, path, depth)
             }
             Kind::Intersection => {

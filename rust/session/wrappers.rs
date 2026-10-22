@@ -3,9 +3,7 @@
 
 use std::sync::atomic::Ordering;
 
-use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyTuple};
 
 use super::callbacks::check_awaitable;
 use super::{
@@ -13,7 +11,8 @@ use super::{
     AsyncTask, CatchFrame, PipeFrame, PostChildFrame, RefineFrame, StringBoolFrame,
     SuperRefineFrame, clone_path, deliver_at,
 };
-use crate::errors::{Error, Issue, PathPart, Result};
+use crate::errors::{Error, PathPart, Result};
+use crate::schema::{evaluate_string_bool, interpret_super_refine};
 use crate::values::deepcopy;
 
 impl AsyncSession {
@@ -113,42 +112,8 @@ impl AsyncSession {
                 let node = frame.node.bind(py).try_borrow().map_err(PyErr::from)?;
                 let result = (|| -> Result<Py<PyAny>> {
                     let ctx = self.context(py)?;
-                    let parsed_bound = parsed.bind(py);
-                    let result = node.args[0].bind(py).call1((parsed_bound,))?;
-                    if result.is_none() {
-                        return Ok(parsed_bound.clone().unbind());
-                    }
-                    let mut issues = Vec::new();
-                    if result.is_instance(&ctx.issue_type)? {
-                        issues.push(Issue::from_python(&result)?);
-                    } else if result.is_instance_of::<PyList>()
-                        || result.is_instance_of::<PyTuple>()
-                    {
-                        for item in result.try_iter()? {
-                            let item = item?;
-                            if !item.is_instance(&ctx.issue_type)? {
-                                return Err(PyTypeError::new_err(
-                                    "super_refine callback returned a non-Issue value",
-                                )
-                                .into());
-                            }
-                            issues.push(Issue::from_python(&item)?);
-                        }
-                    } else {
-                        return Err(PyTypeError::new_err(
-                            "super_refine callback must return Issue, a list or tuple of Issue, or None",
-                        )
-                        .into());
-                    }
-                    if issues.is_empty() {
-                        return Ok(parsed_bound.clone().unbind());
-                    }
-                    for issue in &mut issues {
-                        let mut absolute = clone_path(py, &path);
-                        absolute.extend(issue.path.iter().map(|part| part.clone_ref(py)));
-                        issue.path = absolute;
-                    }
-                    Err(Error::Invalid(issues))
+                    let result = node.args[0].bind(py).call1((parsed.bind(py),))?;
+                    interpret_super_refine(&ctx, parsed, &result, &path, "super_refine")
                 })();
                 drop(node);
                 Ok(deliver_at(result, path))
@@ -187,56 +152,7 @@ impl AsyncSession {
             Ok(parsed) => {
                 let node = frame.node.bind(py).try_borrow().map_err(PyErr::from)?;
                 let ctx = self.context(py)?;
-                let result = (|| -> Result<Py<PyAny>> {
-                    let parsed = parsed.bind(py);
-                    let text: String = parsed.extract()?;
-                    let case_sensitive: bool = node.args[2].bind(py).extract()?;
-                    let normalized = if case_sensitive {
-                        text
-                    } else {
-                        text.to_lowercase()
-                    };
-                    for item in node.args[0].bind(py).try_iter()? {
-                        let candidate: String = item?.extract()?;
-                        let candidate = if case_sensitive {
-                            candidate
-                        } else {
-                            candidate.to_lowercase()
-                        };
-                        if normalized == candidate {
-                            return Ok(true.into_pyobject(py)?.to_owned().into_any().unbind());
-                        }
-                    }
-                    for item in node.args[1].bind(py).try_iter()? {
-                        let candidate: String = item?.extract()?;
-                        let candidate = if case_sensitive {
-                            candidate
-                        } else {
-                            candidate.to_lowercase()
-                        };
-                        if normalized == candidate {
-                            return Ok(false.into_pyobject(py)?.to_owned().into_any().unbind());
-                        }
-                    }
-                    let message: String = node.args[3].bind(py).extract()?;
-                    let truthy = node.args[0]
-                        .bind(py)
-                        .cast::<PyTuple>()
-                        .map_err(PyErr::from)?;
-                    let falsy = node.args[1]
-                        .bind(py)
-                        .cast::<PyTuple>()
-                        .map_err(PyErr::from)?;
-                    let values = truthy
-                        .iter()
-                        .chain(falsy.iter())
-                        .map(Bound::unbind)
-                        .collect::<Vec<_>>();
-                    let values = PyTuple::new(py, values)?;
-                    let params = PyDict::new(py);
-                    params.set_item("values", values)?;
-                    ctx.fail_with("invalid_value", &message, &path, params)
-                })();
+                let result = evaluate_string_bool(&ctx, &node, parsed.bind(py), &path);
                 drop(node);
                 Ok(deliver_at(result, path))
             }

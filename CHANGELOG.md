@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Split the JSON Schema exporter, codec layer, error/result types, and schema
   core into private modules; the public `zodish.schemas` surface is unchanged.
+- Synchronous and asynchronous evaluators now share `super_refine`,
+  `string_bool`, and discriminated-union interpretation logic, preventing
+  semantic drift between parse modes.
 - Release workflows pin third-party actions to commit SHAs, attest build
   provenance for wheels and sdists, and require an explicit tag for manual
   publishes. Benchmark result snapshots are excluded from the sdist, and the

@@ -15,10 +15,10 @@ use super::{
     SuperRefineFrame, clone_path,
 };
 use crate::MAX_DEPTH;
-use crate::errors::{Error, Path, PathPart};
+use crate::errors::{Error, Path};
 use crate::runtime::LazyStore;
-use crate::schema::{Kind, NativeSchema};
-use crate::values::{coerce_value, deepcopy, enum_message};
+use crate::schema::{Kind, NativeSchema, select_discriminated_branch};
+use crate::values::{coerce_value, deepcopy};
 
 impl AsyncSession {
     pub(super) fn eval_node(
@@ -497,29 +497,6 @@ impl AsyncSession {
                 self.start_intersection(py, &ctx, node, &node_ref, value, path, depth)
             }
             Kind::DiscriminatedUnion => {
-                if missing {
-                    drop(node_ref);
-                    let outcome = ctx.fail("required", "Required", &path);
-                    return Ok(AsyncNext::Task(AsyncTask::Deliver { outcome, path }));
-                }
-                let Ok(dict) = value.bind(py).cast::<PyDict>() else {
-                    let params = PyDict::new(py);
-                    if let Err(error) = params.set_item("expected", "dict with string keys") {
-                        drop(node_ref);
-                        return Ok(AsyncNext::Task(AsyncTask::Deliver {
-                            outcome: Err(Error::Python(error)),
-                            path,
-                        }));
-                    }
-                    let outcome = ctx.fail_with(
-                        "invalid_type",
-                        "Expected dict with string keys",
-                        &path,
-                        params,
-                    );
-                    drop(node_ref);
-                    return Ok(AsyncNext::Task(AsyncTask::Deliver { outcome, path }));
-                };
                 let key = node_ref.args[0].bind(py);
                 let options = match node_ref.args[1].bind(py).cast::<PyTuple>() {
                     Ok(options) => options,
@@ -530,55 +507,16 @@ impl AsyncSession {
                         }));
                     }
                 };
-                let raw = match dict.get_item(key) {
-                    Ok(Some(raw)) => raw,
-                    Ok(None) => {
-                        let mut issue_path = clone_path(py, &path);
-                        issue_path.push(PathPart::Value(node_ref.args[0].clone_ref(py)));
-                        let outcome = ctx.fail("required", "Required", &issue_path);
-                        drop(node_ref);
-                        return Ok(AsyncNext::Task(AsyncTask::Deliver { outcome, path }));
-                    }
-                    Err(error) => {
-                        drop(node_ref);
-                        return Ok(AsyncNext::Task(AsyncTask::Deliver {
-                            outcome: Err(Error::Python(error)),
-                            path,
-                        }));
-                    }
-                };
-                let mut selected = None;
-                for (index, option) in options.iter().enumerate() {
-                    if raw.get_type().is(option.get_type()) && raw.eq(&option)? {
-                        selected = Some(index);
-                        break;
-                    }
-                }
-                let Some(index) = selected else {
-                    let message = match enum_message(options) {
-                        Ok(message) => message,
+                let index =
+                    match select_discriminated_branch(&ctx, value.bind(py), key, options, &path) {
+                        Ok(index) => index,
                         Err(error) => {
-                            drop(node_ref);
                             return Ok(AsyncNext::Task(AsyncTask::Deliver {
-                                outcome: Err(Error::Python(error)),
+                                outcome: Err(error),
                                 path,
                             }));
                         }
                     };
-                    let params = PyDict::new(py);
-                    if let Err(error) = params.set_item("values", options) {
-                        drop(node_ref);
-                        return Ok(AsyncNext::Task(AsyncTask::Deliver {
-                            outcome: Err(Error::Python(error)),
-                            path,
-                        }));
-                    }
-                    let mut issue_path = clone_path(py, &path);
-                    issue_path.push(PathPart::Value(node_ref.args[0].clone_ref(py)));
-                    let outcome = ctx.fail_with("invalid_value", &message, &issue_path, params);
-                    drop(node_ref);
-                    return Ok(AsyncNext::Task(AsyncTask::Deliver { outcome, path }));
-                };
                 let child = node_ref.children[index].clone_ref(py);
                 drop(node_ref);
                 Ok(AsyncNext::Task(AsyncTask::Eval {

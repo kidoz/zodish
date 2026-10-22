@@ -18,6 +18,9 @@ use crate::runtime::Context;
 use checks::build_error_template;
 use json::parse_json_value;
 
+pub(crate) use checks::{
+    evaluate_string_bool, interpret_super_refine, select_discriminated_branch,
+};
 pub(crate) use evaluate::is_primitive_kind;
 pub(crate) use kind::Kind;
 

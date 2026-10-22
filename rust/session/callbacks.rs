@@ -5,14 +5,14 @@ use std::sync::atomic::Ordering;
 
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyTuple};
+use pyo3::types::PyDict;
 
 use super::{
     ASYNC_TOKEN_COUNTER, AsyncCallbackFrame, AsyncNext, AsyncPending, AsyncPendingKind,
     AsyncSession, AsyncTask, clone_path, deliver_at,
 };
 use crate::errors::{Error, Issue, PathPart, Result};
-use crate::schema::Kind;
+use crate::schema::{Kind, interpret_super_refine};
 
 impl AsyncSession {
     pub(super) fn resume_async_callback(
@@ -109,45 +109,14 @@ impl AsyncSession {
                 let parsed =
                     parsed.ok_or_else(|| PyRuntimeError::new_err("Async session has no result"))?;
                 let ctx = self.context(py)?;
-                let value = value.bind(py);
-                let mut issues = Vec::new();
-                if value.is_none() {
-                    return Ok(deliver_at(Ok(parsed), path));
-                }
-                if value.is_instance(&ctx.issue_type)? {
-                    issues.push(Issue::from_python(value)?);
-                } else if value.is_instance_of::<PyList>() || value.is_instance_of::<PyTuple>() {
-                    for item in value.try_iter()? {
-                        let item = item?;
-                        if !item.is_instance(&ctx.issue_type)? {
-                            return Ok(deliver_at(
-                                Err(PyTypeError::new_err(
-                                    "super_refine_async callback returned a non-Issue value",
-                                )
-                                .into()),
-                                path,
-                            ));
-                        }
-                        issues.push(Issue::from_python(&item)?);
-                    }
-                } else {
-                    return Ok(deliver_at(
-                        Err(PyTypeError::new_err(
-                            "super_refine_async callback must return Issue, a list or tuple of Issue, or None",
-                        )
-                        .into()),
-                        path,
-                    ));
-                }
-                if issues.is_empty() {
-                    return Ok(deliver_at(Ok(parsed), path));
-                }
-                for issue in &mut issues {
-                    let mut absolute = clone_path(py, &path);
-                    absolute.extend(issue.path.iter().map(|part| part.clone_ref(py)));
-                    issue.path = absolute;
-                }
-                Ok(deliver_at(Err(Error::Invalid(issues)), path))
+                let outcome = interpret_super_refine(
+                    &ctx,
+                    parsed,
+                    value.bind(py),
+                    &path,
+                    "super_refine_async",
+                );
+                Ok(deliver_at(outcome, path))
             }
             AsyncPendingKind::Transform
             | AsyncPendingKind::Overwrite
