@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Validated dataclasses support `InitVar` construction and `init=False` fields:
+  InitVar values are validated and passed to `__post_init__` without being
+  stored or encoded; defaulted `init=False` fields are validated and assigned
+  before post-init. Codec decode accepts InitVar input and applies `init=False`
+  defaults; encode omits both. Inherited InitVar/`init=False` fields work.
 - Validated dataclasses support one dataclass base chain (ordinary or
   validated) plus non-dataclass mixins, including field overrides/additions,
   inherited defaults/factories, `__post_init__`, frozen/slots, and codec

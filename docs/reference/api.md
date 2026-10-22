@@ -289,18 +289,27 @@ Inferred schemas are trusted. An optional field schema without a dataclass
 default, a `MISSING` default, `preprocess` schemas, `transform`, `coerce`,
 `stringbool`, and `pipe` schemas, lazy schemas whose async capability is not
 statically known, async construction, custom `__init__`, `__new__`, and
-`__setattr__`, `InitVar`, and `init=False` fields are rejected at decoration.
-Use `.overwrite()` for type-preserving normalization or a codec for type-changing
+`__setattr__`, and dataclass-level `init=False` are rejected at decoration. Use
+`.overwrite()` for type-preserving normalization or a codec for type-changing
 conversions.
+
+`InitVar` parameters are validated, passed to `__post_init__` in declaration
+order, and are not stored or encoded. InitVar defaults are validated. An
+`init=False` field with a default or `default_factory` is validated and assigned
+before `__post_init__`; an `init=False` field without a default may be assigned
+by `__post_init__` and is not validated. Post-init mutations are not revalidated.
+Codec decode accepts InitVar input and applies `init=False` defaults; encode
+omits both. Because InitVar values are not stored, `dataclasses.replace()` on a
+class with a required InitVar follows stdlib behavior and cannot supply it.
 
 A validated class may inherit from one dataclass base chain (ordinary or
 validated) plus non-dataclass mixins. Inherited fields, defaults, factories,
-overrides, and `__post_init__` are validated with the subclass's annotations.
-Multiple dataclass bases, generic or parameterized bases, a base with
-`init=False` or a custom `__init__`, and inherited `InitVar`/`init=False` fields
-are rejected. An undecorated subclass is not validated; the codec rejects it,
-and stdlib `@dataclasses.dataclass` on the subclass does not restore validation.
-Decorate the subclass with `@z.dataclass`.
+overrides, `InitVar`, `init=False` fields, and `__post_init__` are validated
+with the subclass's annotations. Multiple dataclass bases, generic or
+parameterized bases, and a base with the `init=False` option or a custom
+`__init__` are rejected. An undecorated subclass is not validated; the codec
+rejects it, and stdlib `@dataclasses.dataclass` on the subclass does not restore
+validation. Decorate the subclass with `@z.dataclass`.
 
 Supported options include `frozen`, `slots`, `weakref_slot=True` with slots,
 `kw_only`, `repr`, `eq`, `order`, `unsafe_hash`, and `match_args`. A
