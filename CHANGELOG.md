@@ -24,11 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `to_json_schema` methods backed by a cached `z.codecs.dataclass` schema.
   `z.ValidatedModel` provides typed classmethods; decorated classes also receive
   them at runtime unless a user-defined method or field name wins.
-- Validated dataclasses support one dataclass base chain (ordinary or
-  validated) plus non-dataclass mixins, including field overrides/additions,
-  inherited defaults/factories, `__post_init__`, frozen/slots, and codec
-  decoding. Multiple dataclass bases, generic bases, and undecorated subclasses
-  remain unsupported.
+- Validated dataclasses support one or more dataclass bases (ordinary or
+  validated), including diamond inheritance, plus non-dataclass mixins, field
+  overrides/additions, inherited defaults/factories, `__post_init__`,
+  frozen/slots, and codec decoding. Standard dataclass MRO field-order and
+  duplicate-field rules apply. Generic bases and undecorated subclasses remain
+  unsupported.
 - `@z.dataclass` validates direct dataclass construction, including defaults
   and default factories, and exposes typed constructors through
   `dataclass_transform`. Decoration-time checks reject unsupported dataclass

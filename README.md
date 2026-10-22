@@ -440,9 +440,10 @@ Constructor arguments are decoded values; encoded input still uses
 `z.codecs.dataclass(User)`. Defaults and factories are validated once. The
 decorator supports ordinary dataclasses with `init=True`, frozen/slots/keyword-only
 options, `InitVar` and `init=False` fields, a `__post_init__` matching the
-InitVar parameters, and one dataclass base chain (ordinary or validated) plus
-non-dataclass mixins. Custom `__init__`/`__new__`/`__setattr__`, dataclass-level
-`init=False`, multiple or generic dataclass bases, undecorated subclasses,
+InitVar parameters, and one or more dataclass bases (ordinary or validated)
+plus non-dataclass mixins. Standard dataclass MRO field-order and
+duplicate-field rules apply. Custom `__init__`/`__new__`/`__setattr__`,
+dataclass-level `init=False`, generic dataclass bases, undecorated subclasses,
 `transform`/`coerce`/`stringbool`/`pipe` field schemas, and async construction
 are rejected. InitVar values are validated and passed to `__post_init__` but
 not stored or encoded; defaulted `init=False` fields are validated before

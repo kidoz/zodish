@@ -253,15 +253,15 @@ are not validated by default. Post-init mutations are not revalidated unless
 Because InitVar values are not stored, `dataclasses.replace()` on a class with a
 required InitVar follows stdlib behavior and cannot supply it.
 
-A validated class may inherit from one dataclass base (ordinary or validated)
-plus non-dataclass mixins. Inherited fields, defaults, factories, overrides,
-`InitVar`, `init=False` fields, and `__post_init__` are validated with the
-subclass's annotations. Multiple dataclass bases, generic or parameterized
-bases, and a base with the `init=False` option or a custom `__init__` are
-rejected. An undecorated subclass of a validated class is not validated; the
-codec rejects it, and applying stdlib `@dataclasses.dataclass` to it does not
-restore validation. Decorate the subclass with `@z.dataclass` to validate its
-fields.
+A validated class may inherit from multiple dataclass bases (ordinary or
+validated) plus non-dataclass mixins. Standard dataclass MRO field-order,
+duplicate-field, and diamond rules apply. Inherited fields, defaults,
+factories, overrides, `InitVar`, `init=False` fields, and `__post_init__` are
+validated with the subclass's annotations. Generic or parameterized bases and a
+base with the `init=False` option or a custom `__init__` are rejected. An
+undecorated subclass of a validated class is not validated; the codec rejects
+it, and applying stdlib `@dataclasses.dataclass` to it does not restore
+validation. Decorate the subclass with `@z.dataclass` to validate its fields.
 
 `@z.dataclass` uses `dataclass_transform`, so type checkers see typed
 constructor arguments and attributes. Literal `frozen=True` and `kw_only=True`

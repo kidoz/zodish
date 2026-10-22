@@ -311,14 +311,15 @@ Codec decode accepts InitVar input and applies `init=False` defaults; encode
 omits both. Because InitVar values are not stored, `dataclasses.replace()` on a
 class with a required InitVar follows stdlib behavior and cannot supply it.
 
-A validated class may inherit from one dataclass base chain (ordinary or
-validated) plus non-dataclass mixins. Inherited fields, defaults, factories,
+A validated class may inherit from multiple dataclass bases (ordinary or
+validated) plus non-dataclass mixins. Standard dataclass MRO field-order,
+duplicate-field, and diamond rules apply. Inherited fields, defaults, factories,
 overrides, `InitVar`, `init=False` fields, and `__post_init__` are validated
-with the subclass's annotations. Multiple dataclass bases, generic or
-parameterized bases, and a base with the `init=False` option or a custom
-`__init__` are rejected. An undecorated subclass is not validated; the codec
-rejects it, and stdlib `@dataclasses.dataclass` on the subclass does not restore
-validation. Decorate the subclass with `@z.dataclass`.
+with the subclass's annotations. Generic or parameterized bases and a base with
+the `init=False` option or a custom `__init__` are rejected. An undecorated
+subclass is not validated; the codec rejects it, and stdlib
+`@dataclasses.dataclass` on the subclass does not restore validation. Decorate
+the subclass with `@z.dataclass`.
 
 Supported options include `frozen`, `slots`, `weakref_slot=True` with slots,
 `kw_only`, `repr`, `eq`, `order`, `unsafe_hash`, and `match_args`. A
