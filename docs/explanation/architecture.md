@@ -134,7 +134,11 @@ Decoding parses the encoded schema, calls `decode`, and parses the decoded
 schema. Encoding uses a mirrored reversible node tree: codec nodes use their
 `encode` callback, containers traverse their children in reverse, and one-way
 operations make the tree unavailable. Both directions remain inside the native
-evaluator; only the codec callbacks cross into Python.
+evaluator; only the codec callbacks cross into Python. Validated dataclass
+codecs go further: dedicated `dataclass_decode` and `dataclass_encode` nodes
+evaluate the whole instance natively — fields, defaults, guards, InitVar
+routing, and `__post_init__` — in both the synchronous evaluator and async
+sessions, while plain dataclass codecs keep the closure orchestration.
 
 Because encoding is derived from the schema structure, it is available for
 primitives, constraints, codecs, optional/nullable wrappers, and structural

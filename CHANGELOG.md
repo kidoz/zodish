@@ -98,6 +98,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   provenance for wheels and sdists, and require an explicit tag for manual
   publishes. Benchmark result snapshots are excluded from the sdist, and the
   benchmark lock records artifact hashes.
+- Validated dataclass codecs now decode and encode through native
+  `dataclass_decode`/`dataclass_encode` nodes: one native evaluation per
+  instance covers field validation, defaults and factories, annotation guards,
+  InitVar routing, `init=False` fields, wire names, frozen/slots assembly, and
+  `__post_init__`, with identical issue contents. Synchronous, asynchronous,
+  and recursive validated classes all use the native nodes; plain dataclass
+  codecs are unchanged and no public API changed. Paired single-machine
+  measurements show codec decode/encode roughly 50% faster
+  (`benchmarks/results/2026-10-23-macos-arm64-native-dataclass-codec.md`).
 
 ## [0.10.0] - 2026-10-22
 
