@@ -18,11 +18,14 @@ frame/state storage and lifecycle remain in `session.rs`.
 `rust/session/wrappers.rs` contains catch, refinement, post-child, string-bool,
 and pipe continuations. Its six methods are visible
 within the session module; frame storage and lifecycle remain in `session.rs`.
-`rust/session/containers.rs` contains object, array/set/tuple, and record
-continuations, including snapshots,
-result construction, primitive object-field fast paths, and issue aggregation.
-Its continuation methods are visible within the session module; its path
-helper stays private. `rust/session/composition.rs` contains union/intersection
+`rust/session/containers.rs` declares three child modules and shares a private
+path helper. `containers/object.rs` owns object snapshots, field/extras traversal,
+primitive field fast paths, and issue aggregation. `containers/sequence.rs` owns
+array/set/tuple snapshots, item traversal, and result construction;
+`containers/record.rs` owns record snapshots and key/value traversal. Each child
+contains its three start/advance/resume methods, restricted to session visibility
+with `pub(in crate::session)`. Frame/state definitions remain in `session.rs`.
+`rust/session/composition.rs` contains union/intersection
 continuations, outcome storage/restoration, and intersection result combination.
 Its six dispatch entry points have session visibility; outcome helpers stay
 private. Frame and stored-outcome types remain in `session.rs`.
