@@ -42,6 +42,7 @@ SDIST_REQUIRED = {
     "rust/session/evaluate.rs",
     "rust/session/gc.rs",
     "rust/session/wrappers.rs",
+    "rust/stack.rs",
     "rust/values.rs",
     "src/zodish/__init__.py",
     "src/zodish/_annotations.py",
