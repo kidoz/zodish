@@ -3375,6 +3375,29 @@ class SchemaTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             User(age=30, nickname=1)
 
+    def test_validated_dataclass_none_and_missing(self):
+        @z.dataclass
+        class User:
+            name: str
+            nickname: str | None = None
+
+        self.assertIsNone(User(name="x").nickname)
+        self.assertIsNone(User(name="x", nickname=None).nickname)
+        self.assertEqual(User(name="x", nickname="nick").nickname, "nick")
+        for value in (1, 1.5, b"x"):
+            with self.subTest(value=value), self.assertRaises(ValidationError):
+                User(name="x", nickname=value)
+        with self.assertRaises(TypeError):
+            User()
+
+        @z.dataclass
+        class SchemaDefault:
+            value: Annotated[int, z.integer().default(5)]
+
+        with self.assertRaises(TypeError):
+            SchemaDefault()
+        self.assertEqual(SchemaDefault(value=1).value, 1)
+
     def test_validated_dataclass_operation_order(self):
         calls: list[str] = []
 
@@ -3434,6 +3457,14 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(TupleValue(value=(1, "x")).value, (1, "x"))
         with self.assertRaises(TypeError):
             TupleValue(value=[1, "x"])
+
+        @z.dataclass
+        class BadOverwrite:
+            value: Annotated[int, z.integer().overwrite(lambda value: "x")]
+
+        with self.assertRaises(TypeError) as caught:
+            BadOverwrite(value=1)
+        self.assertIn("produced str", str(caught.exception))
 
     def test_validated_dataclass_binding_errors(self):
         @z.dataclass
