@@ -18,6 +18,14 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any, cast
 
+from ._errors import (
+    ErrorMap,
+    Failure,
+    Issue,
+    Success,
+    ValidationError,
+    _prefix_issue,
+)
 from ._native import NativeSchema
 from .schemas import (
     _BASE64_PATTERN,
@@ -28,10 +36,7 @@ from .schemas import (
     MISSING,
     ArraySchema,
     DiscriminatedUnionSchema,
-    ErrorMap,
-    Failure,
     IntersectionSchema,
-    Issue,
     KeyedRecordSchema,
     MapSchema,
     Missing,
@@ -39,10 +44,8 @@ from .schemas import (
     RecordSchema,
     Schema,
     SetSchema,
-    Success,
     TupleSchema,
     UnionSchema,
-    ValidationError,
     _async_callback,
     _brand_argument,
     _encode_base64,
@@ -56,7 +59,6 @@ from .schemas import (
     _parse_iso_duration,
     _parse_iso_time,
     _parse_path,
-    _prefix_issue,
     _sync_callback,
     array,
     bytes,

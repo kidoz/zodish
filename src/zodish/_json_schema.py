@@ -19,6 +19,7 @@ from ._codecs import (
     _CompoundCodecSchema,
     _JsonTextSchema,
 )
+from ._errors import Path, UnrepresentableError
 from ._native import NativeSchema
 from .schemas import (
     _CONSTRAINT_KINDS,
@@ -33,14 +34,12 @@ from .schemas import (
     KeyedRecordSchema,
     MapSchema,
     ObjectSchema,
-    Path,
     RecordSchema,
     Schema,
     SetSchema,
     TupleSchema,
     TypedObjectSchema,
     UnionSchema,
-    UnrepresentableError,
     UnrepresentablePolicy,
     _field_wire,
 )
