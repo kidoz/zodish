@@ -10,9 +10,12 @@ the Python module. `rust/session.rs` owns `AsyncSession`, its frame/state types,
 token counter, Python methods, and GC lifecycle. Its fields stay private;
 suspended frames retain snapshots, callbacks, issues, and tracebacks.
 `rust/session/dispatch.rs` contains the execution loop, node evaluation, and
-frame dispatch, including wrapper continuations. Only its `run` and `advance`
-entry points are visible to the session parent. `rust/session/containers.rs`
-contains object, array/set/tuple, and record continuations, including snapshots,
+frame dispatch. Only its `run` and `advance` entry points are visible to the
+session parent. `rust/session/wrappers.rs` contains catch, refinement,
+post-child, string-bool, and pipe continuations. Its six methods are visible
+within the session module; frame storage and lifecycle remain in `session.rs`.
+`rust/session/containers.rs` contains object, array/set/tuple, and record
+continuations, including snapshots,
 result construction, primitive object-field fast paths, and issue aggregation.
 Its continuation methods are visible within the session module; its path
 helper stays private. `rust/session/composition.rs` contains union/intersection
@@ -21,12 +24,13 @@ Its six dispatch entry points have session visibility; outcome helpers stay
 private. Frame and stored-outcome types remain in `session.rs`.
 `rust/session/callbacks.rs` contains callback resumption, awaitability checking,
 pending-request creation, and callback-result interpretation. Its entry points
-have session visibility; dispatch imports the shared awaitability checker
-directly. Pending/frame storage, the token counter, Python lifecycle methods,
-and GC hooks remain in `session.rs`. Wrapper dispatch arms retain their
-existing callback behavior. `rust/session/gc.rs` visits references held by
-suspended frames, including issues, stored exceptions, and tracebacks. Its
-visitor is visible only within the session module; Python GC hooks delegate
+have session visibility; dispatch and wrappers import the shared awaitability
+checker directly. Pending/frame storage, the token counter, Python lifecycle methods,
+and GC hooks remain in `session.rs`. Wrapper continuations use the same
+awaitability checker and shared post-child checks. `rust/session/gc.rs` visits
+references held by suspended frames, including issues, stored exceptions, and
+tracebacks. Its visitor is visible only within the session module; Python GC
+hooks delegate
 frame traversal to it. Terminal-state cleanup stays with the session lifecycle.
 Paths, issue/error types, and the GC-aware native issue bundle live in
 `rust/errors.rs`.

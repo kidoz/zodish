@@ -4,13 +4,15 @@
 //! reuse the schema evaluator and shared checks. Container continuations live
 //! in `containers`, union/intersection continuations in `composition`; frame
 //! storage and Python lifecycle methods stay here. Callback resumption and
-//! awaitability checks live in `callbacks`; frame GC traversal lives in `gc`.
+//! awaitability checks live in `callbacks`; wrapper continuations in `wrappers`;
+//! frame GC traversal lives in `gc`.
 
 mod callbacks;
 mod composition;
 mod containers;
 mod dispatch;
 mod gc;
+mod wrappers;
 
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
