@@ -580,6 +580,29 @@ assert_type(WrappedAssignment, type[ExistingAssignment])
 assert_type(WrappedAssignment(value=1), ExistingAssignment)
 
 
+@dataclass
+class TypingLeftBase:
+    left: int
+
+
+@dataclass
+class TypingRightBase:
+    right: str
+
+
+@z.dataclass
+class TypingCombined(TypingLeftBase, TypingRightBase):
+    extra: int = 0
+
+
+typing_combined = TypingCombined(left=1, right="x")
+assert_type(typing_combined.left, int)
+assert_type(typing_combined.right, str)
+assert_type(typing_combined.extra, int)
+if TYPE_CHECKING:
+    TypingCombined(left="x", right="x")  # type: ignore[arg-type]
+
+
 @z.dataclass
 class TypedValidatedModel(z.ValidatedModel):
     name: str

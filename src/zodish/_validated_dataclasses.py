@@ -280,15 +280,6 @@ def _compile_field_schema(
 
 
 def _reject_unsupported_inheritance(cls: type[Any]) -> None:
-    direct_bases = [
-        base
-        for base in cls.__bases__
-        if dataclasses.is_dataclass(base) and dataclasses.fields(base)
-    ]
-    if len(direct_bases) > 1:
-        raise TypeError(
-            "Validated dataclasses support at most one dataclass base",
-        )
     for base in cls.__mro__[1:]:
         if base is object or not dataclasses.is_dataclass(base):
             continue

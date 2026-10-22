@@ -3479,19 +3479,6 @@ class SchemaTests(unittest.TestCase):
                     self.value = value
 
         @dataclasses.dataclass
-        class Base:
-            value: int
-
-        @dataclasses.dataclass
-        class OtherBase:
-            other: int
-
-        with self.assertRaises(TypeError):
-            @z.dataclass
-            class MultipleBases(Base, OtherBase):
-                extra: int
-
-        @dataclasses.dataclass
         class CustomInitBase:
             value: int
 
@@ -4050,6 +4037,126 @@ class SchemaTests(unittest.TestCase):
             @z.dataclass
             class GenericSub(GenericBase[int]):
                 extra: int = 0
+
+    def test_validated_dataclass_multiple_bases(self):
+        @dataclasses.dataclass
+        class LeftBase:
+            left: Annotated[int, z.integer().min(0)]
+
+        @dataclasses.dataclass
+        class RightBase:
+            right: Annotated[str, z.string().min(1)]
+
+        @z.dataclass
+        class Combined(LeftBase, RightBase):
+            extra: Annotated[int, z.integer().min(0)] = 0
+
+        combined = Combined(right="x", left=1, extra=2)
+        self.assertEqual(combined.left, 1)
+        self.assertEqual(combined.right, "x")
+        self.assertEqual(combined.extra, 2)
+        for kwargs in (
+            {"left": -1, "right": "x"},
+            {"left": 1, "right": ""},
+            {"left": 1, "right": "x", "extra": -1},
+        ):
+            with self.subTest(kwargs=kwargs), self.assertRaises(
+                ValidationError,
+            ):
+                Combined(**kwargs)
+
+        codec = z.codecs.dataclass(Combined)
+        decoded = codec.parse({"right": "x", "left": 1})
+        self.assertEqual(decoded, Combined(right="x", left=1))
+        self.assertEqual(
+            codec.encode(decoded),
+            {"right": "x", "left": 1, "extra": 0},
+        )
+        self.assertEqual(
+            Combined.parse({"right": "x", "left": 1}), decoded,
+        )
+        schema = Combined.to_json_schema()
+        self.assertEqual(schema["type"], "object")
+        self.assertEqual(
+            set(schema["properties"]), {"left", "right", "extra"},
+        )
+
+        @z.dataclass(validate_assignment=True)
+        class ValidatedLeft:
+            left: Annotated[int, z.integer().min(0)]
+
+        @z.dataclass
+        class ValidatedRight:
+            right: Annotated[str, z.string().min(1)]
+
+        @z.dataclass
+        class ValidatedCombined(ValidatedLeft, ValidatedRight):
+            extra: int = 0
+
+        validated = ValidatedCombined(left=1, right="x")
+        self.assertEqual(
+            ValidatedCombined.parse({"left": 1, "right": "x"}),
+            validated,
+        )
+        self.assertEqual(
+            ValidatedCombined.encode(validated),
+            {"right": "x", "left": 1, "extra": 0},
+        )
+        validated.left = 2
+        with self.assertRaises(ValidationError):
+            validated.left = -1
+        with self.assertRaises(ValidationError):
+            validated.right = ""
+        self.assertEqual(validated.left, 2)
+        self.assertEqual(validated.right, "x")
+
+        @dataclasses.dataclass
+        class Root:
+            root: int
+
+        @dataclasses.dataclass
+        class LeftBranch(Root):
+            left: int
+
+        @dataclasses.dataclass
+        class RightBranch(Root):
+            right: int
+
+        @z.dataclass
+        class Diamond(LeftBranch, RightBranch):
+            extra: int = 0
+
+        diamond = Diamond(root=1, left=2, right=3)
+        self.assertEqual(
+            Diamond.parse({"root": 1, "left": 2, "right": 3}),
+            diamond,
+        )
+        self.assertEqual(diamond.root, 1)
+
+        @dataclasses.dataclass
+        class ValueBase:
+            value: int
+
+        @dataclasses.dataclass
+        class TokenBase:
+            token: dataclasses.InitVar[str]
+            seen: str = dataclasses.field(init=False, default="")
+
+            def __post_init__(self, token: str) -> None:
+                self.seen = token
+
+        @z.dataclass
+        class WithToken(ValueBase, TokenBase):
+            extra: int = 0
+
+        with_token = WithToken(value=1, token="t")
+        self.assertEqual(with_token.seen, "t")
+        parsed = WithToken.parse({"value": 2, "token": "u"})
+        self.assertEqual(parsed.seen, "u")
+        self.assertEqual(
+            WithToken.encode(parsed),
+            {"value": 2, "extra": 0},
+        )
 
     def test_validated_dataclass_initvar(self):
         calls: list[str] = []
