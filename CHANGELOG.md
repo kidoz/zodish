@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-22
+
 ### Added
 
 - CI enforces a `deny.toml` dependency policy with `cargo deny`: security
@@ -18,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when their item schema is reversible.
 - `z.map` schemas reverse-encode through keyed records when both key and value
   schemas are reversible.
+
+### Changed
+
+- Split synchronous container evaluation and async node, wrapper, and container
+  continuations into focused Rust modules. Native behavior, public APIs, and
+  Python-visible classes are unchanged.
 
 ## [0.9.0] - 2026-10-22
 
