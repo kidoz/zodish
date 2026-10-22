@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Split the JSON Schema exporter and codec layer into private modules; the
+  public `zodish.schemas` surface is unchanged.
 - Release workflows pin third-party actions to commit SHAs, attest build
   provenance for wheels and sdists, and require an explicit tag for manual
   publishes. Benchmark result snapshots are excluded from the sdist, and the
