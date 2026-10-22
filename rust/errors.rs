@@ -3,8 +3,11 @@
 use std::sync::Arc;
 
 use pyo3::class::{PyTraverseError, PyVisit};
+use pyo3::exceptions::PyRecursionError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
+
+use crate::MAX_DEPTH;
 
 pub(crate) enum PathPart {
     Value(Py<PyAny>),
@@ -100,6 +103,13 @@ impl Issue {
     }
 
     fn to_raw(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        self.to_raw_at(py, 0)
+    }
+
+    fn to_raw_at(&self, py: Python<'_>, depth: usize) -> PyResult<Py<PyAny>> {
+        if depth >= MAX_DEPTH {
+            return Err(issue_depth_error());
+        }
         let path = PyTuple::new(
             py,
             self.path
@@ -113,7 +123,7 @@ impl Issue {
             .map(|branch| {
                 let issues = branch
                     .iter()
-                    .map(|i| i.to_raw(py))
+                    .map(|i| i.to_raw_at(py, depth + 1))
                     .collect::<PyResult<Vec<_>>>()?;
                 Ok(PyTuple::new(py, issues)?.into_any().unbind())
             })
@@ -131,6 +141,13 @@ impl Issue {
     }
 
     pub(crate) fn from_python(value: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Self::from_python_at(value, 0)
+    }
+
+    fn from_python_at(value: &Bound<'_, PyAny>, depth: usize) -> PyResult<Self> {
+        if depth >= MAX_DEPTH {
+            return Err(issue_depth_error());
+        }
         let path = value
             .getattr("path")?
             .try_iter()?
@@ -142,7 +159,7 @@ impl Issue {
             .map(|branch| {
                 branch?
                     .try_iter()?
-                    .map(|issue| Self::from_python(&issue?))
+                    .map(|issue| Self::from_python_at(&issue?, depth + 1))
                     .collect::<PyResult<Vec<_>>>()
             })
             .collect::<PyResult<Vec<_>>>()?;
@@ -188,17 +205,36 @@ impl NativeIssueBundle {
     }
 }
 
+fn issue_depth_error() -> PyErr {
+    PyRecursionError::new_err("Issue branch depth exceeds 256 levels")
+}
+
 pub(crate) fn visit_issue(
     issue: &Issue,
     visit: &PyVisit<'_>,
 ) -> std::result::Result<(), PyTraverseError> {
-    for part in &issue.path {
-        part.visit(visit)?;
+    // Most issues have no branches; keep the common GC path allocation-free.
+    if issue.branches.is_empty() {
+        for part in &issue.path {
+            part.visit(visit)?;
+        }
+        visit.call(&issue.params)?;
+        return Ok(());
     }
-    visit.call(&issue.params)?;
-    for branch in &issue.branches {
-        for child in branch {
-            visit_issue(child, visit)?;
+    // Iterate with an explicit stack: GC traversal must not recurse through
+    // branch graphs. The depth cap bounds a malformed Python-built cycle.
+    let mut pending = vec![(issue, 0usize)];
+    while let Some((issue, depth)) = pending.pop() {
+        for part in &issue.path {
+            part.visit(visit)?;
+        }
+        visit.call(&issue.params)?;
+        if depth + 1 < MAX_DEPTH {
+            for branch in &issue.branches {
+                for child in branch {
+                    pending.push((child, depth + 1));
+                }
+            }
         }
     }
     Ok(())

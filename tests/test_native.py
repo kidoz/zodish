@@ -440,6 +440,22 @@ class NativeTests(unittest.TestCase):
         with self.assertRaises(RecursionError):
             circular.parse(1)
 
+    def test_cyclic_issue_branches_raise_recursion_error(self):
+        issue = Issue("custom", "boom")
+        object.__setattr__(issue, "branches", ((issue,),))
+
+        schema = z.string().super_refine(lambda _: issue)
+        with self.assertRaises(RecursionError):
+            schema.parse("x")
+        with self.assertRaises(RecursionError):
+            schema.safe_parse("x")
+
+        def raise_validation_error(_):
+            raise ValidationError([issue])
+
+        with self.assertRaises(RecursionError):
+            z.string().refine(raise_validation_error, "unused").parse("x")
+
     def test_intersection_merge_depth_is_bounded(self):
         schema = z.intersection(z.unknown(), z.unknown())
         nested = {}

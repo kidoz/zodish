@@ -2124,6 +2124,25 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
             await async_limit(await asynchronous_schema()),
         )
 
+    async def test_cyclic_issue_branches_raise_recursion_error(self):
+        issue = Issue("custom", "boom")
+        object.__setattr__(issue, "branches", ((issue,),))
+
+        async def callback(_):
+            return issue
+
+        with self.assertRaises(RecursionError):
+            await z.string().super_refine_async(callback).parse_async("x")
+
+        async def transform(value):
+            return value
+
+        schema = z.string().transform_async(transform).super_refine(
+            lambda _: issue,
+        )
+        with self.assertRaises(RecursionError):
+            await schema.parse_async("x")
+
     async def test_async_intersection_merge_depth_is_bounded(self):
         schema = z.intersection(z.unknown(), z.unknown())
         nested = {}
