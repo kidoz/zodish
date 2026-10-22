@@ -160,10 +160,7 @@ class CodecSchema[Out, In = Out](Schema[Out, In]):
 
     def record(self) -> CodecSchema[dict[str, Out], dict[str, In]]:
         result = _record_codec(self)
-        return cast(
-            CodecSchema[dict[str, Out], dict[str, In]],
-            replace(result, _meta=self._meta),
-        )
+        return cast(CodecSchema[dict[str, Out], dict[str, In]], result)
 
 
 @dataclass(frozen=True)
@@ -244,7 +241,6 @@ class AsyncCodecSchema[Out, In = Out](CodecSchema[Out, In]):
             _output_schema=output_schema,
             _json_output_schema=json_output_schema,
             _inner=output_schema,
-            _meta=self._meta,
         )
 
 
@@ -272,6 +268,7 @@ def _async_array_codec(
     inner: CodecSchema[Any, Any],
 ) -> AsyncCodecSchema[Any, Any]:
     output_schema = array(inner.output_schema)
+    # Collection constructors start with empty metadata.
     return AsyncCodecSchema[Any, Any](
         NativeSchema("array", (inner._node,), ()),
         _encode_node=NativeSchema("array", (inner._encode_node,), ()),
@@ -279,7 +276,6 @@ def _async_array_codec(
         _output_schema=output_schema,
         _json_output_schema=array(_json_output_schema_for(inner)),
         _inner=output_schema,
-        _meta=inner._meta,
     )
 
 
@@ -287,6 +283,8 @@ def _async_union_codec(
     branches: Sequence[CodecSchema[Any, Any]],
 ) -> AsyncCodecSchema[Any, Any]:
     output_schema = union(*(branch.output_schema for branch in branches))
+    # Composition constructors start with empty metadata; no single branch owns
+    # the container's title or description.
     return AsyncCodecSchema[Any, Any](
         NativeSchema(
             "union",
@@ -311,6 +309,8 @@ def _async_tuple_codec(
     branches: Sequence[CodecSchema[Any, Any]],
 ) -> AsyncCodecSchema[Any, Any]:
     output_schema = tuple(*(branch.output_schema for branch in branches))
+    # Composition constructors start with empty metadata; no single branch owns
+    # the container's title or description.
     return AsyncCodecSchema[Any, Any](
         NativeSchema(
             "tuple",
@@ -507,6 +507,7 @@ def _array_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
 
     output_schema = array(inner.output_schema)
     placeholder = array(unknown())
+    # Collection constructors start with empty metadata.
     return _CompoundCodecSchema[Any, Any](
         _codec_transform(placeholder, decode_values),
         _encode_node=_codec_transform(placeholder, encode_values),
@@ -514,7 +515,6 @@ def _array_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
         _output_schema=output_schema,
         _json_output_schema=array(_json_output_schema_for(inner)),
         _inner=output_schema,
-        _meta=inner._meta,
     )
 
 
@@ -548,6 +548,7 @@ def _record_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
 
     output_schema = record(inner.output_schema)
     placeholder = record(unknown())
+    # Collection constructors start with empty metadata.
     return _CompoundCodecSchema[Any, Any](
         _codec_transform(placeholder, decode_values),
         _encode_node=_codec_transform(placeholder, encode_values),
@@ -555,7 +556,6 @@ def _record_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
         _output_schema=output_schema,
         _json_output_schema=record(_json_output_schema_for(inner)),
         _inner=output_schema,
-        _meta=inner._meta,
     )
 
 
@@ -666,6 +666,8 @@ def _union_codec(options: Sequence[Schema[Any, Any]]) -> CodecSchema[Any, Any]:
 
     output_schema = union(*(branch.output_schema for branch in branches))
     placeholder = unknown().optional()
+    # Composition constructors start with empty metadata; no single branch owns
+    # the container's title or description.
     return _CompoundCodecSchema[Any, Any](
         _codec_transform(placeholder, decode_value),
         _encode_node=_codec_transform(placeholder, encode_value),
@@ -716,6 +718,8 @@ def _tuple_codec(options: Sequence[Schema[Any, Any]]) -> CodecSchema[Any, Any]:
 
     output_schema = tuple(*(branch.output_schema for branch in branches))
     placeholder = tuple(*(unknown() for _ in branches))
+    # Composition constructors start with empty metadata; no single branch owns
+    # the container's title or description.
     return _CompoundCodecSchema[Any, Any](
         _codec_transform(placeholder, decode_values),
         _encode_node=_codec_transform(placeholder, encode_values),
@@ -837,10 +841,7 @@ class _Codecs:
         if not isinstance(codec, CodecSchema):
             raise TypeError("array expects a codec")
         result = _array_codec(codec)
-        return cast(
-            CodecSchema[list[Out], list[In]],
-            replace(result, _meta=codec._meta),
-        )
+        return cast(CodecSchema[list[Out], list[In]], result)
 
     @staticmethod
     def union(

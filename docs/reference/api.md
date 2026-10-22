@@ -282,7 +282,10 @@ Metadata is a read-only mapping. `.meta()` merges keys and overrides existing
 ones; `.describe()` replaces `description`. Metadata follows value-preserving
 derivations such as constraints, refinements, transforms, wrappers, and object
 structural methods. Collection and composition constructors start with empty
-metadata. Metadata does not affect validation, equality, or hashing.
+metadata. Codec combinators follow the same rule: `z.codecs.array`,
+`codec.record()`, `z.codecs.union`, and `z.codecs.tuple` start empty, while
+`optional`, `nonoptional`, `nullable`, and `nullish` preserve the wrapped
+codec's metadata. Metadata does not affect validation, equality, or hashing.
 
 Container and composition schemas retain their children:
 

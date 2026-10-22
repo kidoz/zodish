@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Codec collection and composition combinators (`z.codecs.array`,
+  `.record()`, `z.codecs.union`, and `z.codecs.tuple`) now start with empty
+  metadata, matching the plain collection constructors. Wrapper combinators
+  still preserve metadata.
 - Split the JSON Schema exporter, codec layer, error/result types, and schema
   core into private modules; the public `zodish.schemas` surface is unchanged.
 - Synchronous and asynchronous evaluators now share `super_refine`,

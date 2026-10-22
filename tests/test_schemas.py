@@ -2410,6 +2410,35 @@ class SchemaTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             z.codecs.tuple("not a schema")
 
+    def test_codec_combinator_metadata(self):
+        codec = z.codecs.iso_date().meta({"title": "Date"})
+        self.assertEqual(codec.metadata, {"title": "Date"})
+
+        # Collection and composition constructors start empty, matching the
+        # plain array/record/union/tuple builders.
+        self.assertEqual(z.codecs.array(codec).metadata, {})
+        self.assertEqual(codec.record().metadata, {})
+        self.assertEqual(z.codecs.union(codec, z.string()).metadata, {})
+        self.assertEqual(z.codecs.tuple(codec, z.string()).metadata, {})
+
+        # Wrappers describe the same value and preserve metadata.
+        for wrapped in (
+            codec.optional(),
+            codec.nonoptional(),
+            codec.nullable(),
+            codec.nullish(),
+        ):
+            self.assertEqual(wrapped.metadata, {"title": "Date"})
+
+        self.assertEqual(
+            z.codecs.array(codec).meta({"title": "Dates"}).metadata,
+            {"title": "Dates"},
+        )
+        self.assertEqual(
+            codec.record().meta({"title": "By name"}).metadata,
+            {"title": "By name"},
+        )
+
     def test_codec_composition_runs_callbacks_once(self):
         input_calls: list[str] = []
         output_calls: list[str] = []

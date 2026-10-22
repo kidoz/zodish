@@ -806,6 +806,36 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
             await tuple_codec.encode_async((8, "x")), ("8", "x"),
         )
 
+    async def test_async_codec_combinator_metadata(self):
+        async def decode(value):
+            return int(value)
+
+        async def encode(value):
+            return str(value)
+
+        codec = z.codec_async(
+            z.string(), z.integer(), decode=decode, encode=encode,
+        ).meta({"title": "Async"})
+        self.assertEqual(codec.metadata, {"title": "Async"})
+
+        self.assertEqual(z.codecs.array(codec).metadata, {})
+        self.assertEqual(codec.record().metadata, {})
+        self.assertEqual(z.codecs.union(codec, z.string()).metadata, {})
+        self.assertEqual(z.codecs.tuple(codec, z.string()).metadata, {})
+
+        for wrapped in (
+            codec.optional(),
+            codec.nonoptional(),
+            codec.nullable(),
+            codec.nullish(),
+        ):
+            self.assertEqual(wrapped.metadata, {"title": "Async"})
+
+        self.assertEqual(
+            z.codecs.array(codec).meta({"title": "Items"}).metadata,
+            {"title": "Items"},
+        )
+
     async def test_async_encoding_and_reversibility(self):
         async def decode(value):
             return int(value)
