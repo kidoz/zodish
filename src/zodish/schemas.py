@@ -1547,14 +1547,6 @@ class ValidatedModel:
         io: JSONSchemaIO = "output",
         unrepresentable: UnrepresentablePolicy = "throw",
     ) -> JSONSchema:
-        from ._validated_dataclasses import marker_for
-
-        marker = marker_for(cls)
-        if marker is not None and marker.recursive:
-            raise TypeError(
-                "Recursive validated dataclasses do not support JSON Schema "
-                "export yet",
-            )
         return cast(
             JSONSchema,
             _validated_model_codec(cls).to_json_schema(

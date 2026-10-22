@@ -69,6 +69,7 @@ from .schemas import (
     decimal,
     instance_of,
     json,
+    lazy,
     object,
     path,
     record,
@@ -458,6 +459,157 @@ def _json_output_schema_for(schema: Schema[Any, Any]) -> Schema[Any, Any]:
     if isinstance(schema, CodecSchema):
         return schema.output_schema
     return schema
+
+
+def _replace_json_class_ref(
+    schema: Schema[Any, Any],
+    cls: type[Any],
+    replacement: Schema[Any, Any],
+) -> Schema[Any, Any]:
+    """Replace ``instance_of(cls)`` with a recursive JSON ``$ref`` schema."""
+    node = schema._node
+    if (
+        node.kind == "instance"
+        and node.args
+        and node.args[0] is cls
+    ):
+        return replacement
+    if isinstance(schema, ArraySchema):
+        item = _replace_json_class_ref(schema.item, cls, replacement)
+        return schema if item is schema.item else replace(schema, item=item)
+    if isinstance(schema, SetSchema):
+        item = _replace_json_class_ref(schema.item, cls, replacement)
+        return schema if item is schema.item else replace(schema, item=item)
+    if isinstance(schema, RecordSchema):
+        value = _replace_json_class_ref(
+            schema.value_schema, cls, replacement,
+        )
+        return (
+            schema
+            if value is schema.value_schema
+            else replace(schema, value_schema=value)
+        )
+    if isinstance(schema, KeyedRecordSchema):
+        key = _replace_json_class_ref(schema.key_schema, cls, replacement)
+        value = _replace_json_class_ref(
+            schema.value_schema, cls, replacement,
+        )
+        return (
+            schema
+            if key is schema.key_schema and value is schema.value_schema
+            else replace(schema, key_schema=key, value_schema=value)
+        )
+    if isinstance(schema, MapSchema):
+        key = _replace_json_class_ref(schema.key_schema, cls, replacement)
+        value = _replace_json_class_ref(
+            schema.value_schema, cls, replacement,
+        )
+        return (
+            schema
+            if key is schema.key_schema and value is schema.value_schema
+            else replace(schema, key_schema=key, value_schema=value)
+        )
+    if isinstance(schema, TupleSchema):
+        items = builtins.tuple(
+            _replace_json_class_ref(item, cls, replacement)
+            for item in schema.items
+        )
+        rest = (
+            None
+            if schema._rest is None
+            else _replace_json_class_ref(schema._rest, cls, replacement)
+        )
+        if all(
+            new is old
+            for new, old in zip(items, schema.items, strict=True)
+        ) and rest is schema._rest:
+            return schema
+        return replace(schema, items=items, _rest=rest)
+    if isinstance(schema, UnionSchema):
+        options = builtins.tuple(
+            _replace_json_class_ref(option, cls, replacement)
+            for option in schema.options
+        )
+        if all(
+            new is old
+            for new, old in zip(options, schema.options, strict=True)
+        ):
+            return schema
+        return replace(schema, options=options)
+    if isinstance(schema, ObjectSchema):
+        shape = {
+            key: _replace_json_class_ref(value, cls, replacement)
+            for key, value in schema.shape.items()
+        }
+        catchall = (
+            None
+            if schema._catchall is None
+            else _replace_json_class_ref(
+                schema._catchall, cls, replacement,
+            )
+        )
+        if (
+            all(
+                shape[key] is schema.shape[key]
+                for key in shape
+            )
+            and catchall is schema._catchall
+        ):
+            return schema
+        return replace(schema, shape=shape, _catchall=catchall)
+    if isinstance(schema, DiscriminatedUnionSchema):
+        option_map = {
+            key: _replace_json_class_ref(value, cls, replacement)
+            for key, value in schema.options.items()
+        }
+        if all(
+            option_map[key] is schema.options[key]
+            for key in option_map
+        ):
+            return schema
+        return replace(schema, options=option_map)
+    if isinstance(schema, IntersectionSchema):
+        left = _replace_json_class_ref(schema.left, cls, replacement)
+        right = _replace_json_class_ref(schema.right, cls, replacement)
+        return (
+            schema
+            if left is schema.left and right is schema.right
+            else replace(schema, left=left, right=right)
+        )
+    if schema._inner is not None:
+        inner = _replace_json_class_ref(schema._inner, cls, replacement)
+        return schema if inner is schema._inner else replace(schema, _inner=inner)
+    return schema
+
+
+def _node_has_async_without_lazy(node: NativeSchema) -> bool:
+    """Detect async callbacks while ignoring lazy recursion placeholders."""
+    if node.kind == "lazy":
+        return False
+    if node.kind.startswith("async_"):
+        return True
+    if builtins.any(
+        _node_has_async_without_lazy(child) for child in node.children
+    ):
+        return True
+    for arg in node.args:
+        if isinstance(arg, NativeSchema):
+            if _node_has_async_without_lazy(arg):
+                return True
+        elif isinstance(arg, (builtins.tuple, builtins.list)):
+            if builtins.any(
+                isinstance(item, NativeSchema)
+                and _node_has_async_without_lazy(item)
+                for item in arg
+            ):
+                return True
+        elif isinstance(arg, Mapping) and builtins.any(
+            isinstance(item, NativeSchema)
+            and _node_has_async_without_lazy(item)
+            for item in arg.values()
+        ):
+            return True
+    return False
 
 
 def _identity_codec(schema: Schema[Any, Any]) -> CodecSchema[Any, Any]:
@@ -965,19 +1117,54 @@ class _Codecs:
         hints = dataclass_type_hints(cls) if missing else {}
 
         recursion_holder: dict[str, Any] = {}
+        json_holder: dict[str, Any] = {}
+        lazy_output: Schema[Any, Any] | None = None
         recursive_codec: CodecSchema[Any, Any] | None = None
         if marker is not None and marker.recursive:
+            json_id = f"{cls.__module__}.{cls.__qualname__}"
+            lazy_input = lazy(
+                lambda: json_holder["input_schema"],
+            ).meta({"id": json_id})
+            lazy_output = lazy(
+                lambda: json_holder["output_json_schema"],
+            ).meta({"id": json_id})
+            output_placeholder = instance_of(cls)
+
             def decode_recursive(value: Any) -> Any:
                 return recursion_holder["codec"].decode(value)
 
             def encode_recursive(value: Any) -> Any:
                 return recursion_holder["codec"].encode(value)
 
-            recursive_codec = codec(
-                unknown(),
-                instance_of(cls),
-                decode=decode_recursive,
-                encode=encode_recursive,
+            recursive_codec = _CompoundCodecSchema[Any, Any](
+                NativeSchema(
+                    "pipe",
+                    (
+                        NativeSchema(
+                            "transform",
+                            (lazy_input._node,),
+                            (decode_recursive,),
+                        ),
+                        output_placeholder._node,
+                    ),
+                    (),
+                ),
+                _encode_node=NativeSchema(
+                    "pipe",
+                    (
+                        NativeSchema(
+                            "transform",
+                            (output_placeholder._node,),
+                            (encode_recursive,),
+                        ),
+                        lazy_input._node,
+                    ),
+                    (),
+                ),
+                _input_schema=lazy_input,
+                _output_schema=output_placeholder,
+                _json_output_schema=lazy_output,
+                _inner=output_placeholder,
             )
 
         schemas_by_name: dict[str, Schema[Any, Any]] = {}
@@ -1047,6 +1234,10 @@ class _Codecs:
         output_shape = {}
         for name in stored_names:
             field_output = _json_output_schema_for(schemas_by_name[name])
+            if recursive_codec is not None and lazy_output is not None:
+                field_output = _replace_json_class_ref(
+                    field_output, cls, lazy_output,
+                )
             output_shape[name] = (
                 field_output.nonoptional()
                 if has_default[name]
@@ -1252,18 +1443,36 @@ class _Codecs:
                 raise ValidationError(issues)
             return encoded
 
-        decode_async_needed = any(
-            isinstance(schema, CodecSchema) and schema._node.has_async
-            for schema in schemas_by_name.values()
-        )
-        encode_async_needed = any(
-            (
-                schema._encode_node.has_async
-                if isinstance(schema, CodecSchema)
-                else schema._node.has_async
+        if recursive_codec is None:
+            decode_async_needed = any(
+                isinstance(schema, CodecSchema) and schema._node.has_async
+                for schema in schemas_by_name.values()
             )
-            for schema in (schemas_by_name[name] for name in stored_names)
-        )
+            encode_async_needed = any(
+                (
+                    schema._encode_node.has_async
+                    if isinstance(schema, CodecSchema)
+                    else schema._node.has_async
+                )
+                for schema in (
+                    schemas_by_name[name] for name in stored_names
+                )
+            )
+        else:
+            decode_async_needed = any(
+                _node_has_async_without_lazy(schema._node)
+                for schema in schemas_by_name.values()
+            )
+            encode_async_needed = any(
+                _node_has_async_without_lazy(
+                    schema._encode_node
+                    if isinstance(schema, CodecSchema)
+                    else schema._node,
+                )
+                for schema in (
+                    schemas_by_name[name] for name in stored_names
+                )
+            )
         if recursive_codec is not None and (
             decode_async_needed or encode_async_needed
         ):
@@ -1297,6 +1506,8 @@ class _Codecs:
         )
         if recursive_codec is not None:
             recursion_holder["codec"] = result
+            json_holder["input_schema"] = input_schema
+            json_holder["output_json_schema"] = output_json_schema
         return result
 
 

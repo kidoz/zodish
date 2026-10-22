@@ -4156,10 +4156,24 @@ class SchemaTests(unittest.TestCase):
         with self.assertRaises(ValidationError) as caught:
             Node.parse({"value": 1, "child": {"value": "wrong"}})
         self.assertEqual(caught.exception.issues[0].path, ("child", "value"))
-        with self.assertRaisesRegex(
-            TypeError, "Recursive validated dataclasses",
-        ):
-            Node.to_json_schema()
+        node_schema = Node.to_json_schema()
+        child_schema = node_schema["properties"]["child"]["anyOf"]
+        self.assertTrue(child_schema[0]["$ref"].startswith("#/$defs/"))
+        self.assertEqual(child_schema[1], {"type": "null"})
+        self.assertEqual(len(node_schema["$defs"]), 1)
+        node_definition = next(iter(node_schema["$defs"].values()))
+        self.assertEqual(
+            node_definition["properties"]["child"]["anyOf"][0]["$ref"],
+            child_schema[0]["$ref"],
+        )
+        self.assertIn(
+            "child",
+            Node.to_json_schema(io="input")["properties"],
+        )
+        self.assertNotIn(
+            "child",
+            Node.to_json_schema(io="input").get("required", []),
+        )
 
         @z.dataclass
         class Tree:
@@ -4191,8 +4205,15 @@ class SchemaTests(unittest.TestCase):
                 ],
             },
         )
-        with self.assertRaises(TypeError):
-            Tree.to_json_schema()
+        tree_schema = Tree.to_json_schema()
+        self.assertEqual(
+            tree_schema["properties"]["children"]["type"], "array",
+        )
+        self.assertTrue(
+            tree_schema["properties"]["children"]["items"]["$ref"].startswith(
+                "#/$defs/",
+            ),
+        )
 
         @z.dataclass
         class Parent:
@@ -4210,8 +4231,11 @@ class SchemaTests(unittest.TestCase):
             Parent.encode(parsed_parent),
             {"root": {"value": 7, "child": {"value": 8, "child": None}}},
         )
-        with self.assertRaises(TypeError):
-            Parent.to_json_schema()
+        parent_schema = Parent.to_json_schema()
+        self.assertEqual(
+            parent_schema["properties"]["root"]["type"], "object",
+        )
+        self.assertIn("$defs", parent_schema)
 
         @z.dataclass
         class SubNode(Node):
@@ -4233,8 +4257,10 @@ class SchemaTests(unittest.TestCase):
             SubNode.encode(parsed_sub),
             {"value": 1, "child": {"value": 2, "child": None}, "extra": 3},
         )
-        with self.assertRaises(TypeError):
-            SubNode.to_json_schema()
+        sub_schema = SubNode.to_json_schema()
+        self.assertEqual(
+            set(sub_schema["properties"]), {"value", "child", "extra"},
+        )
 
         @z.dataclass(validate_assignment=True)
         class AssignNode:
@@ -4272,8 +4298,8 @@ class SchemaTests(unittest.TestCase):
             GenericNode.encode(parsed_generic),
             {"value": 1, "child": {"value": 2, "child": None}},
         )
-        with self.assertRaises(TypeError):
-            GenericNode.to_json_schema()
+        generic_schema = GenericNode.to_json_schema()
+        self.assertIn("child", generic_schema["properties"])
 
     def test_validated_dataclass_multiple_bases(self):
         @dataclasses.dataclass
