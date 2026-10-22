@@ -14,14 +14,39 @@ native build profile.
 from __future__ import annotations
 
 import argparse
+import dataclasses
+import datetime as dt
 import json
 import statistics
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Annotated, Any, Protocol
 
-from zodish import Schema, z
+from zodish import Failure, Schema, Success, ValidationError, z
+
+
+class _Parser(Protocol):
+    """The subset of the schema protocol the harness drives."""
+
+    def parse(self, value: Any) -> Any: ...
+    def safe_parse(self, value: Any) -> Success[Any] | Failure: ...
+
+
+class _Operation:
+    """Present one callable (constructor, codec encode) as a parser."""
+
+    def __init__(self, call: Callable[[Any], Any]) -> None:
+        self._call = call
+
+    def parse(self, value: Any) -> Any:
+        return self._call(value)
+
+    def safe_parse(self, value: Any) -> Success[Any] | Failure:
+        try:
+            return Success(self._call(value))
+        except ValidationError as error:
+            return Failure(error)
 
 
 def _inspect_failure(result: Any) -> Any:
@@ -32,7 +57,7 @@ def _inspect_failure(result: Any) -> Any:
 @dataclass(frozen=True)
 class Scenario:
     name: str
-    schema: Schema[Any, Any]
+    schema: _Parser
     payload: Any
     iterations: int
     expect_failure: bool = False
@@ -65,6 +90,24 @@ def scenarios() -> list[Scenario]:
             "tags": z.string().array(),
         }
     )
+
+    @z.dataclass
+    class BenchUser:
+        id: int
+        name: Annotated[str, z.string().trim().min(1)]
+        created: Annotated[dt.datetime, z.codecs.iso_datetime()]
+        tags: list[str] = dataclasses.field(default_factory=list)
+
+    user_codec = z.codecs.dataclass(BenchUser)
+    user_created = dt.datetime(2026, 1, 1, 12, 30, tzinfo=dt.UTC)
+    user_kwargs: dict[str, Any] = {"id": 1, "name": "Alex", "created": user_created}
+    user_instance = BenchUser(**user_kwargs)
+    user_payload = {
+        "id": 1,
+        "name": " Alex ",
+        "created": "2026-01-01T12:30:00Z",
+    }
+
     branches = [
         z.object({"kind": z.literal(kind), "value": z.integer()})
         for kind in ("created", "updated", "deleted", "archived")
@@ -112,6 +155,19 @@ def scenarios() -> list[Scenario]:
             "union_last",
             z.union(*branches),
             {"kind": "archived", "value": 1},
+            5_000,
+        ),
+        Scenario(
+            "dataclass_construct",
+            _Operation(lambda kwargs: BenchUser(**kwargs)),
+            user_kwargs,
+            5_000,
+        ),
+        Scenario("dataclass_decode", user_codec, user_payload, 5_000),
+        Scenario(
+            "dataclass_encode",
+            _Operation(user_codec.encode),
+            user_instance,
             5_000,
         ),
         Scenario("recursive_tree", recursive, tree(4), 1_000),
