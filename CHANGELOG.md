@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bases. Unbound class type parameters validate as `Any`; decorated
   parameterized subclasses substitute concrete type arguments into inherited
   fields and codecs. Variadic generic parameters remain unsupported.
+- Self-referential validated dataclasses support direct construction with
+  nested instances, including `Node | None`, `list[Node]`, frozen/slots,
+  assignment validation, and deferred annotations. Recursive classes and
+  validated classes containing recursive fields reject codec decoding/encoding
+  and generated classmethods; construct nested instances directly.
 - Validated dataclasses support one or more dataclass bases (ordinary or
   validated), including diamond inheritance, plus non-dataclass mixins, field
   overrides/additions, inherited defaults/factories, `__post_init__`,

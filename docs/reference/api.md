@@ -323,11 +323,17 @@ with the subclass's annotations. Parameterized dataclass bases bind concrete
 type arguments into inherited fields; a generic class's own unbound type
 parameters validate as `Any`. Use a decorated parameterized subclass such as
 `class IntBox(Box[int])` for concrete runtime validation; `Box[int](...)` itself
-cannot see the runtime type argument. Variadic generic parameters and recursive
-self-references are rejected, as are bases with the `init=False` option or a
-custom `__init__`. An undecorated subclass is not validated; the codec rejects
+cannot see the runtime type argument. Variadic generic parameters are rejected,
+as are bases with the `init=False` option or a custom `__init__`. An undecorated subclass is not validated; the codec rejects
 it, and stdlib `@dataclasses.dataclass` on the subclass does not restore
 validation. Decorate the subclass with `@z.dataclass`.
+
+Self-referential fields such as `Node | None` or `list[Node]` are supported for
+direct construction; nested values must be already-validated instances. A
+recursive class, and any validated class containing a recursive field, rejects
+`z.codecs.dataclass(Cls)` and generated classmethods such as `parse`, `encode`,
+and `to_json_schema` with `TypeError`. Construct nested instances directly for
+those models. Deferred and quoted self-references resolve during decoration.
 
 Supported options include `frozen`, `slots`, `weakref_slot=True` with slots,
 `kw_only`, `repr`, `eq`, `order`, `unsafe_hash`, and `match_args`. A

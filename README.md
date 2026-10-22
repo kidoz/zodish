@@ -443,13 +443,16 @@ options, `InitVar` and `init=False` fields, a `__post_init__` matching the
 InitVar parameters, and one or more dataclass bases (ordinary or validated)
 plus non-dataclass mixins. Standard dataclass MRO field-order and
 duplicate-field rules apply. Custom `__init__`/`__new__`/`__setattr__`,
-dataclass-level `init=False`, variadic generic classes/bases, recursive
-self-references, undecorated subclasses, `transform`/`coerce`/`stringbool`/
-`pipe` field schemas, and async field schemas without `async_fields=True` are
-rejected. Generic classes bind
+dataclass-level `init=False`, variadic generic classes/bases, undecorated
+subclasses, `transform`/`coerce`/`stringbool`/`pipe` field schemas, and async
+field schemas without `async_fields=True` are rejected. Generic classes bind
 unbound type parameters to `Any`; a decorated parameterized subclass such as
 `class IntBox(Box[int])` substitutes concrete type arguments into inherited
-fields. `Box[int](...)` itself cannot see the runtime type argument. InitVar values are validated and passed to `__post_init__` but
+fields. `Box[int](...)` itself cannot see the runtime type argument.
+Self-referential validated classes such as trees are supported for direct
+construction with nested instances; recursive classes and validated classes
+containing recursive fields do not support codec decoding/encoding or generated
+classmethods. InitVar values are validated and passed to `__post_init__` but
 not stored or encoded; defaulted `init=False` fields are validated before
 post-init. Use `.overwrite()` for type-preserving normalization or a codec for
 type-changing conversions.

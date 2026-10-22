@@ -265,11 +265,31 @@ concrete type arguments into inherited fields; a generic validated class's own
 unbound type parameters validate as `Any`. Use a decorated parameterized
 subclass such as `class IntBox(Box[int])` for concrete runtime validation;
 `Box[int](...)` itself cannot see the runtime type argument. Variadic generic
-parameters and recursive self-references are rejected, as are bases with the
-`init=False` option or a custom `__init__`. An undecorated subclass of a
-validated class is not validated; the codec rejects it, and applying stdlib
+parameters are rejected, as are bases with the `init=False` option or a custom
+`__init__`. An undecorated subclass of a validated class is not validated; the
+codec rejects it, and applying stdlib
 `@dataclasses.dataclass` to it does not restore validation. Decorate the
 subclass with `@z.dataclass` to validate its fields.
+
+Self-referential fields such as `Node | None` or `list[Node]` are supported for
+direct construction. Recursive constructor values are already-validated
+instances, not encoded dictionaries:
+
+```python
+@z.dataclass
+class Node:
+    value: int
+    child: Node | None = None
+
+
+Node(1, Node(2))
+```
+
+Recursive classes and validated classes containing recursive fields do not
+support codec decoding/encoding or generated classmethods such as `parse`,
+`encode`, and `to_json_schema`; `z.codecs.dataclass(Cls)` raises `TypeError`.
+Construct nested instances directly for those models. Deferred and quoted
+self-references are resolved during decoration.
 
 `@z.dataclass` uses `dataclass_transform`, so type checkers see typed
 constructor arguments and attributes. Literal `frozen=True` and `kw_only=True`
