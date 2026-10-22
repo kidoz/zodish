@@ -10,6 +10,12 @@ import unittest
 import weakref
 
 from zodish import MISSING, Failure, Issue, ValidationError, _native, z
+from zodish._boundary import (
+    _issue_conforms,
+    _schema_conforms,
+    _validation_error_conforms,
+)
+from zodish._errors import _issue_from_raw
 
 
 class NativeTests(unittest.TestCase):
@@ -440,6 +446,33 @@ class NativeTests(unittest.TestCase):
         circular = z.lazy(lambda: circular)
         with self.assertRaises(RecursionError):
             circular.parse(1)
+
+    def test_native_python_boundary_contract(self):
+        issue = Issue("custom", "x", path=("field",), params={"values": [1]})
+        self.assertIs(_issue_conforms(issue), issue)
+        self.assertIsInstance(_native.NativeIssueBundle, type)
+
+        raw = ("custom", "x", ("field",), (), {"values": [1]})
+        rebuilt = _issue_from_raw(raw)
+        self.assertEqual(
+            (
+                rebuilt.code,
+                rebuilt.message,
+                rebuilt.path,
+                rebuilt.branches,
+                dict(rebuilt.params),
+            ),
+            ("custom", "x", ("field",), (), {"values": [1]}),
+        )
+
+        error = z.string().safe_parse(1).error
+        self.assertIs(_validation_error_conforms(error), error)
+        self.assertTrue(callable(error._from_bundle))
+        self.assertIsInstance(error.issues, tuple)
+
+        schema = z.string()
+        self.assertIs(_schema_conforms(schema), schema)
+        self.assertIsInstance(schema._node, _native.NativeSchema)
 
     def test_cyclic_issue_branches_raise_recursion_error(self):
         issue = Issue("custom", "boom")

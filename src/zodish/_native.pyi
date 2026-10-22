@@ -21,6 +21,9 @@ class NativeSchema:
     ) -> Any: ...
     def parse_json(self, data: str | bytes | bytearray) -> tuple[bool, Any]: ...
 
+class NativeIssueBundle:
+    def to_raw(self) -> tuple[tuple[Any, ...], ...]: ...
+
 class AsyncSession:
     def __init__(
         self,

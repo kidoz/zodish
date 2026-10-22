@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 WHEEL_REQUIRED = {
     "zodish/__init__.py",
     "zodish/_annotations.py",
+    "zodish/_boundary.py",
     "zodish/_codecs.py",
     "zodish/_core.py",
     "zodish/_errors.py",
@@ -50,6 +51,7 @@ SDIST_REQUIRED = {
     "rust/values.rs",
     "src/zodish/__init__.py",
     "src/zodish/_annotations.py",
+    "src/zodish/_boundary.py",
     "src/zodish/_codecs.py",
     "src/zodish/_core.py",
     "src/zodish/_errors.py",

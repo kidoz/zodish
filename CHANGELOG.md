@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a single Rust kind registry covering operation names, arity, and
   async/primitive/JSON-fast capability flags; schema-kind bookkeeping no longer
   duplicates those tables.
+- Documented and type-checked the Python shapes consumed by the native
+  evaluator (`_node`, `Issue` fields, `ValidationError.issues`/`_from_bundle`,
+  and raw issue tuples) in `zodish/_boundary.py`.
 - Release workflows pin third-party actions to commit SHAs, attest build
   provenance for wheels and sdists, and require an explicit tag for manual
   publishes. Benchmark result snapshots are excluded from the sdist, and the
