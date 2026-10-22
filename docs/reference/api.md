@@ -289,11 +289,18 @@ Inferred schemas are trusted. An optional field schema without a dataclass
 default, a `MISSING` default, `preprocess` schemas, `transform`, `coerce`,
 `stringbool`, and `pipe` schemas, lazy schemas whose async capability is not
 statically known, async construction, custom `__init__`, `__new__`, and
-`__setattr__`, `InitVar`, `init=False` fields, and inherited dataclass fields
-are rejected at decoration. Use `.overwrite()` for type-preserving
-normalization or a codec for type-changing conversions.
-Subclasses of validated classes are rejected by the codec; applying stdlib
-`@dataclasses.dataclass` to a subclass does not restore validation.
+`__setattr__`, `InitVar`, and `init=False` fields are rejected at decoration.
+Use `.overwrite()` for type-preserving normalization or a codec for type-changing
+conversions.
+
+A validated class may inherit from one dataclass base chain (ordinary or
+validated) plus non-dataclass mixins. Inherited fields, defaults, factories,
+overrides, and `__post_init__` are validated with the subclass's annotations.
+Multiple dataclass bases, generic or parameterized bases, a base with
+`init=False` or a custom `__init__`, and inherited `InitVar`/`init=False` fields
+are rejected. An undecorated subclass is not validated; the codec rejects it,
+and stdlib `@dataclasses.dataclass` on the subclass does not restore validation.
+Decorate the subclass with `@z.dataclass`.
 
 Supported options include `frozen`, `slots`, `weakref_slot=True` with slots,
 `kw_only`, `repr`, `eq`, `order`, `unsafe_hash`, and `match_args`. A

@@ -439,11 +439,12 @@ User(name=" Alex ", age=30)  # normalized and validated
 Constructor arguments are decoded values; encoded input still uses
 `z.codecs.dataclass(User)`. Defaults and factories are validated once. The
 decorator supports ordinary dataclasses with `init=True`, frozen/slots/keyword-only
-options, and a zero-argument `__post_init__`; `InitVar`, `init=False`, custom
-`__init__`/`__new__`/`__setattr__`, inherited dataclass fields, `transform`/
-`coerce`/`stringbool`/`pipe` field schemas, and async construction are rejected.
-Use `.overwrite()` for type-preserving normalization or a codec for
-type-changing conversions.
+options, a zero-argument `__post_init__`, and one dataclass base chain (ordinary
+or validated) plus non-dataclass mixins. `InitVar`, `init=False`, custom
+`__init__`/`__new__`/`__setattr__`, multiple or generic dataclass bases,
+undecorated subclasses, `transform`/`coerce`/`stringbool`/`pipe` field schemas,
+and async construction are rejected. Use `.overwrite()` for type-preserving
+normalization or a codec for type-changing conversions.
 `dataclasses.replace()` revalidates; assignment, `copy`, and `pickle` bypass
 validation. See the
 [validated construction guide](docs/how-to/use-codecs.md#validate-direct-construction).

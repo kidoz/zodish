@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Validated dataclasses support one dataclass base chain (ordinary or
+  validated) plus non-dataclass mixins, including field overrides/additions,
+  inherited defaults/factories, `__post_init__`, frozen/slots, and codec
+  decoding. Multiple dataclass bases, generic bases, and undecorated subclasses
+  remain unsupported.
 - `@z.dataclass` validates direct dataclass construction, including defaults
   and default factories, and exposes typed constructors through
   `dataclass_transform`. Decoration-time checks reject unsupported dataclass

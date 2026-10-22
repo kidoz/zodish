@@ -234,14 +234,20 @@ Error behavior:
 The first slice supports ordinary dataclasses with `init=True`, defaults and
 default factories, `frozen`, `slots`, `weakref_slot=True` with slots,
 `kw_only`, and a zero-argument `__post_init__`. Custom `__init__`, `__new__`,
-and `__setattr__`; `InitVar`; `init=False` fields; inherited dataclass fields;
-`preprocess`; `transform`, `coerce`, `stringbool`, and `pipe` field schemas; and
-async construction are rejected at decoration. Use `.overwrite()` for
-type-preserving normalization or a codec for type-changing conversions. Lazy field schemas are also rejected because
-their async capability is not statically known. Subclasses of validated classes
-are not supported; the codec rejects them rather than inheriting the decode
-path, and applying stdlib `@dataclasses.dataclass` to a subclass does not restore
-validation for inherited fields.
+and `__setattr__`; `InitVar`; `init=False` fields; `preprocess`; `transform`,
+`coerce`, `stringbool`, and `pipe` field schemas; and async construction are
+rejected at decoration. Use `.overwrite()` for type-preserving normalization or
+a codec for type-changing conversions. Lazy field schemas are also rejected
+because their async capability is not statically known.
+
+A validated class may inherit from one dataclass base (ordinary or validated)
+plus non-dataclass mixins. Inherited fields, defaults, factories, overrides, and
+`__post_init__` are validated with the subclass's annotations. Multiple
+dataclass bases, generic or parameterized bases, a base with `init=False` or a
+custom `__init__`, and inherited `InitVar`/`init=False` fields are rejected.
+An undecorated subclass of a validated class is not validated; the codec rejects
+it, and applying stdlib `@dataclasses.dataclass` to it does not restore
+validation. Decorate the subclass with `@z.dataclass` to validate its fields.
 
 `@z.dataclass` uses `dataclass_transform`, so type checkers see typed
 constructor arguments and attributes. Literal `frozen=True` and `kw_only=True`
