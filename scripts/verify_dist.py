@@ -36,6 +36,7 @@ SDIST_REQUIRED = {
     "rust/session/composition.rs",
     "rust/session/containers.rs",
     "rust/session/dispatch.rs",
+    "rust/session/evaluate.rs",
     "rust/session/gc.rs",
     "rust/session/wrappers.rs",
     "rust/values.rs",

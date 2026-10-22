@@ -9,10 +9,14 @@ what it buys, and what it costs.
 the Python module. `rust/session.rs` owns `AsyncSession`, its frame/state types,
 token counter, Python methods, and GC lifecycle. Its fields stay private;
 suspended frames retain snapshots, callbacks, issues, and tracebacks.
-`rust/session/dispatch.rs` contains the execution loop, node evaluation, and
-frame dispatch. Only its `run` and `advance` entry points are visible to the
-session parent. `rust/session/wrappers.rs` contains catch, refinement,
-post-child, string-bool, and pipe continuations. Its six methods are visible
+`rust/session/dispatch.rs` contains the execution loop, outcome delivery, and
+frame routing. Only its `run` and `advance` entry points are visible to the
+session parent. `rust/session/evaluate.rs` owns async-aware node evaluation,
+continuation setup, lazy resolution, and routing of synchronous subtrees to the
+ordinary native evaluator. Its `eval_node` method has session visibility;
+frame/state storage and lifecycle remain in `session.rs`.
+`rust/session/wrappers.rs` contains catch, refinement, post-child, string-bool,
+and pipe continuations. Its six methods are visible
 within the session module; frame storage and lifecycle remain in `session.rs`.
 `rust/session/containers.rs` contains object, array/set/tuple, and record
 continuations, including snapshots,
@@ -24,7 +28,7 @@ Its six dispatch entry points have session visibility; outcome helpers stay
 private. Frame and stored-outcome types remain in `session.rs`.
 `rust/session/callbacks.rs` contains callback resumption, awaitability checking,
 pending-request creation, and callback-result interpretation. Its entry points
-have session visibility; dispatch and wrappers import the shared awaitability
+have session visibility; evaluation and wrappers import the shared awaitability
 checker directly. Pending/frame storage, the token counter, Python lifecycle methods,
 and GC hooks remain in `session.rs`. Wrapper continuations use the same
 awaitability checker and shared post-child checks. `rust/session/gc.rs` visits

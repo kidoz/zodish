@@ -1,7 +1,8 @@
 //! Rust-owned resumable validation sessions and their Python lifecycle.
 //! Frames retain snapshots, paths, issues, and callbacks across suspension.
-//! Execution and node/frame dispatch live in `dispatch`; synchronous subtrees
-//! reuse the schema evaluator and shared checks. Container continuations live
+//! Execution and frame routing live in `dispatch`; node evaluation lives in
+//! `evaluate`. Synchronous subtrees reuse the schema evaluator and shared checks.
+//! Container continuations live
 //! in `containers`, union/intersection continuations in `composition`; frame
 //! storage and Python lifecycle methods stay here. Callback resumption and
 //! awaitability checks live in `callbacks`; wrapper continuations in `wrappers`;
@@ -11,6 +12,7 @@ mod callbacks;
 mod composition;
 mod containers;
 mod dispatch;
+mod evaluate;
 mod gc;
 mod wrappers;
 
