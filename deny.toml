@@ -1,0 +1,32 @@
+# Dependency policy for the Rust crate graph.
+# Run `cargo deny check` locally; CI runs the same check on every push and pull
+# request. Update the license list deliberately when adding a dependency.
+
+[advisories]
+# Fail on yanked releases as well as open security advisories.
+yanked = "deny"
+ignore = []
+
+[licenses]
+# Only permissive licenses currently present in the dependency graph.
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "MIT",
+  "Unicode-3.0",
+  "Unlicense",
+]
+confidence-threshold = 0.8
+
+[bans]
+# Keep the dependency graph free of duplicate versions and wildcard
+# requirements. If a duplicate becomes unavoidable, add a justified `skip`.
+multiple-versions = "deny"
+wildcards = "deny"
+
+[sources]
+# Only crates.io is an allowed source; no git dependencies.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

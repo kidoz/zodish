@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- CI enforces a `deny.toml` dependency policy with `cargo deny`: security
+  advisories, yanked releases, allowed licenses, duplicate crate versions,
+  wildcard requirements, and registry sources are checked. Run the same check
+  locally with `cargo deny check` or `just rust-deny`.
 - `z.set` schemas now export as JSON Schema arrays with `uniqueItems: true`,
   map length constraints to `minItems`/`maxItems`, and reverse-encode to lists
   when their item schema is reversible.

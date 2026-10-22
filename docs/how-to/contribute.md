@@ -30,18 +30,21 @@ ruff check .
 mypy
 cargo fmt --check
 cargo clippy --locked -- -D warnings
+cargo deny check
 ```
 
 Ruff and strict mypy settings live in `pyproject.toml`; the `dev` dependency
 group installs both tools. `py.typed` is included for type checkers, and
-`Cargo.lock` pins Rust dependencies.
+`Cargo.lock` pins Rust dependencies. `deny.toml` defines the Rust dependency
+policy; install `cargo-deny` with `cargo install cargo-deny --locked` to run
+the check locally.
 
 If `just` is installed, the same workflows are available as recipes:
 
 ```bash
 just                  # list recipes
 just install          # install dependencies
-just check            # static checks (lint, mypy, rust fmt, clippy)
+just check            # static checks (lint, mypy, rust fmt, clippy, cargo deny)
 just ci               # static checks, tests, and examples
 just bench            # benchmark harness
 ```
@@ -78,7 +81,10 @@ other scenarios use `parse`. `--smoke` uses minimal counts for CI.
 
 The [CI workflow](https://github.com/kidoz/zodish/blob/main/.github/workflows/tests.yml)
 runs tests, the quickstart, and a benchmark smoke run on Ubuntu with Python 3.14
-and 3.15. Its packaging job builds the wheel and sdist on Ubuntu, macOS, and
+and 3.15. A `cargo-deny` job checks the Rust dependency graph for security
+advisories, yanked releases, disallowed licenses, duplicate versions, wildcard
+requirements, and unexpected registry sources. Its packaging job builds the
+wheel and sdist on Ubuntu, macOS, and
 Windows with Python 3.14, verifies both artifact contents, then installs each
 artifact and runs the test suite, quickstart, and native-extension check against
 it. The package job also re-runs the abi3 wheel smoke test under Python 3.15 on

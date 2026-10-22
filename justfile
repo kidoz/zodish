@@ -35,8 +35,12 @@ rust-fmt:
 rust-clippy:
     cargo clippy --locked -- -D warnings
 
-# Run all static checks (the CI lint job).
-check: lint typecheck rust-fmt rust-clippy
+# Check Rust dependencies for advisories, licenses, duplicates, and sources.
+rust-deny:
+    cargo deny check
+
+# Run all static checks (the CI lint and deny jobs).
+check: lint typecheck rust-fmt rust-clippy rust-deny
 
 # Run tests and examples after the static checks.
 ci: check test examples
