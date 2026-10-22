@@ -603,6 +603,10 @@ if TYPE_CHECKING:
     TypingCombined(left="x", right="x")  # type: ignore[arg-type]
 
 
+RuntimeModel = z.create_model("RuntimeModel", {"name": z.string()})
+assert_type(RuntimeModel, type[Any])
+
+
 @z.dataclass
 class TypedValidatedModel(z.ValidatedModel):
     name: str

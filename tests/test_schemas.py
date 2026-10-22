@@ -4158,6 +4158,142 @@ class SchemaTests(unittest.TestCase):
             {"value": 2, "extra": 0},
         )
 
+    def test_create_model(self):
+        User = z.create_model("User", {
+            "name": z.string().trim().min(1),
+            "age": z.integer().min(0),
+            "nickname": z.string().nullable(),
+        }, defaults={"nickname": None})
+
+        user = User(name=" Alex ", age=30)
+        self.assertEqual(user.name, "Alex")
+        self.assertEqual(user.age, 30)
+        self.assertIsNone(user.nickname)
+        self.assertEqual(User.__name__, "User")
+        self.assertEqual(User.__module__, __name__)
+        with self.assertRaises(TypeError):
+            User("Alex", 30)
+        with self.assertRaises(ValidationError):
+            User(name="", age=1)
+
+        self.assertEqual(
+            User.parse({"name": "Bob", "age": 1}),
+            User(name="Bob", age=1),
+        )
+        self.assertEqual(
+            User.encode(user),
+            {"name": "Alex", "age": 30, "nickname": None},
+        )
+        Event = z.create_model("Event", z.object({
+            "name": z.string().min(1),
+            "count": z.integer().default(0),
+        }))
+        event = Event(name="x")
+        self.assertEqual(event.count, 0)
+        self.assertEqual(Event.parse({"name": "y"}), Event(name="y"))
+        self.assertEqual(Event.encode(event), {"name": "x", "count": 0})
+        self.assertEqual(
+            Event.to_json_schema(io="input")["required"], ["name"],
+        )
+
+        Tags = z.create_model("Tags", {
+            "tags": z.string().array().default_factory(lambda: []),
+        })
+        first = Tags()
+        second = Tags()
+        first.tags.append("x")
+        self.assertEqual(first.tags, ["x"])
+        self.assertEqual(second.tags, [])
+
+        DefaultTags = z.create_model("DefaultTags", {
+            "values": z.string().array().default([]),
+        })
+        first_default = DefaultTags()
+        second_default = DefaultTags()
+        first_default.values.append("x")
+        self.assertEqual(first_default.values, ["x"])
+        self.assertEqual(second_default.values, [])
+
+        Maybe = z.create_model("Maybe", {
+            "value": z.integer().nullable(),
+        }, defaults={"value": None})
+        self.assertIsNone(Maybe().value)
+
+        Mutable = z.create_model("Mutable", {
+            "values": z.string().array(),
+        }, defaults={"values": []})
+        first_mutable = Mutable()
+        second_mutable = Mutable()
+        first_mutable.values.append("x")
+        self.assertEqual(first_mutable.values, ["x"])
+        self.assertEqual(second_mutable.values, [])
+
+        BadDefault = z.create_model("BadDefault", {
+            "value": z.integer().min(0),
+        }, defaults={"value": -1})
+        with self.assertRaises(ValidationError):
+            BadDefault()
+
+        Dynamic = z.create_model("Dynamic", {
+            "value": z.integer().min(0),
+        }, validate_assignment=True)
+        dynamic = Dynamic(value=1)
+        with self.assertRaises(ValidationError):
+            dynamic.value = -1
+
+        Frozen = z.create_model("Frozen", {
+            "value": z.integer(),
+        }, frozen=True)
+        frozen = Frozen(value=1)
+        with self.assertRaises(dataclasses.FrozenInstanceError):
+            frozen.value = 2
+
+        Slotted = z.create_model("Slotted", {
+            "value": z.integer(),
+        }, slots=True)
+        self.assertFalse(hasattr(Slotted(value=1), "__dict__"))
+
+        DateModel = z.create_model("DateModel", {
+            "when": z.codecs.iso_date(),
+        })
+        date_model = DateModel(when=dt.date(2026, 1, 1))
+        self.assertEqual(
+            DateModel.parse({"when": "2026-01-02"}).when,
+            dt.date(2026, 1, 2),
+        )
+        self.assertEqual(
+            DateModel.encode(date_model),
+            {"when": "2026-01-01"},
+        )
+
+        for call in (
+            lambda: z.create_model("bad name", {"x": z.integer()}),
+            lambda: z.create_model("Model", {"bad-name": z.integer()}),
+            lambda: z.create_model("Model", {"x": object()}),
+            lambda: z.create_model(
+                "Model", {"x": z.integer()}, defaults={"y": 1},
+            ),
+            lambda: z.create_model("Model", {"x": z.integer().optional()}),
+            lambda: z.create_model(
+                "Model", {"x": z.integer()}, defaults={"x": MISSING},
+            ),
+            lambda: z.create_model("Model", z.integer()),
+            lambda: z.create_model(
+                "Model", z.object({"x": z.integer()}).strict(),
+            ),
+            lambda: z.create_model(
+                "Model", z.object({"x": z.integer()}).catchall(z.integer()),
+            ),
+            lambda: z.create_model("Model", {"x": z.integer()}, init=False),
+            lambda: z.create_model(
+                "Model", {"x": z.integer()}, kw_only=False,
+            ),
+        ):
+            with self.subTest(call=call), self.assertRaises(
+                (TypeError, ValueError),
+            ):
+                call()
+
     def test_validated_dataclass_initvar(self):
         calls: list[str] = []
 

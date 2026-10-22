@@ -5,12 +5,15 @@ from __future__ import annotations
 import base64
 import binascii
 import builtins
+import copy
 import dataclasses
 import datetime as _datetime
 import decimal as _decimal
+import keyword
 import math
 import pathlib as _pathlib
 import re
+import sys
 import typing
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass as _dataclass
@@ -1590,6 +1593,142 @@ def dataclass[T](
     from ._validated_dataclasses import dataclass as _validated_dataclass
 
     return _validated_dataclass(cls, **options)
+
+
+def _schema_default_spec(
+    schema: Schema[Any, Any],
+) -> builtins.tuple[str, Any] | None:
+    node = schema._node
+    if node.kind == "default":
+        value = node.args[0]
+        if value is MISSING:
+            raise TypeError("Model field default cannot be MISSING")
+        return ("value", value)
+    if node.kind == "default_factory":
+        return ("factory", node.args[0])
+    return None
+
+
+def _copy_default(value: Any) -> Callable[[], Any]:
+    return lambda: copy.deepcopy(value)
+
+
+def _model_default_field(spec: builtins.tuple[str, Any]) -> Any:
+    kind, value = spec
+    if kind == "factory":
+        return field(default_factory=value)
+    return field(default_factory=_copy_default(value))
+
+
+def create_model(
+    name: str,
+    fields: Mapping[str, Schema[Any, Any]] | ObjectSchema,
+    *,
+    defaults: Mapping[str, Any] | None = None,
+    validate_assignment: bool | None = None,
+    **options: Any,
+) -> type[Any]:
+    """Create a validated dataclass from runtime field schemas.
+
+    ``fields`` is a mapping of Python field names to schemas, or a plain
+    ``z.object`` schema whose shape supplies the fields. Models are
+    keyword-only. ``defaults`` supplies decoded constructor defaults; a
+    top-level ``.default`` or ``.default_factory`` on a plain field schema is
+    also honored. For codec fields, supply the decoded default through
+    ``defaults``. Encoded input still uses ``z.codecs.dataclass(Model)`` or the
+    generated class methods.
+    """
+    if (
+        not isinstance(name, str)
+        or not name.isidentifier()
+        or keyword.iskeyword(name)
+    ):
+        raise ValueError("Model name must be a valid Python identifier")
+    if isinstance(fields, ObjectSchema):
+        if fields.unknown_keys != "strip" or fields._catchall is not None:
+            raise TypeError(
+                "create_model requires a plain strip object schema",
+            )
+        field_schemas = dict(fields.shape)
+    elif isinstance(fields, Mapping):
+        field_schemas = dict(fields)
+    else:
+        raise TypeError("Model fields must be a mapping or object schema")
+
+    for field_name, field_schema in field_schemas.items():
+        if (
+            not isinstance(field_name, str)
+            or not field_name.isidentifier()
+            or keyword.iskeyword(field_name)
+        ):
+            raise ValueError(
+                "Model field names must be valid Python identifiers",
+            )
+        if not isinstance(field_schema, Schema):
+            raise TypeError("Model fields must map names to schemas")
+
+    explicit_defaults = {} if defaults is None else dict(defaults)
+    if builtins.any(
+        not isinstance(key, str) for key in explicit_defaults
+    ):
+        raise ValueError("Model defaults must use string field names")
+    unknown_defaults = builtins.set(explicit_defaults) - builtins.set(
+        field_schemas,
+    )
+    if unknown_defaults:
+        raise ValueError(
+            "Unknown model defaults: "
+            + ", ".join(sorted(unknown_defaults)),
+        )
+
+    if options.pop("kw_only", True) is not True:
+        raise ValueError("create_model fields are keyword-only")
+    if options.get("init", True) is False:
+        raise ValueError("create_model requires init=True")
+
+    field_specs: list[Any] = []
+    for field_name, field_schema in field_schemas.items():
+        annotation = typing.Annotated[Any, field_schema]
+        default_spec: builtins.tuple[str, Any] | None
+        if field_name in explicit_defaults:
+            default_value = explicit_defaults[field_name]
+            if default_value is MISSING:
+                raise TypeError("Model field default cannot be MISSING")
+            default_spec = ("value", default_value)
+        else:
+            default_spec = _schema_default_spec(field_schema)
+        if default_spec is None:
+            if field_schema._node.kind == "optional":
+                raise ValueError(
+                    f"Model field {field_name!r} permits missing input; "
+                    "supply a default",
+                )
+            field_specs.append((field_name, annotation))
+        else:
+            field_specs.append((
+                field_name,
+                annotation,
+                _model_default_field(default_spec),
+            ))
+
+    module = sys._getframe(1).f_globals.get("__name__", "__main__")
+    dynamic = dataclasses.make_dataclass(
+        name,
+        field_specs,
+        namespace={"__module__": module},
+        kw_only=True,
+        **options,
+    )
+    dynamic.__module__ = module
+    from ._validated_dataclasses import dataclass as _validated_dataclass
+
+    return cast(
+        type[Any],
+        _validated_dataclass(
+            dynamic,
+            validate_assignment=validate_assignment,
+        ),
+    )
 
 
 def to_json_schema(
