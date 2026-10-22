@@ -449,10 +449,10 @@ field schemas without `async_fields=True` are rejected. Generic classes bind
 unbound type parameters to `Any`; a decorated parameterized subclass such as
 `class IntBox(Box[int])` substitutes concrete type arguments into inherited
 fields. `Box[int](...)` itself cannot see the runtime type argument.
-Self-referential validated classes such as trees are supported for direct
-construction with nested instances; recursive classes and validated classes
-containing recursive fields do not support codec decoding/encoding or generated
-classmethods. InitVar values are validated and passed to `__post_init__` but
+Self-referential validated classes such as trees support direct construction
+with nested instances and codec `parse`/`encode` with nested encoded
+dictionaries. Recursive JSON Schema export and async recursive codecs remain
+unsupported. InitVar values are validated and passed to `__post_init__` but
 not stored or encoded; defaulted `init=False` fields are validated before
 post-init. Use `.overwrite()` for type-preserving normalization or a codec for
 type-changing conversions.

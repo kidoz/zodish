@@ -285,11 +285,18 @@ class Node:
 Node(1, Node(2))
 ```
 
-Recursive classes and validated classes containing recursive fields do not
-support codec decoding/encoding or generated classmethods such as `parse`,
-`encode`, and `to_json_schema`; `z.codecs.dataclass(Cls)` raises `TypeError`.
-Construct nested instances directly for those models. Deferred and quoted
-self-references are resolved during decoration.
+Recursive classes and validated classes containing recursive fields support
+codec `parse`/`encode` and generated classmethods with nested encoded
+dictionaries:
+
+```python
+Node.parse({"value": 1, "child": {"value": 2}})
+Node.encode(Node(1, Node(2)))
+```
+
+`to_json_schema` raises `TypeError` for recursive classes, and recursive async
+codecs are not supported. Direct constructor values remain already-decoded
+instances. Deferred and quoted self-references are resolved during decoration.
 
 `@z.dataclass` uses `dataclass_transform`, so type checkers see typed
 constructor arguments and attributes. Literal `frozen=True` and `kw_only=True`
