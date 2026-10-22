@@ -450,8 +450,8 @@ unbound type parameters to `Any`; a decorated parameterized subclass such as
 `class IntBox(Box[int])` substitutes concrete type arguments into inherited
 fields. `Box[int](...)` itself cannot see the runtime type argument.
 Self-referential validated classes such as trees support direct construction
-with nested instances and codec `parse`/`encode` with nested encoded
-dictionaries. Recursive JSON Schema export and async recursive codecs remain
+with nested instances, codec `parse`/`encode` with nested encoded dictionaries,
+and JSON Schema export using `$ref`/definitions. Async recursive codecs remain
 unsupported. InitVar values are validated and passed to `__post_init__` but
 not stored or encoded; defaulted `init=False` fields are validated before
 post-init. Use `.overwrite()` for type-preserving normalization or a codec for

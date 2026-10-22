@@ -294,8 +294,8 @@ Node.parse({"value": 1, "child": {"value": 2}})
 Node.encode(Node(1, Node(2)))
 ```
 
-`to_json_schema` raises `TypeError` for recursive classes, and recursive async
-codecs are not supported. Direct constructor values remain already-decoded
+`to_json_schema` emits recursive `$ref` definitions for these models. Recursive
+async codecs are not supported. Direct constructor values remain already-decoded
 instances. Deferred and quoted self-references are resolved during decoration.
 
 `@z.dataclass` uses `dataclass_transform`, so type checkers see typed
