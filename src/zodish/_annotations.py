@@ -159,18 +159,25 @@ def infer_dataclass_field(
     *,
     stack: builtins.tuple[type[Any], ...],
     context: _DataclassAnnotation | None = None,
+    type_only: bool = False,
 ) -> _schemas.Schema[Any, Any]:
-    """Build a field schema while retaining alias bindings and dataclass ancestry."""
+    """Build a field schema while retaining alias bindings and dataclass ancestry.
+
+    ``type_only`` ignores ``Annotated`` schemas and compiles a type-shape guard
+    for already-decoded values instead of a conversion codec.
+    """
     context, metadata = _resolve_annotation(
         _DataclassAnnotation(annotation) if context is None
         else replace(context, annotation=annotation), name,
     )
-    if metadata:
+    if metadata and not type_only:
         return metadata[0]
     annotation = context.annotation
 
     def child(item: Any) -> _schemas.Schema[Any, Any]:
-        return infer_dataclass_field(item, name, stack=stack, context=context)
+        return infer_dataclass_field(
+            item, name, stack=stack, context=context, type_only=type_only,
+        )
 
     if annotation is Any or annotation is builtins.object:
         return _schemas.unknown()
@@ -192,10 +199,12 @@ def infer_dataclass_field(
             return _schemas.none()
         if len(options) == 1:
             combined: _schemas.Schema[Any, Any] = options[0]
-        elif any(isinstance(item, _codecs.CodecSchema) for item in options):
-            combined = _codecs._union_codec(options)
-        else:
+        elif type_only or not any(
+            isinstance(item, _codecs.CodecSchema) for item in options
+        ):
             combined = _schemas.union(*options)
+        else:
+            combined = _codecs._union_codec(options)
         if len(non_none) != len(args):
             combined = (
                 _codecs._nullable_codec(combined)
@@ -205,15 +214,15 @@ def infer_dataclass_field(
         return combined
     if origin is list or origin is Sequence:
         item = child(args[0]) if args else _schemas.unknown()
-        return (
-            _codecs._array_codec(item)
-            if isinstance(item, _codecs.CodecSchema)
-            else _schemas.array(item)
-        )
+        if type_only or not isinstance(item, _codecs.CodecSchema):
+            return _schemas.array(item)
+        return _codecs._array_codec(item)
     if origin is dict or origin is Mapping:
         if not args:
             return _schemas.record(_schemas.unknown())
         key_type, value_type = args[0], args[1]
+        if type_only:
+            return _schemas.record(child(key_type), child(value_type))
         key_context, key_metadata = _resolve_annotation(
             replace(context, annotation=key_type), name,
         )
@@ -227,30 +236,54 @@ def infer_dataclass_field(
             if isinstance(value, _codecs.CodecSchema)
             else _schemas.record(value)
         )
+    if type_only and origin is builtins.set:
+        return _schemas.set(child(args[0]) if args else _schemas.unknown())
+    if type_only and origin is builtins.frozenset:
+        return _schemas.instance_of(builtins.frozenset)
     if origin is builtins.tuple:
         if annotation is builtins.tuple:
+            if type_only:
+                return _schemas.instance_of(builtins.tuple)
             raise TypeError(
                 f"Field {name!r} uses a bare tuple annotation; "
                 "use fixed-length tuple[...] syntax",
             )
         if args and args[-1] is Ellipsis:
+            if type_only:
+                item = child(args[0]) if len(args) > 1 else _schemas.unknown()
+                return _schemas.instance_of(builtins.tuple).pipe(
+                    _schemas.tuple().rest(item),
+                )
             raise TypeError(
                 f"Field {name!r} uses a variable-length tuple; "
                 "use a fixed-length tuple[...] annotation",
             )
+        items_schema: _schemas.Schema[Any, Any]
         if not args:
-            return _schemas.tuple()
-        items = [child(item) for item in args]
-        return (
-            _codecs._tuple_codec(items)
-            if any(isinstance(item, _codecs.CodecSchema) for item in items)
-            else _schemas.tuple(*items)
-        )
+            items_schema = _schemas.tuple()
+        else:
+            items = [child(item) for item in args]
+            items_schema = (
+                _schemas.tuple(*items)
+                if type_only or not any(
+                    isinstance(item, _codecs.CodecSchema) for item in items
+                )
+                else _codecs._tuple_codec(items)
+            )
+        if type_only:
+            return _schemas.instance_of(builtins.tuple).pipe(items_schema)
+        return items_schema
     if annotation is list or annotation is Sequence:
         return _schemas.array(_schemas.unknown())
     if annotation is dict or annotation is Mapping:
         return _schemas.record(_schemas.unknown())
+    if type_only and annotation is builtins.set:
+        return _schemas.set(_schemas.unknown())
+    if type_only and annotation is builtins.frozenset:
+        return _schemas.instance_of(builtins.frozenset)
     if annotation is builtins.tuple:
+        if type_only:
+            return _schemas.instance_of(builtins.tuple)
         raise TypeError(
             f"Field {name!r} uses a bare tuple annotation; "
             "use fixed-length tuple[...] syntax",
@@ -263,32 +296,106 @@ def infer_dataclass_field(
             f"Cannot infer a schema for field {name!r}: "
             f"{annotation!r}",
         )
+    if type_only and typing.is_typeddict(annotation):
+        return _schemas.record(_schemas.unknown())
     if dataclasses.is_dataclass(annotation):
+        if type_only:
+            return _schemas.instance_of(annotation)
         return _codecs._Codecs.dataclass(annotation, _stack=stack)
     if issubclass(annotation, Enum):
         return _schemas.native_enum(annotation)
+    if annotation is bool:
+        return _schemas.boolean()
+    if annotation is int:
+        return _schemas.integer()
+    if annotation is float:
+        return _schemas.number()
+    if annotation is str:
+        return _schemas.string()
+    if annotation is builtins.bytes:
+        return _schemas.bytes()
+    if annotation is _datetime.datetime:
+        return _schemas.datetime()
+    if annotation is _datetime.date:
+        return _schemas.date()
+    if annotation is _datetime.time:
+        return _schemas.time()
+    if annotation is _datetime.timedelta:
+        return _schemas.timedelta()
+    if annotation is _decimal.Decimal:
+        return _schemas.decimal()
+    if annotation is _pathlib.PurePath:
+        return _schemas.path()
+    if type_only:
+        return _schemas.instance_of(annotation)
     if issubclass(annotation, bool):
         return _schemas.boolean()
     if issubclass(annotation, int):
-        return _schemas.integer()
+        return _schemas.instance_of(annotation)
     if issubclass(annotation, float):
-        return _schemas.number()
+        return _schemas.instance_of(annotation)
     if issubclass(annotation, str):
-        return _schemas.string()
+        return _schemas.instance_of(annotation)
     if issubclass(annotation, builtins.bytes):
-        return _schemas.bytes()
+        return _schemas.instance_of(annotation)
     if issubclass(annotation, _datetime.datetime):
-        return _schemas.datetime()
+        return _schemas.instance_of(annotation)
     if issubclass(annotation, _datetime.date):
-        return _schemas.date()
+        return _schemas.instance_of(annotation)
     if issubclass(annotation, _datetime.time):
-        return _schemas.time()
+        return _schemas.instance_of(annotation)
     if issubclass(annotation, _datetime.timedelta):
-        return _schemas.timedelta()
+        return _schemas.instance_of(annotation)
     if issubclass(annotation, _decimal.Decimal):
-        return _schemas.decimal()
+        return _schemas.instance_of(annotation)
     if issubclass(annotation, _pathlib.PurePath):
-        return _schemas.path()
+        return _schemas.instance_of(annotation)
     raise TypeError(
         f"Cannot infer a schema for field {name!r}: {annotation!r}",
     )
+
+
+def _has_nested_schema_metadata(
+    annotation: Any,
+    name: str,
+    context: _DataclassAnnotation | None = None,
+) -> bool:
+    context, metadata = _resolve_annotation(
+        _DataclassAnnotation(annotation) if context is None
+        else replace(context, annotation=annotation), name,
+    )
+    if metadata:
+        return True
+    annotation = context.annotation
+    supertype = getattr(annotation, "__supertype__", None)
+    if supertype is not None:
+        return _has_nested_schema_metadata(supertype, name, context)
+    if typing.get_origin(annotation) is typing.Literal:
+        return False
+    return builtins.any(
+        _has_nested_schema_metadata(item, name, context)
+        for item in typing.get_args(annotation)
+        if item is not Ellipsis
+    )
+
+
+def dataclass_field_schema(
+    annotation: Any,
+    name: str,
+    *,
+    stack: builtins.tuple[type[Any], ...],
+) -> builtins.tuple[_schemas.Schema[Any, Any], Any, bool]:
+    """Return the field schema, resolved annotation, and explicit-schema flag."""
+    context, metadata = _resolve_annotation(
+        _DataclassAnnotation(annotation), name,
+    )
+    if metadata:
+        schema = metadata[0]
+    else:
+        schema = infer_dataclass_field(
+            context.annotation, name, stack=stack, context=context,
+        )
+    explicit = bool(metadata) or _has_nested_schema_metadata(
+        context.annotation, name, context,
+    )
+    return schema, context.annotation, explicit

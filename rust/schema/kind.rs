@@ -140,6 +140,7 @@ define_kinds! {
     Coerce => ("coerce", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
     StringBool => ("string_bool", ChildArity::Exact(1), 4, false, false, JsonFast::Never),
     Preprocess => ("preprocess", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
+    OutputGuard => ("output_guard", ChildArity::Exact(2), 2, false, false, JsonFast::Never),
     Pipe => ("pipe", ChildArity::Exact(2), 0, false, false, JsonFast::Never),
     LengthMin => ("length_min", ChildArity::Exact(1), 2, false, false, JsonFast::InheritFirstChild),
     LengthMax => ("length_max", ChildArity::Exact(1), 2, false, false, JsonFast::InheritFirstChild),

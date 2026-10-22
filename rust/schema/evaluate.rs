@@ -199,6 +199,23 @@ impl NativeSchema {
                 let parsed = parsed.bind(py);
                 self.evaluate_post_child(ctx, parsed, path)
             }
+            Kind::OutputGuard => {
+                let parsed = self.child(0, ctx, value, path, depth)?;
+                let guard = self.children[1].try_borrow(py).map_err(PyErr::from)?;
+                match guard.validate(ctx, parsed.bind(py), path, depth + 1) {
+                    Ok(_) => Ok(parsed),
+                    Err(Error::Invalid(_)) => {
+                        let field: String = self.args[0].bind(py).extract()?;
+                        let expected: String = self.args[1].bind(py).extract()?;
+                        let actual = parsed.bind(py).get_type().name()?.to_string();
+                        Err(PyTypeError::new_err(format!(
+                            "field {field:?} produced {actual}, expected {expected}"
+                        ))
+                        .into())
+                    }
+                    Err(error) => Err(error),
+                }
+            }
             Kind::Pipe => {
                 let parsed = self.child(0, ctx, value, path, depth)?;
                 self.child(1, ctx, parsed.bind(py), path, depth)

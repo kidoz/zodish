@@ -6,6 +6,7 @@ import threading
 import unittest
 import weakref
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Annotated, NewType, NotRequired, TypedDict
 
 from zodish import MISSING, Failure, Issue, Success, ValidationError, z
@@ -834,6 +835,58 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             z.codecs.array(codec).meta({"title": "Items"}).metadata,
             {"title": "Items"},
+        )
+
+    async def test_validated_dataclass_rejects_async_field(self):
+        async def bump(value):
+            return value + 1
+
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class AsyncField:
+                value: Annotated[int, z.integer().transform_async(bump)]
+
+    async def test_validated_dataclass_async_codec_decode(self):
+        calls: list[str] = []
+
+        async def decode(value):
+            calls.append(value)
+            return datetime.fromisoformat(value)
+
+        async def encode(value):
+            return value.isoformat()
+
+        @z.dataclass
+        class Event:
+            created: Annotated[datetime, z.codec_async(
+                z.string(), z.datetime(), decode=decode, encode=encode,
+            )]
+
+        direct = Event(created=datetime(2026, 10, 20, 12, 30))
+        self.assertEqual(direct.created, datetime(2026, 10, 20, 12, 30))
+        with self.assertRaises(ValidationError):
+            Event(created="2026-10-20T12:30:00")
+
+        codec = z.codecs.dataclass(Event)
+        parsed = await codec.parse_async({
+            "created": "2026-10-20T12:30:00",
+        })
+        self.assertEqual(parsed.created, datetime(2026, 10, 20, 12, 30))
+        self.assertEqual(calls, ["2026-10-20T12:30:00"])
+        self.assertEqual(
+            await codec.encode_async(parsed),
+            {"created": "2026-10-20T12:30:00"},
+        )
+
+        @z.dataclass
+        class Outer:
+            event: Event
+
+        nested = await z.codecs.dataclass(Outer).parse_async({
+            "event": {"created": "2026-10-20T12:30:00"},
+        })
+        self.assertEqual(
+            nested.event.created, datetime(2026, 10, 20, 12, 30),
         )
 
     async def test_async_encoding_and_reversibility(self):

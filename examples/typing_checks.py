@@ -9,7 +9,15 @@ from datetime import timedelta as TimeDelta
 from decimal import Decimal
 from enum import Enum
 from pathlib import PurePath
-from typing import Annotated, Any, NewType, NotRequired, TypedDict, assert_type
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    NewType,
+    NotRequired,
+    TypedDict,
+    assert_type,
+)
 
 from zodish import Failure, Issue, Missing, Schema, Success, to_json_schema, z
 
@@ -498,3 +506,52 @@ class User:
 
 schema = z.object({"name": z.string()}).transform(lambda data: User(**data))
 assert_type(schema.parse({"name": "Alex"}), User)
+
+
+@z.dataclass
+class ValidatedUser:
+    name: Annotated[str, z.string().min(1)]
+    age: int
+    nickname: str | None = None
+
+
+validated_user = ValidatedUser(name="Alex", age=30)
+assert_type(validated_user, ValidatedUser)
+assert_type(validated_user.name, str)
+assert_type(validated_user.age, int)
+assert_type(validated_user.nickname, str | None)
+if TYPE_CHECKING:
+    ValidatedUser(name="Alex", age="30")  # type: ignore[arg-type]
+
+
+@z.dataclass(frozen=True)
+class FrozenValidated:
+    name: str
+
+
+frozen_validated = FrozenValidated(name="Alex")
+assert_type(frozen_validated.name, str)
+if TYPE_CHECKING:
+    frozen_validated.name = "Other"  # type: ignore[misc]
+
+
+@z.dataclass(kw_only=True)
+class KeywordValidated:
+    name: str
+
+
+KeywordValidated(name="Alex")
+if TYPE_CHECKING:
+    KeywordValidated("Alex")  # type: ignore[call-arg]
+
+
+@dataclass
+class ExistingValidated:
+    name: str
+
+
+WrappedValidated = z.dataclass(ExistingValidated)
+assert_type(WrappedValidated, type[ExistingValidated])
+assert_type(WrappedValidated(name="Alex"), ExistingValidated)
+if TYPE_CHECKING:
+    WrappedValidated(name=1)  # type: ignore[arg-type]

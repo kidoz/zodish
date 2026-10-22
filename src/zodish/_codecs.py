@@ -891,13 +891,14 @@ class _Codecs:
         expected = builtins.set(names)
         parameters = {
             name
-            for name, parameter in inspect.signature(cls).parameters.items()
+            for name, parameter in inspect.signature(cls.__init__).parameters.items()
             if parameter.kind in (
                 inspect.Parameter.POSITIONAL_ONLY,
                 inspect.Parameter.POSITIONAL_OR_KEYWORD,
                 inspect.Parameter.KEYWORD_ONLY,
             )
         }
+        parameters.discard("self")
         unsupported = parameters - expected
         if unsupported:
             raise TypeError(
@@ -945,6 +946,21 @@ class _Codecs:
             )
             for name in names
         }
+        from ._validated_dataclasses import (
+            assemble_validated,
+            default_value,
+            marker_for,
+        )
+
+        marker = marker_for(cls)
+        if marker is None:
+            for base in cls.__mro__[1:]:
+                if marker_for(base) is not None:
+                    raise TypeError(
+                        "Dataclass codecs do not support subclasses of "
+                        "validated dataclasses",
+                    )
+
         def input_field_schema(name: str) -> Schema[Any, Any]:
             schema = schemas_by_name[name]
             base = (
@@ -997,6 +1013,23 @@ class _Codecs:
                 if value is MISSING:
                     if not has_default[name]:
                         issues.append(Issue("required", "Required", (name,)))
+                        continue
+                    if marker is None:
+                        continue
+                    try:
+                        value = marker.construction_schemas[name].parse(
+                            default_value(fields_by_name[name]),
+                        )
+                    except ValidationError as error:
+                        issues.extend(
+                            _prefix_issue(item, name) for item in error.issues
+                        )
+                        continue
+                    if value is MISSING:
+                        raise TypeError(
+                            f"Field {name!r} default produced MISSING",
+                        )
+                    decoded[name] = value
                     continue
                 if isinstance(schema, CodecSchema):
                     try:
@@ -1006,9 +1039,17 @@ class _Codecs:
                             _prefix_issue(item, name) for item in error.issues
                         )
                         continue
+                if marker is not None:
+                    guard = marker.annotation_guards[name]
+                    if guard is not None and (
+                        name in overrides or marker.guards[name] is not None
+                    ):
+                        value = guard.parse(value)
                 decoded[name] = value
             if issues:
                 raise ValidationError(issues)
+            if marker is not None:
+                return cast(DataclassT, assemble_validated(cls, decoded))
             return cls(**decoded)
 
         async def decode_value_async(data: dict[str, Any]) -> DataclassT:
@@ -1020,6 +1061,23 @@ class _Codecs:
                 if value is MISSING:
                     if not has_default[name]:
                         issues.append(Issue("required", "Required", (name,)))
+                        continue
+                    if marker is None:
+                        continue
+                    try:
+                        value = marker.construction_schemas[name].parse(
+                            default_value(fields_by_name[name]),
+                        )
+                    except ValidationError as error:
+                        issues.extend(
+                            _prefix_issue(item, name) for item in error.issues
+                        )
+                        continue
+                    if value is MISSING:
+                        raise TypeError(
+                            f"Field {name!r} default produced MISSING",
+                        )
+                    decoded[name] = value
                     continue
                 if isinstance(schema, CodecSchema):
                     try:
@@ -1029,9 +1087,17 @@ class _Codecs:
                             _prefix_issue(item, name) for item in error.issues
                         )
                         continue
+                if marker is not None:
+                    guard = marker.annotation_guards[name]
+                    if guard is not None and (
+                        name in overrides or marker.guards[name] is not None
+                    ):
+                        value = guard.parse(value)
                 decoded[name] = value
             if issues:
                 raise ValidationError(issues)
+            if marker is not None:
+                return cast(DataclassT, assemble_validated(cls, decoded))
             return cls(**decoded)
 
         def encode_value(value: DataclassT) -> dict[str, Any]:

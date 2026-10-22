@@ -8,6 +8,7 @@ import subprocess
 import sys
 import unittest
 import weakref
+from typing import Annotated
 
 from zodish import MISSING, Failure, Issue, ValidationError, _native, z
 from zodish._boundary import (
@@ -700,6 +701,40 @@ print("all cases ok")
                 return iter([1, 2])
 
         self.assertIsInstance(z.tuple(z.integer()).safe_parse(WeirdList([1])), Failure)
+
+
+    def test_native_output_guard(self):
+        node = _native.NativeSchema(
+            "output_guard",
+            (z.unknown()._node, z.integer()._node),
+            ("value", "int"),
+        )
+        self.assertEqual(
+            node.parse(1, MISSING, Issue, ValidationError), 1,
+        )
+        with self.assertRaises(TypeError) as caught:
+            node.parse("x", MISSING, Issue, ValidationError)
+        self.assertEqual(
+            str(caught.exception),
+            'field "value" produced str, expected int',
+        )
+
+    def test_validated_dataclass_native_boundary(self):
+        @z.dataclass
+        class Record:
+            value: Annotated[int, z.integer()]
+            text: Annotated[str, z.string()]
+
+        huge = 10**5000
+        record = Record(value=huge, text="héllo")
+        self.assertEqual(record.value, huge)
+        self.assertEqual(record.text, "héllo")
+        with self.assertRaises(ValidationError) as caught:
+            Record(value="x", text=1)
+        self.assertEqual(
+            [issue.path for issue in caught.exception.issues],
+            [("value",), ("text",)],
+        )
 
 
 class AsyncSessionProtocolTests(unittest.IsolatedAsyncioTestCase):

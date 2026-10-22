@@ -3,12 +3,14 @@ import dataclasses
 import datetime as dt
 import decimal
 import enum
+import inspect
 import json
 import math
 import pathlib
 import pickle
 import re
 import unittest
+import weakref
 from typing import (
     Annotated,
     Any,
@@ -3270,6 +3272,619 @@ class SchemaTests(unittest.TestCase):
         ):
             with self.subTest(fn=fn), self.assertRaises((TypeError, ValueError)):
                 fn()
+
+    def test_validated_dataclass_constructor_accepts_and_normalizes(self):
+        @z.dataclass
+        class User:
+            name: Annotated[str, z.string().trim().min(1)]
+            age: Annotated[int, z.integer().min(0)]
+            nickname: str | None = None
+
+        user = User(name=" Alex ", age=30)
+        self.assertEqual(user.name, "Alex")
+        self.assertEqual(user, User(name="Alex", age=30, nickname=None))
+        self.assertTrue(dataclasses.is_dataclass(User))
+        signature = inspect.signature(User)
+        self.assertEqual(
+            tuple(signature.parameters), ("name", "age", "nickname"),
+        )
+        self.assertIsNone(signature.parameters["nickname"].default)
+        self.assertIsNotNone(User.__init__.__wrapped__)
+
+    def test_validated_dataclass_constructor_aggregates_issues(self):
+        @z.dataclass
+        class User:
+            name: Annotated[str, z.string().min(1)]
+            age: Annotated[int, z.integer().min(0)]
+            nickname: str | None = None
+
+        with self.assertRaises(ValidationError) as caught:
+            User(name="", age=-1, nickname=1)
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in caught.exception.issues],
+            [
+                ("too_small", ("name",)),
+                ("too_small", ("age",)),
+                ("invalid_type", ("nickname",)),
+            ],
+        )
+
+    def test_validated_dataclass_defaults_are_validated(self):
+        @z.dataclass
+        class Defaults:
+            name: Annotated[str, z.string().min(3)] = "valid"
+            age: Annotated[int, z.integer().min(0)] = 1
+
+        self.assertEqual(Defaults().name, "valid")
+        with self.assertRaises(ValidationError) as caught:
+            Defaults(name="x", age=-1)
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in caught.exception.issues],
+            [("too_small", ("name",)), ("too_small", ("age",))],
+        )
+
+        @z.dataclass
+        class BadDefault:
+            value: Annotated[int, z.integer().min(0)] = -1
+
+        with self.assertRaises(ValidationError) as caught:
+            BadDefault()
+        self.assertEqual(caught.exception.issues[0].path, ("value",))
+
+        @z.dataclass
+        class BadDefaults:
+            name: Annotated[str, z.string().min(3)] = "x"
+            age: Annotated[int, z.integer().min(0)] = -1
+
+        with self.assertRaises(ValidationError) as caught:
+            BadDefaults()
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in caught.exception.issues],
+            [("too_small", ("name",)), ("too_small", ("age",))],
+        )
+
+    def test_validated_dataclass_default_factory_called_once(self):
+        calls: list[int] = []
+
+        @z.dataclass
+        class Item:
+            tags: list[str] = dataclasses.field(
+                default_factory=lambda: calls.append(1) or [],
+            )
+            count: Annotated[int, z.integer().min(0)] = 1
+
+        first = Item()
+        second = Item()
+        Item(tags=["x"])
+        self.assertEqual(calls, [1, 1])
+        self.assertIsNot(first.tags, second.tags)
+
+    def test_validated_dataclass_strict_types(self):
+        @z.dataclass
+        class User:
+            age: Annotated[int, z.integer()]
+            nickname: str | None = None
+
+        for value in ("30", True, 1.0):
+            with self.subTest(value=value), self.assertRaises(ValidationError):
+                User(age=value)
+        self.assertIsNone(User(age=30, nickname=None).nickname)
+        with self.assertRaises(ValidationError):
+            User(age=30, nickname=1)
+
+    def test_validated_dataclass_operation_order(self):
+        calls: list[str] = []
+
+        def upper(value: str) -> str:
+            calls.append(value)
+            return value.upper()
+
+        @z.dataclass
+        class Normalized:
+            name: Annotated[
+                str, z.string().trim().min(2).overwrite(upper)
+            ]
+
+        self.assertEqual(Normalized(name=" ab ").name, "AB")
+        self.assertEqual(calls, ["ab"])
+        with self.assertRaises(ValidationError):
+            Normalized(name=" a ")
+        self.assertEqual(calls, ["ab"])
+
+    def test_validated_dataclass_uses_one_native_evaluation(self):
+        calls: list[int] = []
+
+        @z.dataclass
+        class One:
+            value: Annotated[int, z.integer().overwrite(
+                lambda value: calls.append(value) or value + 1,
+            )]
+
+        self.assertEqual(One(value=1).value, 2)
+        self.assertEqual(calls, [1])
+
+    def test_validated_dataclass_explicit_output_guard(self):
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class StaticMismatch:
+                value: Annotated[int, z.string()]
+
+        @z.dataclass
+        class DynamicMismatch:
+            value: Annotated[str, z.unknown()]
+
+        with self.assertRaises(TypeError) as caught:
+            DynamicMismatch(value=1)
+        self.assertIn("produced int", str(caught.exception))
+
+        @z.dataclass
+        class Items:
+            values: Annotated[list[int], z.array(z.string())]
+
+        with self.assertRaises(TypeError):
+            Items(values=["x"])
+
+        @z.dataclass
+        class TupleValue:
+            value: Annotated[tuple[int, str], z.unknown()]
+
+        self.assertEqual(TupleValue(value=(1, "x")).value, (1, "x"))
+        with self.assertRaises(TypeError):
+            TupleValue(value=[1, "x"])
+
+    def test_validated_dataclass_binding_errors(self):
+        @z.dataclass
+        class Simple:
+            value: int
+
+        for call in (
+            lambda: Simple(),
+            lambda: Simple(1, 2),
+            lambda: Simple(value=1, extra=2),
+            lambda: Simple(value=MISSING),
+        ):
+            with self.subTest(call=call), self.assertRaises(TypeError):
+                call()
+
+    def test_validated_dataclass_rejects_unsupported_features(self):
+        with self.assertRaises(ValueError):
+            @z.dataclass
+            class OptionalNoDefault:
+                value: Annotated[int, z.integer().optional()]
+
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class InitFalse:
+                value: int = dataclasses.field(init=False, default=1)
+
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class WithInitVar:
+                value: int
+                extra: dataclasses.InitVar[int]
+
+                def __post_init__(self, extra: int) -> None: ...
+
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class BadPostInit:
+                value: int
+
+                def __post_init__(self, extra: int) -> None: ...
+
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class CustomInit:
+                value: int
+
+                def __init__(self, value: int) -> None:
+                    self.value = value
+
+        @dataclasses.dataclass
+        class Base:
+            value: int
+
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class Child(Base):
+                extra: int
+
+        with self.assertRaises(TypeError):
+            @z.dataclass(weakref_slot=True)
+            class Weak:
+                value: int
+
+        with self.assertRaises(TypeError):
+            @z.dataclass(init=False)
+            class NoInit:
+                value: int
+
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class MissingDefault:
+                value: int = MISSING
+
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class Preprocessed:
+                value: Annotated[int, z.preprocess(int, z.integer())]
+
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class LazyField:
+                value: Annotated[int, z.lazy(lambda: z.integer())]
+
+        @z.dataclass
+        class MissingFactoryResult:
+            value: int = dataclasses.field(
+                default_factory=lambda: MISSING,
+            )
+
+        with self.assertRaises(TypeError):
+            MissingFactoryResult()
+        with self.assertRaises(TypeError):
+            z.codecs.dataclass(MissingFactoryResult).parse({})
+
+        @z.dataclass
+        class ValidatedBase:
+            value: int
+
+        class ValidatedChild(ValidatedBase):
+            pass
+
+        with self.assertRaises(TypeError):
+            z.codecs.dataclass(ValidatedChild)
+
+    def test_validated_dataclass_frozen_slots_and_kw_only(self):
+        @z.dataclass(frozen=True, slots=True, weakref_slot=True)
+        class Frozen:
+            name: str
+
+        instance = Frozen("Alex")
+        self.assertEqual(instance.name, "Alex")
+        with self.assertRaises(dataclasses.FrozenInstanceError):
+            instance.name = "Other"
+        self.assertIs(weakref.ref(instance)(), instance)
+
+        @z.dataclass(kw_only=True)
+        class Keyword:
+            name: str
+
+        with self.assertRaises(TypeError):
+            Keyword("Alex")
+        self.assertEqual(Keyword(name="Alex").name, "Alex")
+
+    def test_validated_dataclass_replace_and_wrapping(self):
+        @z.dataclass
+        class Replaceable:
+            value: Annotated[int, z.integer().min(0)]
+
+        instance = Replaceable(1)
+        self.assertEqual(dataclasses.replace(instance, value=2).value, 2)
+        with self.assertRaises(ValidationError):
+            dataclasses.replace(instance, value=-1)
+
+        @dataclasses.dataclass
+        class Existing:
+            name: str
+
+        Wrapped = z.dataclass(Existing)
+        self.assertEqual(Wrapped("Alex").name, "Alex")
+        with self.assertRaises(ValidationError):
+            Wrapped(name=1)
+        with self.assertRaises(TypeError):
+            z.dataclass(frozen=True)(Existing)
+
+        @dataclasses.dataclass
+        class Outer:
+            name: str
+
+        z.dataclass(Outer)
+        dataclasses.dataclass(Outer)
+        with self.assertRaises(ValidationError):
+            Outer(name=1)
+
+    def test_validated_dataclass_codec_transform_runs_once(self):
+        calls: list[int] = []
+        post: list[int] = []
+
+        def bump(value: int) -> int:
+            calls.append(value)
+            return value + 1
+
+        @z.dataclass
+        class Counter:
+            value: Annotated[int, z.integer().overwrite(bump)]
+
+            def __post_init__(self) -> None:
+                post.append(self.value)
+
+        direct = Counter(value=1)
+        self.assertEqual(direct.value, 2)
+        self.assertEqual(calls, [1])
+        self.assertEqual(post, [2])
+
+        calls.clear()
+        post.clear()
+        decoded = z.codecs.dataclass(Counter).parse({"value": 1})
+        self.assertEqual(decoded.value, 2)
+        self.assertEqual(calls, [1])
+        self.assertEqual(post, [2])
+
+    def test_validated_dataclass_codec_validates_defaults(self):
+        @z.dataclass
+        class Defaulted:
+            count: Annotated[int, z.integer().min(0)] = 1
+
+        self.assertEqual(z.codecs.dataclass(Defaulted).parse({}).count, 1)
+
+        @z.dataclass
+        class BadDefault:
+            count: Annotated[int, z.integer().min(0)] = -1
+
+        with self.assertRaises(ValidationError) as caught:
+            z.codecs.dataclass(BadDefault).parse({})
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in caught.exception.issues],
+            [("too_small", ("count",))],
+        )
+
+    def test_validated_dataclass_codec_guards_override_outputs(self):
+        @z.dataclass
+        class Override:
+            value: Annotated[int, z.integer()]
+
+        codec = z.codecs.dataclass(Override, fields={"value": z.string()})
+        with self.assertRaises(TypeError) as caught:
+            codec.parse({"value": "12"})
+        self.assertIn("expected int", str(caught.exception))
+
+        @z.dataclass
+        class Inferred:
+            value: int
+
+        inferred = z.codecs.dataclass(Inferred, fields={"value": z.string()})
+        with self.assertRaises(TypeError):
+            inferred.parse({"value": "12"})
+
+    def test_validated_dataclass_codec_boundary_and_aggregation(self):
+        @z.dataclass
+        class User:
+            name: Annotated[str, z.string().min(1)]
+
+        codec = z.codecs.dataclass(User)
+        self.assertEqual(codec.parse({"name": "Alex"}).name, "Alex")
+        self.assertEqual(codec.encode(User("Alex")), {"name": "Alex"})
+        self.assertEqual(
+            to_json_schema(codec, io="input")["type"], "object",
+        )
+
+        @z.dataclass
+        class Multi:
+            created: Annotated[dt.date, z.codecs.iso_date()]
+            count: Annotated[int, z.integer().min(0)] = -1
+
+        with self.assertRaises(ValidationError) as caught:
+            z.codecs.dataclass(Multi).parse({"created": "bad"})
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in caught.exception.issues],
+            [("invalid_format", ("created",)), ("too_small", ("count",))],
+        )
+
+        @z.dataclass
+        class DefaultedCodec:
+            created: Annotated[
+                dt.date, z.codecs.iso_date()
+            ] = dt.date(2026, 1, 1)
+
+        self.assertEqual(
+            z.codecs.dataclass(DefaultedCodec).parse({}).created,
+            dt.date(2026, 1, 1),
+        )
+
+    def test_validated_dataclass_nested(self):
+        @z.dataclass
+        class Inner:
+            value: Annotated[int, z.integer().min(0)]
+
+        @z.dataclass
+        class Outer:
+            inner: Inner
+            label: str
+
+        outer = Outer(inner=Inner(1), label="x")
+        self.assertEqual(outer.inner.value, 1)
+        with self.assertRaises(ValidationError):
+            Outer(inner={"value": 1}, label="x")
+        parsed = z.codecs.dataclass(Outer).parse({
+            "inner": {"value": 2}, "label": "y",
+        })
+        self.assertEqual(parsed.inner.value, 2)
+
+    def test_validated_dataclass_generic_alias_guards(self):
+        type Items[T] = list[T]
+        type Maybe[T] = T | None
+        type Box[T = int] = list[T]
+
+        @z.dataclass
+        class Batch:
+            values: Items[int]
+            maybe: Maybe[int]
+            box: Box
+
+        batch = Batch(values=[1, 2], maybe=None, box=[3])
+        self.assertEqual(batch.values, [1, 2])
+        self.assertIsNone(batch.maybe)
+        self.assertEqual(batch.box, [3])
+        with self.assertRaises(ValidationError):
+            Batch(values=["x"], maybe=1, box=[3])
+
+    def test_validated_dataclass_nested_explicit_metadata(self):
+        @z.dataclass
+        class NestedExplicit:
+            values: list[Annotated[int, z.string()]]
+
+        with self.assertRaises(TypeError):
+            NestedExplicit(values=["x"])
+        with self.assertRaises(TypeError):
+            z.codecs.dataclass(NestedExplicit).parse({"values": ["x"]})
+
+    def test_validated_dataclass_rejects_nested_preprocess(self):
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class NestedPreprocess:
+                extra: Annotated[
+                    dict[str, int],
+                    z.object({}).catchall(
+                        z.preprocess(int, z.integer()),
+                    ),
+                ]
+
+    def test_validated_dataclass_wire_codec_uses_decoded_values(self):
+        @z.dataclass
+        class Wired:
+            created: Annotated[
+                dt.datetime, z.codecs.iso_datetime().wire("createdAt")
+            ]
+
+        value = Wired(created=dt.datetime(2026, 1, 1, 12, 30))
+        self.assertEqual(value.created, dt.datetime(2026, 1, 1, 12, 30))
+        with self.assertRaises(ValidationError):
+            Wired(created="2026-01-01T12:30:00")
+        decoded = z.codecs.dataclass(Wired).parse({
+            "createdAt": "2026-01-01T12:30:00",
+        })
+        self.assertEqual(decoded.created, dt.datetime(2026, 1, 1, 12, 30))
+
+    def test_validated_dataclass_rejects_custom_hooks(self):
+        @dataclasses.dataclass
+        class ExistingCustomInit:
+            value: int
+
+            def __init__(self, value: int) -> None:
+                self.value = value * 10
+
+        with self.assertRaises(TypeError):
+            z.dataclass(ExistingCustomInit)
+
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class CustomNew:
+                value: int
+
+                def __new__(cls, *args: Any, **kwargs: Any) -> CustomNew:
+                    return super().__new__(cls)
+
+        with self.assertRaises(TypeError):
+            @z.dataclass
+            class CustomSetAttr:
+                value: int
+
+                def __setattr__(self, name: str, value: Any) -> None:
+                    object.__setattr__(self, name, value)
+
+        class Meta(type):
+            def __call__(cls, *args: Any, **kwargs: Any) -> Any:
+                return super().__call__(*args, **kwargs)
+
+        @z.dataclass
+        class WithMeta(metaclass=Meta):
+            value: int
+
+        self.assertEqual(WithMeta(value=1).value, 1)
+
+    def test_validated_dataclass_inherited_fieldless_base(self):
+        @dataclasses.dataclass
+        class EmptyBase:
+            pass
+
+        @z.dataclass
+        class Child(EmptyBase):
+            value: int
+
+        self.assertEqual(Child(value=1).value, 1)
+
+    def test_validated_dataclass_primitive_subclass_guard(self):
+        class MyInt(int):
+            pass
+
+        @z.dataclass
+        class Guarded:
+            value: Annotated[MyInt, z.unknown()]
+
+        self.assertEqual(Guarded(value=MyInt(3)).value, MyInt(3))
+        with self.assertRaises(TypeError):
+            Guarded(value=3)
+
+        @z.dataclass
+        class Explicit:
+            value: Annotated[MyInt, z.instance_of(MyInt)]
+
+        self.assertIsInstance(Explicit(value=MyInt(3)).value, MyInt)
+        with self.assertRaises(ValidationError):
+            Explicit(value=3)
+
+        @z.dataclass
+        class Inferred:
+            value: MyInt
+
+        self.assertIsInstance(Inferred(value=MyInt(3)).value, MyInt)
+        with self.assertRaises(ValidationError):
+            Inferred(value=3)
+
+    def test_validated_dataclass_extended_guard_annotations(self):
+        class Blob:
+            pass
+
+        class Data(TypedDict):
+            x: int
+
+        @z.dataclass
+        class Guards:
+            blob: Annotated[Blob, z.unknown()]
+            tags: Annotated[set[int], z.unknown()]
+            keys: Annotated[dict[int, str], z.unknown()]
+            values: Annotated[tuple[int, ...], z.unknown()]
+            data: Annotated[Data, z.unknown()]
+
+        item = Guards(
+            blob=Blob(), tags={1, 2}, keys={1: "a"},
+            values=(1, 2), data={"x": 1},
+        )
+        self.assertIsInstance(item.blob, Blob)
+        self.assertEqual(item.tags, {1, 2})
+        self.assertEqual(item.keys, {1: "a"})
+        self.assertEqual(item.values, (1, 2))
+        self.assertEqual(item.data, {"x": 1})
+
+        invalid_values = (
+            {"blob": object()},
+            {"tags": {1, "x"}},
+            {"keys": {"x": "a"}},
+            {"values": [1, 2]},
+            {"values": (1, "x")},
+            {"data": "x"},
+        )
+        for changes in invalid_values:
+            arguments = {
+                "blob": Blob(), "tags": {1, 2}, "keys": {1: "a"},
+                "values": (1, 2), "data": {"x": 1},
+            }
+            arguments.update(changes)
+            with self.subTest(changes=changes), self.assertRaises(TypeError):
+                Guards(**arguments)
+
+    def test_validated_dataclass_rejects_type_changing_schemas(self):
+        for schema in (
+            z.string().transform(int),
+            z.coerce.integer(),
+            z.string().stringbool(),
+            z.string().pipe(z.integer()),
+        ):
+            with self.subTest(schema=schema), self.assertRaises(TypeError):
+                @z.dataclass
+                class Field:
+                    value: Annotated[Any, schema]
 
     def test_public_annotations_resolve(self):
         self.assertIn("params", get_type_hints(z.Issue))

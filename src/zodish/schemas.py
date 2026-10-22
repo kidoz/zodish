@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import binascii
 import builtins
+import dataclasses
 import datetime as _datetime
 import decimal as _decimal
 import math
@@ -12,7 +13,8 @@ import pathlib as _pathlib
 import re
 import typing
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass as _dataclass
+from dataclasses import field, replace
 from enum import Enum
 from types import MappingProxyType
 from typing import Any, Literal, Self, cast, overload
@@ -237,7 +239,7 @@ def _parse_path(value: str) -> _pathlib.PurePath:
     return _pathlib.Path(value)
 
 
-@dataclass(frozen=True)
+@_dataclass(frozen=True)
 class StringSchema(Schema[str, str]):
     def min(self, length: int, *, message: str | None = None) -> Self:
         _length_bound(length)
@@ -424,7 +426,7 @@ class StringSchema(Schema[str, str]):
         return self._wrap("upper")
 
 
-@dataclass(frozen=True)
+@_dataclass(frozen=True)
 class NumberSchema[T: (int, float, int | float)](Schema[T, T]):
     def min(self, bound: int | float, *, message: str | None = None) -> Self:
         _numeric_bound(bound)
@@ -480,7 +482,7 @@ class NumberSchema[T: (int, float, int | float)](Schema[T, T]):
         return self._wrap("integral", _message(message, "Must be an integer"))
 
 
-@dataclass(frozen=True)
+@_dataclass(frozen=True)
 class ArraySchema[Out, In = Out](Schema[list[Out], list[In]]):
     item: Schema[Out, In]
 
@@ -517,7 +519,7 @@ class ArraySchema[Out, In = Out](Schema[list[Out], list[In]]):
         return self.min(1, message=message)
 
 
-@dataclass(frozen=True)
+@_dataclass(frozen=True)
 class SetSchema[Out, In = Out](
     Schema[builtins.set[Out], builtins.set[In]],
 ):
@@ -553,7 +555,7 @@ class SetSchema[Out, In = Out](
         return self.min(length, message=message).max(length, message=message)
 
 
-@dataclass(frozen=True)
+@_dataclass(frozen=True)
 class BytesSchema(Schema[builtins.bytes, builtins.bytes]):
     def min(self, length: int, *, message: str | None = None) -> Self:
         _length_bound(length)
@@ -762,7 +764,7 @@ def set[Out, In](item: Schema[Out, In]) -> SetSchema[Out, In]:
 type UnknownKeys = Literal["strip", "strict", "passthrough"]
 
 
-@dataclass(frozen=True)
+@_dataclass(frozen=True)
 class ObjectSchema(Schema[dict[str, Any], dict[str, Any]]):
     shape: Mapping[str, Schema[Any, Any]]
     unknown_keys: UnknownKeys | Literal["catchall"] = "strip"
@@ -835,7 +837,7 @@ class ObjectSchema(Schema[dict[str, Any], dict[str, Any]]):
         return enum(keys)
 
 
-@dataclass(frozen=True)
+@_dataclass(frozen=True)
 class TypedObjectSchema[Shape](Schema[Shape, Shape]):
     shape: Mapping[str, Schema[Any, Any]]
     unknown_keys: UnknownKeys | Literal["catchall"] = "strip"
@@ -931,7 +933,7 @@ class TypedObjectSchema[Shape](Schema[Shape, Shape]):
         return enum(keys)
 
 
-@dataclass(frozen=True)
+@_dataclass(frozen=True)
 class RecordSchema[Out, In = Out](Schema[dict[str, Out], dict[str, In]]):
     value_schema: Schema[Out, In]
 
@@ -939,7 +941,7 @@ class RecordSchema[Out, In = Out](Schema[dict[str, Out], dict[str, In]]):
         return self.value_schema
 
 
-@dataclass(frozen=True)
+@_dataclass(frozen=True)
 class KeyedRecordSchema[Key, Out, In = Out](
     Schema[dict[Key, Out], dict[Key, In]],
 ):
@@ -950,7 +952,7 @@ class KeyedRecordSchema[Key, Out, In = Out](
         return self.value_schema
 
 
-@dataclass(frozen=True)
+@_dataclass(frozen=True)
 class MapSchema[Key, Out, In = Out](
     Schema[dict[Key, Out], dict[Key, In]],
 ):
@@ -961,7 +963,7 @@ class MapSchema[Key, Out, In = Out](
         return self.value_schema
 
 
-@dataclass(frozen=True)
+@_dataclass(frozen=True)
 class TupleSchema[
     Out = builtins.tuple[Any, ...],
     In = list[Any] | builtins.tuple[Any, ...],
@@ -992,12 +994,12 @@ class TupleSchema[
         )
 
 
-@dataclass(frozen=True)
+@_dataclass(frozen=True)
 class UnionSchema[Out, In = Out](Schema[Out, In]):
     options: builtins.tuple[Schema[Any, Any], ...]
 
 
-@dataclass(frozen=True)
+@_dataclass(frozen=True)
 class DiscriminatedUnionSchema(Schema[Any, Any]):
     key: str
     options: Mapping[str, Schema[Any, Any]]
@@ -1013,7 +1015,7 @@ class DiscriminatedUnionSchema(Schema[Any, Any]):
             )
 
 
-@dataclass(frozen=True)
+@_dataclass(frozen=True)
 class IntersectionSchema(Schema[Any, Any]):
     left: Schema[Any, Any]
     right: Schema[Any, Any]
@@ -1364,6 +1366,43 @@ _CONSTRAINT_KINDS = frozenset({
     "multiple_of", "positive", "integral", "regex", "starts_with", "ends_with",
     "includes", "ipv6", "cidrv4", "cidrv6",
 })
+
+
+@overload
+def dataclass[T](cls: type[T], /) -> type[T]: ...
+
+
+@overload
+def dataclass[T](
+    *,
+    init: bool = ...,
+    repr: bool = ...,
+    eq: bool = ...,
+    order: bool = ...,
+    unsafe_hash: bool = ...,
+    frozen: bool = ...,
+    match_args: bool = ...,
+    kw_only: bool = ...,
+    slots: bool = ...,
+    weakref_slot: bool = ...,
+) -> Callable[[type[T]], type[T]]: ...
+
+
+@typing.dataclass_transform(field_specifiers=(dataclasses.field,))
+def dataclass[T](
+    cls: type[T] | None = None,
+    /,
+    **options: Any,
+) -> Any:
+    """Validate ordinary construction of a dataclass.
+
+    Field annotations are compiled into one native object schema. Constructor
+    arguments are decoded values; use ``z.codecs.dataclass`` for encoded input.
+    """
+    from ._validated_dataclasses import dataclass as _validated_dataclass
+
+    return _validated_dataclass(cls, **options)
+
 
 def to_json_schema(
     schema: Schema[Any, Any],
