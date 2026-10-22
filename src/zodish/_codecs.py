@@ -886,8 +886,45 @@ class _Codecs:
         stack = (*_stack, cls)
         if fields is not None and not isinstance(fields, Mapping):
             raise TypeError("Dataclass fields must be a mapping")
-        init_fields = [item for item in dataclasses.fields(cls) if item.init]
-        names = builtins.tuple(item.name for item in init_fields)
+        from ._validated_dataclasses import (
+            _initvar_annotation,
+            _is_initvar_field,
+            assemble_validated,
+            default_value,
+            marker_for,
+        )
+
+        marker = marker_for(cls)
+        fields_by_name: Mapping[str, dataclasses.Field[Any]]
+        has_default: Mapping[str, bool]
+        if marker is None:
+            for base in cls.__mro__[1:]:
+                if marker_for(base) is not None:
+                    raise TypeError(
+                        "Dataclass codecs do not support subclasses of "
+                        "validated dataclasses",
+                    )
+            init_fields = [item for item in dataclasses.fields(cls) if item.init]
+            names = builtins.tuple(item.name for item in init_fields)
+            stored_names = names
+            initvar_names: builtins.tuple[str, ...] = ()
+            non_init_names: builtins.tuple[str, ...] = ()
+            fields_by_name = {item.name: item for item in init_fields}
+            has_default = {
+                name: (
+                    fields_by_name[name].default is not dataclasses.MISSING
+                    or fields_by_name[name].default_factory
+                    is not dataclasses.MISSING
+                )
+                for name in names
+            }
+        else:
+            names = marker.constructor_names
+            stored_names = marker.stored_names
+            initvar_names = marker.initvar_names
+            non_init_names = marker.non_init_names
+            fields_by_name = marker.fields
+            has_default = marker.has_default
         expected = builtins.set(names)
         parameters = {
             name
@@ -933,33 +970,12 @@ class _Codecs:
                     raise TypeError(
                         f"Cannot infer a schema for field {name!r}",
                     )
+                if _is_initvar_field(fields_by_name[name]):
+                    annotation = _initvar_annotation(annotation, name)
                 schema = infer_dataclass_field(annotation, name, stack=stack)
             if not isinstance(schema, Schema):
                 raise TypeError(f"Field {name!r} must be a schema")
             schemas_by_name[name] = schema
-
-        fields_by_name = {item.name: item for item in init_fields}
-        has_default = {
-            name: (
-                fields_by_name[name].default is not dataclasses.MISSING
-                or fields_by_name[name].default_factory is not dataclasses.MISSING
-            )
-            for name in names
-        }
-        from ._validated_dataclasses import (
-            assemble_validated,
-            default_value,
-            marker_for,
-        )
-
-        marker = marker_for(cls)
-        if marker is None:
-            for base in cls.__mro__[1:]:
-                if marker_for(base) is not None:
-                    raise TypeError(
-                        "Dataclass codecs do not support subclasses of "
-                        "validated dataclasses",
-                    )
 
         def input_field_schema(name: str) -> Schema[Any, Any]:
             schema = schemas_by_name[name]
@@ -995,8 +1011,8 @@ class _Codecs:
         decode_input_schema = object(decode_shape)
         output_schema: Schema[DataclassT, Any] = instance_of(cls)
         output_shape = {}
-        for name, schema in schemas_by_name.items():
-            field_output = _json_output_schema_for(schema)
+        for name in stored_names:
+            field_output = _json_output_schema_for(schemas_by_name[name])
             output_shape[name] = (
                 field_output.nonoptional()
                 if has_default[name]
@@ -1006,6 +1022,7 @@ class _Codecs:
 
         def decode_value(data: dict[str, Any]) -> DataclassT:
             decoded: dict[str, Any] = {}
+            initvar_decoded: dict[str, Any] = {}
             issues: list[Issue] = []
             for name in names:
                 schema = schemas_by_name[name]
@@ -1029,7 +1046,10 @@ class _Codecs:
                         raise TypeError(
                             f"Field {name!r} default produced MISSING",
                         )
-                    decoded[name] = value
+                    if name in initvar_names:
+                        initvar_decoded[name] = value
+                    else:
+                        decoded[name] = value
                     continue
                 if isinstance(schema, CodecSchema):
                     try:
@@ -1045,15 +1065,41 @@ class _Codecs:
                         name in overrides or marker.guards[name] is not None
                     ):
                         value = guard.parse(value)
-                decoded[name] = value
+                if marker is not None and name in initvar_names:
+                    initvar_decoded[name] = value
+                else:
+                    decoded[name] = value
+            if marker is not None:
+                for name in non_init_names:
+                    try:
+                        value = marker.construction_schemas[name].parse(
+                            default_value(fields_by_name[name]),
+                        )
+                    except ValidationError as error:
+                        issues.extend(
+                            _prefix_issue(item, name) for item in error.issues
+                        )
+                        continue
+                    if value is MISSING:
+                        raise TypeError(
+                            f"Field {name!r} default produced MISSING",
+                        )
+                    decoded[name] = value
             if issues:
                 raise ValidationError(issues)
             if marker is not None:
-                return cast(DataclassT, assemble_validated(cls, decoded))
+                initvar_values = [
+                    initvar_decoded[name] for name in initvar_names
+                ]
+                return cast(
+                    DataclassT,
+                    assemble_validated(cls, decoded, initvar_values),
+                )
             return cls(**decoded)
 
         async def decode_value_async(data: dict[str, Any]) -> DataclassT:
             decoded: dict[str, Any] = {}
+            initvar_decoded: dict[str, Any] = {}
             issues: list[Issue] = []
             for name in names:
                 schema = schemas_by_name[name]
@@ -1077,7 +1123,10 @@ class _Codecs:
                         raise TypeError(
                             f"Field {name!r} default produced MISSING",
                         )
-                    decoded[name] = value
+                    if name in initvar_names:
+                        initvar_decoded[name] = value
+                    else:
+                        decoded[name] = value
                     continue
                 if isinstance(schema, CodecSchema):
                     try:
@@ -1093,17 +1142,42 @@ class _Codecs:
                         name in overrides or marker.guards[name] is not None
                     ):
                         value = guard.parse(value)
-                decoded[name] = value
+                if marker is not None and name in initvar_names:
+                    initvar_decoded[name] = value
+                else:
+                    decoded[name] = value
+            if marker is not None:
+                for name in non_init_names:
+                    try:
+                        value = marker.construction_schemas[name].parse(
+                            default_value(fields_by_name[name]),
+                        )
+                    except ValidationError as error:
+                        issues.extend(
+                            _prefix_issue(item, name) for item in error.issues
+                        )
+                        continue
+                    if value is MISSING:
+                        raise TypeError(
+                            f"Field {name!r} default produced MISSING",
+                        )
+                    decoded[name] = value
             if issues:
                 raise ValidationError(issues)
             if marker is not None:
-                return cast(DataclassT, assemble_validated(cls, decoded))
+                initvar_values = [
+                    initvar_decoded[name] for name in initvar_names
+                ]
+                return cast(
+                    DataclassT,
+                    assemble_validated(cls, decoded, initvar_values),
+                )
             return cls(**decoded)
 
         def encode_value(value: DataclassT) -> dict[str, Any]:
             encoded: dict[str, Any] = {}
             issues: list[Issue] = []
-            for name in names:
+            for name in stored_names:
                 schema = schemas_by_name[name]
                 field_value = getattr(value, name)
                 try:
@@ -1124,7 +1198,7 @@ class _Codecs:
         async def encode_value_async(value: DataclassT) -> dict[str, Any]:
             encoded: dict[str, Any] = {}
             issues: list[Issue] = []
-            for name in names:
+            for name in stored_names:
                 schema = schemas_by_name[name]
                 field_value = getattr(value, name)
                 try:
@@ -1154,7 +1228,7 @@ class _Codecs:
                 if isinstance(schema, CodecSchema)
                 else schema._node.has_async
             )
-            for schema in schemas_by_name.values()
+            for schema in (schemas_by_name[name] for name in stored_names)
         )
 
         decode_transform = NativeSchema(

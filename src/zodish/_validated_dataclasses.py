@@ -13,7 +13,7 @@ import dataclasses
 import functools
 import inspect
 import typing
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass as _dataclass
 from typing import Any
 
@@ -36,12 +36,28 @@ _INIT_PARAMETER_KINDS = (
 )
 
 
+_INITVAR_FIELD = getattr(dataclasses, "_FIELD_INITVAR", None)
+
+
+def _is_initvar_field(field: dataclasses.Field[Any]) -> bool:
+    return getattr(field, "_field_type", None) is _INITVAR_FIELD
+
+
+def _initvar_annotation(annotation: Any, name: str) -> Any:
+    if isinstance(annotation, dataclasses.InitVar):
+        return annotation.type
+    raise TypeError(f"Field {name!r} has an invalid InitVar annotation")
+
+
 @_dataclass(frozen=True)
 class _ValidatedDataclass:
     """Private metadata attached to the exact decorated class."""
 
     cls: type[Any]
-    init_names: builtins.tuple[str, ...]
+    stored_names: builtins.tuple[str, ...]
+    initvar_names: builtins.tuple[str, ...]
+    non_init_names: builtins.tuple[str, ...]
+    constructor_names: builtins.tuple[str, ...]
     construction_schemas: Mapping[str, Schema[Any, Any]]
     guards: Mapping[str, Schema[Any, Any] | None]
     annotation_guards: Mapping[str, Schema[Any, Any] | None]
@@ -55,10 +71,14 @@ def marker_for(cls: type[Any]) -> _ValidatedDataclass | None:
     return marker if isinstance(marker, _ValidatedDataclass) else None
 
 
-def assemble_validated(cls: type[Any], values: Mapping[str, Any]) -> Any:
+def assemble_validated(
+    cls: type[Any],
+    values: Mapping[str, Any],
+    initvar_values: Sequence[Any] = (),
+) -> Any:
     """Allocate and populate an instance without calling its initializer."""
     instance = object.__new__(cls)
-    _assign(instance, values)
+    _assign(instance, values, initvar_values)
     return instance
 
 
@@ -80,12 +100,16 @@ def default_value(field: dataclasses.Field[Any]) -> Any:
     raise TypeError(f"Field {field.name!r} has no default value")
 
 
-def _assign(instance: Any, values: Mapping[str, Any]) -> None:
+def _assign(
+    instance: Any,
+    values: Mapping[str, Any],
+    initvar_values: Sequence[Any] = (),
+) -> None:
     for name, value in values.items():
         object.__setattr__(instance, name, value)
     post_init = getattr(instance, "__post_init__", None)
     if post_init is not None:
-        post_init()
+        post_init(*initvar_values)
 
 
 def _contains_kind(node: NativeSchema, kinds: frozenset[str]) -> bool:
@@ -232,57 +256,61 @@ def _reject_unsupported(cls: type[Any]) -> None:
     params = getattr(cls, "__dataclass_params__", None)
     if params is not None and not params.init:
         raise TypeError("Validated dataclasses require init=True")
-    fields = getattr(cls, "__dataclass_fields__", {})
-    initvar_type = getattr(dataclasses, "_FIELD_INITVAR", None)
-    for field in fields.values():
-        if getattr(field, "_field_type", None) is initvar_type:
-            raise TypeError(
-                "Validated dataclasses do not support InitVar fields",
-            )
-        if not field.init:
-            raise TypeError(
-                "Validated dataclasses do not support init=False fields",
-            )
     _reject_unsupported_inheritance(cls)
+    initvar_fields = [
+        field
+        for field in getattr(cls, "__dataclass_fields__", {}).values()
+        if _is_initvar_field(field)
+    ]
     post_init = getattr(cls, "__post_init__", None)
     if post_init is not None:
-        parameters = [
-            parameter
-            for parameter in inspect.signature(post_init).parameters.values()
-            if parameter.kind in _INIT_PARAMETER_KINDS
-        ]
-        if len(parameters) != 1 or parameters[0].name != "self":
-            raise TypeError(
-                "Validated dataclasses require a zero-argument __post_init__",
+        parameters = list(inspect.signature(post_init).parameters.values())
+        if parameters and parameters[0].name == "self":
+            parameters = parameters[1:]
+        if (
+            len(parameters) != len(initvar_fields)
+            or builtins.any(
+                parameter.kind not in (
+                    inspect.Parameter.POSITIONAL_ONLY,
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                )
+                for parameter in parameters
             )
+        ):
+            raise TypeError(
+                "Validated dataclasses require __post_init__ to accept "
+                "exactly the InitVar fields",
+            )
+
+
+def _checked_value(name: str, value: Any) -> Any:
+    if value is MISSING:
+        raise TypeError(
+            f"MISSING is not a valid value for field {name!r}",
+        )
+    return value
 
 
 def _resolved_values(
     bound: inspect.BoundArguments,
-    fields: Mapping[str, dataclasses.Field[Any]],
+    constructor_fields: Mapping[str, dataclasses.Field[Any]],
+    non_init_fields: Mapping[str, dataclasses.Field[Any]],
 ) -> dict[str, Any]:
     values: dict[str, Any] = {}
-    for name, field in fields.items():
+    for name, field in constructor_fields.items():
         if name in bound.arguments:
-            value = bound.arguments[name]
-            if value is MISSING:
-                raise TypeError(
-                    f"MISSING is not a valid constructor value for field {name!r}",
-                )
-            values[name] = value
+            values[name] = _checked_value(name, bound.arguments[name])
         elif field.default is not dataclasses.MISSING:
-            if field.default is MISSING:
-                raise TypeError(
-                    f"Field {name!r} cannot use MISSING as a default",
-                )
-            values[name] = field.default
+            values[name] = _checked_value(name, field.default)
         elif field.default_factory is not dataclasses.MISSING:
-            value = field.default_factory()
-            if value is MISSING:
-                raise TypeError(f"Field {name!r} factory produced MISSING")
-            values[name] = value
+            values[name] = _checked_value(name, field.default_factory())
         else:
             raise TypeError(f"Missing required argument: {name!r}")
+    for name, field in non_init_fields.items():
+        if field.default is not dataclasses.MISSING:
+            values[name] = _checked_value(name, field.default)
+        elif field.default_factory is not dataclasses.MISSING:
+            values[name] = _checked_value(name, field.default_factory())
     return values
 
 
@@ -347,10 +375,36 @@ def _decorate(cls: type[Any], options: Mapping[str, Any]) -> type[Any]:
     if init_parameters and init_parameters[0].name == "self":
         init_parameters = init_parameters[1:]
     signature = init_signature.replace(parameters=init_parameters)
-    init_fields = [field for field in dataclasses.fields(cls) if field.init]
-    field_map = {field.name: field for field in init_fields}
-    init_names = builtins.tuple(field_map)
-    expected = builtins.set(field_map)
+    all_fields = cls.__dataclass_fields__
+    regular_init_fields = [
+        field for field in dataclasses.fields(cls) if field.init
+    ]
+    initvar_fields = [
+        field for field in all_fields.values() if _is_initvar_field(field)
+    ]
+    constructor_fields = {
+        name: field
+        for name, field in all_fields.items()
+        if _is_initvar_field(field) or field.init
+    }
+    non_init_default_fields = {
+        field.name: field
+        for field in dataclasses.fields(cls)
+        if not field.init
+        and (
+            field.default is not dataclasses.MISSING
+            or field.default_factory is not dataclasses.MISSING
+        )
+    }
+    stored_names = builtins.tuple(
+        field.name for field in regular_init_fields
+    )
+    initvar_names = builtins.tuple(
+        field.name for field in initvar_fields
+    )
+    non_init_names = builtins.tuple(non_init_default_fields)
+    constructor_names = builtins.tuple(constructor_fields)
+    expected = builtins.set(constructor_names)
     parameters = {
         name
         for name, parameter in signature.parameters.items()
@@ -372,10 +426,15 @@ def _decorate(cls: type[Any], options: Mapping[str, Any]) -> type[Any]:
     guards: dict[str, Schema[Any, Any] | None] = {}
     annotation_guards: dict[str, Schema[Any, Any] | None] = {}
     has_default: dict[str, bool] = {}
-    for name, field in field_map.items():
+    schema_fields = builtins.tuple(constructor_fields.items()) + builtins.tuple(
+        non_init_default_fields.items()
+    )
+    for name, field in schema_fields:
         annotation = hints.get(name, _UNSET)
         if annotation is _UNSET:
             raise TypeError(f"Cannot infer a schema for field {name!r}")
+        if _is_initvar_field(field):
+            annotation = _initvar_annotation(annotation, name)
         schema, resolved, explicit = _annotations.dataclass_field_schema(
             annotation, name, stack=(cls,),
         )
@@ -432,11 +491,14 @@ def _decorate(cls: type[Any], options: Mapping[str, Any]) -> type[Any]:
     constructor_schema = _schemas.object(construction_schemas)
     marker = _ValidatedDataclass(
         cls=cls,
-        init_names=init_names,
+        stored_names=stored_names,
+        initvar_names=initvar_names,
+        non_init_names=non_init_names,
+        constructor_names=constructor_names,
         construction_schemas=construction_schemas,
         guards=guards,
         annotation_guards=annotation_guards,
-        fields=field_map,
+        fields={name: field for name, field in all_fields.items()},
         has_default=has_default,
     )
     original_init = cls.__init__
@@ -444,11 +506,13 @@ def _decorate(cls: type[Any], options: Mapping[str, Any]) -> type[Any]:
     @functools.wraps(original_init)
     def __init__(self: Any, *args: Any, **kwargs: Any) -> None:
         bound = signature.bind(*args, **kwargs)
-        values = _resolved_values(bound, field_map)
+        values = _resolved_values(
+            bound, constructor_fields, non_init_default_fields,
+        )
         parsed = constructor_schema.parse(values)
         missing_outputs = [
             name
-            for name in init_names
+            for name in construction_schemas
             if name not in parsed or parsed[name] is MISSING
         ]
         if missing_outputs:
@@ -456,7 +520,12 @@ def _decorate(cls: type[Any], options: Mapping[str, Any]) -> type[Any]:
                 "Fields produced MISSING: "
                 + ", ".join(builtins.map(repr, missing_outputs)),
             )
-        _assign(self, parsed)
+        initvar_values = [parsed[name] for name in initvar_names]
+        stored_values = {
+            name: parsed[name]
+            for name in (*stored_names, *non_init_names)
+        }
+        _assign(self, stored_values, initvar_values)
 
     setattr(cls, _MARKER_ATTR, marker)
     cls.__init__ = __init__

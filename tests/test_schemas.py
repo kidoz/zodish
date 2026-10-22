@@ -3456,16 +3456,11 @@ class SchemaTests(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             @z.dataclass
-            class InitFalse:
-                value: int = dataclasses.field(init=False, default=1)
-
-        with self.assertRaises(TypeError):
-            @z.dataclass
-            class WithInitVar:
+            class InitVarMissingPostInitParam:
                 value: int
                 extra: dataclasses.InitVar[int]
 
-                def __post_init__(self, extra: int) -> None: ...
+                def __post_init__(self) -> None: ...
 
         with self.assertRaises(TypeError):
             @z.dataclass
@@ -4003,6 +3998,28 @@ class SchemaTests(unittest.TestCase):
         z.codecs.dataclass(PostSub).parse({"x": 3})
         self.assertEqual(post_calls, [3])
 
+        @dataclasses.dataclass
+        class InitVarBase:
+            x: int
+            token: dataclasses.InitVar[str]
+            seen: str = dataclasses.field(init=False, default="")
+
+            def __post_init__(self, token: str) -> None:
+                self.seen = token
+
+        @z.dataclass
+        class InitVarSub(InitVarBase):
+            y: int = 0
+
+        inherited = InitVarSub(x=1, token="t")
+        self.assertEqual(inherited.seen, "t")
+        self.assertEqual(
+            z.codecs.dataclass(InitVarSub).parse(
+                {"x": 2, "token": "u"},
+            ).seen,
+            "u",
+        )
+
         @z.dataclass(frozen=True)
         class FrozenBase:
             x: int
@@ -4032,6 +4049,138 @@ class SchemaTests(unittest.TestCase):
             @z.dataclass
             class GenericSub(GenericBase[int]):
                 extra: int = 0
+
+    def test_validated_dataclass_initvar(self):
+        calls: list[str] = []
+
+        @z.dataclass
+        class User:
+            name: Annotated[str, z.string().min(1)]
+            token: dataclasses.InitVar[
+                Annotated[str, z.string().min(1)]
+            ]
+            seen: str = dataclasses.field(init=False, default="")
+
+            def __post_init__(self, token: str) -> None:
+                calls.append(token)
+                self.seen = token
+
+        user = User(name="Alex", token="abc")
+        self.assertEqual(user.seen, "abc")
+        self.assertEqual(calls, ["abc"])
+        self.assertFalse(hasattr(user, "token"))
+        self.assertIn("token", inspect.signature(User).parameters)
+        with self.assertRaises(ValidationError) as caught:
+            User(name="", token="")
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in caught.exception.issues],
+            [("too_small", ("name",)), ("too_small", ("token",))],
+        )
+        codec = z.codecs.dataclass(User)
+        decoded = codec.parse({"name": "Alex", "token": "xyz"})
+        self.assertEqual(decoded.seen, "xyz")
+        self.assertEqual(codec.encode(decoded), {"name": "Alex"})
+
+        @z.dataclass
+        class Defaulted:
+            value: int
+            token: dataclasses.InitVar[str] = "default"
+            seen: str = dataclasses.field(init=False, default="")
+
+            def __post_init__(self, token: str) -> None:
+                self.seen = token
+
+        self.assertEqual(Defaulted(value=1).seen, "default")
+        self.assertEqual(
+            z.codecs.dataclass(Defaulted).parse({"value": 1}).seen,
+            "default",
+        )
+
+        @z.dataclass
+        class NoPost:
+            value: int
+            token: dataclasses.InitVar[str]
+
+        self.assertEqual(NoPost(value=1, token="ignored").value, 1)
+
+        @z.dataclass
+        class Coded:
+            value: int
+            token: dataclasses.InitVar[
+                Annotated[dt.date, z.codecs.iso_date()]
+            ]
+            seen: dt.date = dataclasses.field(
+                init=False, default=dt.date(2000, 1, 1),
+            )
+
+            def __post_init__(self, token: dt.date) -> None:
+                self.seen = token
+
+        self.assertEqual(
+            Coded(value=1, token=dt.date(2026, 1, 1)).seen,
+            dt.date(2026, 1, 1),
+        )
+        with self.assertRaises(ValidationError):
+            Coded(value=1, token="2026-01-01")
+        coded = z.codecs.dataclass(Coded).parse({
+            "value": 1, "token": "2026-01-01",
+        })
+        self.assertEqual(coded.seen, dt.date(2026, 1, 1))
+
+    def test_validated_dataclass_init_false_fields(self):
+        factory_calls: list[int] = []
+
+        @z.dataclass
+        class Item:
+            value: int
+            doubled: Annotated[int, z.integer().min(0)] = dataclasses.field(
+                init=False, default=0,
+            )
+            tags: list[str] = dataclasses.field(
+                init=False,
+                default_factory=lambda: factory_calls.append(1) or [],
+            )
+
+            def __post_init__(self) -> None:
+                self.doubled = self.value * 2
+
+        item = Item(value=2)
+        self.assertEqual(item.doubled, 4)
+        self.assertEqual(item.tags, [])
+        self.assertEqual(factory_calls, [1])
+        self.assertEqual(
+            z.codecs.dataclass(Item).parse({"value": 3}).doubled, 6,
+        )
+        self.assertEqual(factory_calls, [1, 1])
+        self.assertEqual(
+            z.codecs.dataclass(Item).encode(item), {"value": 2},
+        )
+
+        @z.dataclass
+        class BadDefault:
+            value: int
+            count: Annotated[int, z.integer().min(0)] = dataclasses.field(
+                init=False, default=-1,
+            )
+
+        with self.assertRaises(ValidationError) as caught:
+            BadDefault(value=1)
+        self.assertEqual(caught.exception.issues[0].path, ("count",))
+        with self.assertRaises(ValidationError):
+            z.codecs.dataclass(BadDefault).parse({"value": 1})
+
+        @z.dataclass
+        class PostOnly:
+            value: int
+            result: int = dataclasses.field(init=False)
+
+            def __post_init__(self) -> None:
+                self.result = self.value + 1
+
+        self.assertEqual(PostOnly(value=1).result, 2)
+        self.assertEqual(
+            z.codecs.dataclass(PostOnly).parse({"value": 1}).result, 2,
+        )
 
     def test_public_annotations_resolve(self):
         self.assertIn("params", get_type_hints(z.Issue))
