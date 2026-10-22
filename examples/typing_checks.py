@@ -535,6 +535,19 @@ if TYPE_CHECKING:
     frozen_validated.name = "Other"  # type: ignore[misc]
 
 
+@z.dataclass(validate_assignment=True)
+class AssignmentValidated:
+    name: str
+    age: int = 0
+
+
+assignment_validated = AssignmentValidated(name="Alex")
+assert_type(assignment_validated.name, str)
+assignment_validated.name = "Bob"
+if TYPE_CHECKING:
+    assignment_validated.name = 1  # type: ignore[assignment]
+
+
 @z.dataclass(kw_only=True)
 class KeywordValidated:
     name: str
@@ -555,6 +568,16 @@ assert_type(WrappedValidated, type[ExistingValidated])
 assert_type(WrappedValidated(name="Alex"), ExistingValidated)
 if TYPE_CHECKING:
     WrappedValidated(name=1)  # type: ignore[arg-type]
+
+
+@dataclass
+class ExistingAssignment:
+    value: int
+
+
+WrappedAssignment = z.dataclass(ExistingAssignment, validate_assignment=True)
+assert_type(WrappedAssignment, type[ExistingAssignment])
+assert_type(WrappedAssignment(value=1), ExistingAssignment)
 
 
 @z.dataclass

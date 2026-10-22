@@ -21,6 +21,7 @@ from . import _annotations
 from . import schemas as _schemas
 from ._codecs import CodecSchema
 from ._core import _UNSET, MISSING, Schema
+from ._errors import ValidationError, _prefix_issue
 from ._native import NativeSchema
 
 
@@ -63,6 +64,8 @@ class _ValidatedDataclass:
     annotation_guards: Mapping[str, Schema[Any, Any] | None]
     fields: Mapping[str, dataclasses.Field[Any]]
     has_default: Mapping[str, bool]
+    assignment_schemas: Mapping[str, Schema[Any, Any]]
+    validate_assignment: bool
 
 
 def marker_for(cls: type[Any]) -> _ValidatedDataclass | None:
@@ -224,6 +227,58 @@ def _guard_only_schema(
     )
 
 
+def _compile_field_schema(
+    cls: type[Any],
+    name: str,
+    field: dataclasses.Field[Any],
+    annotation: Any,
+) -> tuple[
+    Schema[Any, Any],
+    Schema[Any, Any] | None,
+    Schema[Any, Any] | None,
+    Schema[Any, Any],
+]:
+    """Compile one field schema and its optional output guards."""
+    if _is_initvar_field(field):
+        annotation = _initvar_annotation(annotation, name)
+    schema, resolved, explicit = _annotations.dataclass_field_schema(
+        annotation, name, stack=(cls,),
+    )
+    if not isinstance(schema, Schema):
+        raise TypeError(f"Field {name!r} must be a schema")
+    base = _codec_output_schema(schema) or schema
+    if base._node.has_async:
+        raise TypeError(
+            f"Field {name!r} uses asynchronous validation; "
+            "construction is synchronous",
+        )
+    if _contains_kind(base._node, _UNSUPPORTED_CONSTRUCTION_KINDS):
+        raise TypeError(
+            f"Field {name!r} uses a type-changing conversion; "
+            "constructor values are decoded values. Use a codec or the "
+            "codec boundary instead",
+        )
+    candidate = _annotations.infer_dataclass_field(
+        annotation, name, stack=(cls,), type_only=True,
+    )
+    expected_text = _annotation_text(resolved)
+    annotation_guard = (
+        None
+        if candidate._node.kind == "unknown"
+        else _guard_only_schema(candidate, name, expected_text)
+    )
+    guard: Schema[Any, Any] | None = None
+    construction = base
+    if explicit:
+        _check_static_output(annotation, base, name, candidate)
+        if annotation_guard is not None:
+            construction = _guarded_schema(
+                base, candidate, name, expected_text,
+            )
+            guard = annotation_guard
+    return construction, guard, annotation_guard, base
+
+
 def _reject_unsupported_inheritance(cls: type[Any]) -> None:
     direct_bases = [
         base
@@ -331,6 +386,40 @@ def _is_generated_init(init: Any) -> bool:
     return code is not None and code.co_filename == "<string>"
 
 
+def _inherited_assignment_validation(cls: type[Any]) -> bool:
+    for base in cls.__mro__[1:]:
+        marker = marker_for(base)
+        if marker is not None and marker.validate_assignment:
+            return True
+    return False
+
+
+def _validated_setattr(self: Any, name: str, value: Any) -> None:
+    """Validate a declared stored-field assignment before setting it."""
+    marker = marker_for(type(self))
+    if marker is not None and marker.validate_assignment:
+        schema = marker.assignment_schemas.get(name)
+        if schema is not None:
+            if value is MISSING:
+                raise TypeError(
+                    f"MISSING is not a valid value for field {name!r}",
+                )
+            try:
+                parsed = schema.parse(value)
+            except ValidationError as error:
+                raise ValidationError([
+                    _prefix_issue(issue, name) for issue in error.issues
+                ]) from None
+            value = _checked_value(name, parsed)
+    object.__setattr__(self, name, value)
+
+
+def _install_assignment_validation(cls: type[Any]) -> None:
+    if cls.__dict__.get("__setattr__") is _validated_setattr:
+        return
+    type.__setattr__(cls, "__setattr__", _validated_setattr)
+
+
 def _reject_allocation_hooks(cls: type[Any]) -> None:
     if getattr(cls, "__new__", object.__new__) is not object.__new__:
         raise TypeError(
@@ -338,10 +427,11 @@ def _reject_allocation_hooks(cls: type[Any]) -> None:
         )
     dataclass_params = getattr(cls, "__dataclass_params__", None)
     frozen = bool(dataclass_params is not None and dataclass_params.frozen)
+    current_setattr = getattr(cls, "__setattr__", object.__setattr__)
     if (
         not frozen
-        and getattr(cls, "__setattr__", object.__setattr__)
-        is not object.__setattr__
+        and current_setattr is not object.__setattr__
+        and current_setattr is not _validated_setattr
     ):
         raise TypeError(
             "Validated dataclasses do not support a custom __setattr__",
@@ -382,9 +472,14 @@ def _install_classmethods(
             setattr(cls, name, classmethod(descriptor.__func__))
 
 
-def _decorate(cls: type[Any], options: Mapping[str, Any]) -> type[Any]:
+def _decorate(
+    cls: type[Any],
+    options: Mapping[str, Any],
+    *,
+    validate_assignment: bool | None = None,
+) -> type[Any]:
     if marker_for(cls) is not None:
-        if options:
+        if options or validate_assignment is not None:
             raise TypeError(
                 "Applied options to an already validated dataclass",
             )
@@ -415,6 +510,18 @@ def _decorate(cls: type[Any], options: Mapping[str, Any]) -> type[Any]:
 
     _reject_unsupported(cls)
     _reject_allocation_hooks(cls)
+
+    effective_validate_assignment = (
+        _inherited_assignment_validation(cls)
+        if validate_assignment is None
+        else validate_assignment
+    )
+    if effective_validate_assignment:
+        params = getattr(cls, "__dataclass_params__", None)
+        if params is not None and params.frozen:
+            raise TypeError(
+                "validate_assignment requires a non-frozen dataclass",
+            )
 
     init_signature = inspect.signature(cls.__init__)
     init_parameters = list(init_signature.parameters.values())
@@ -479,25 +586,9 @@ def _decorate(cls: type[Any], options: Mapping[str, Any]) -> type[Any]:
         annotation = hints.get(name, _UNSET)
         if annotation is _UNSET:
             raise TypeError(f"Cannot infer a schema for field {name!r}")
-        if _is_initvar_field(field):
-            annotation = _initvar_annotation(annotation, name)
-        schema, resolved, explicit = _annotations.dataclass_field_schema(
-            annotation, name, stack=(cls,),
+        construction, guard, annotation_guard, base = _compile_field_schema(
+            cls, name, field, annotation,
         )
-        if not isinstance(schema, Schema):
-            raise TypeError(f"Field {name!r} must be a schema")
-        base = _codec_output_schema(schema) or schema
-        if base._node.has_async:
-            raise TypeError(
-                f"Field {name!r} uses asynchronous validation; "
-                "construction is synchronous",
-            )
-        if _contains_kind(base._node, _UNSUPPORTED_CONSTRUCTION_KINDS):
-            raise TypeError(
-                f"Field {name!r} uses a type-changing conversion; "
-                "constructor values are decoded values. Use a codec or the "
-                "codec boundary instead",
-            )
         field_has_default = (
             field.default is not dataclasses.MISSING
             or field.default_factory is not dataclasses.MISSING
@@ -511,28 +602,29 @@ def _decorate(cls: type[Any], options: Mapping[str, Any]) -> type[Any]:
                 f"Field {name!r} accepts missing input but the dataclass "
                 "field has no default",
             )
-        candidate = _annotations.infer_dataclass_field(
-            annotation, name, stack=(cls,), type_only=True,
-        )
-        expected_text = _annotation_text(resolved)
-        annotation_guard = (
-            None
-            if candidate._node.kind == "unknown"
-            else _guard_only_schema(candidate, name, expected_text)
-        )
-        guard: Schema[Any, Any] | None = None
-        construction = base
-        if explicit:
-            _check_static_output(annotation, base, name, candidate)
-            if annotation_guard is not None:
-                construction = _guarded_schema(
-                    base, candidate, name, expected_text,
-                )
-                guard = annotation_guard
         construction_schemas[name] = construction
         guards[name] = guard
         annotation_guards[name] = annotation_guard
         has_default[name] = field_has_default
+
+    assignment_schemas = {
+        name: schema
+        for name, schema in construction_schemas.items()
+        if name not in initvar_names
+    }
+    if effective_validate_assignment:
+        for field in dataclasses.fields(cls):
+            if field.name in assignment_schemas:
+                continue
+            annotation = hints.get(field.name, _UNSET)
+            if annotation is _UNSET:
+                raise TypeError(
+                    f"Cannot infer a schema for field {field.name!r}",
+                )
+            construction, _, _, _ = _compile_field_schema(
+                cls, field.name, field, annotation,
+            )
+            assignment_schemas[field.name] = construction
 
     constructor_schema = _schemas.object(construction_schemas)
     marker = _ValidatedDataclass(
@@ -546,6 +638,8 @@ def _decorate(cls: type[Any], options: Mapping[str, Any]) -> type[Any]:
         annotation_guards=annotation_guards,
         fields={name: field for name, field in all_fields.items()},
         has_default=has_default,
+        assignment_schemas=assignment_schemas,
+        validate_assignment=effective_validate_assignment,
     )
     original_init = cls.__init__
 
@@ -577,16 +671,24 @@ def _decorate(cls: type[Any], options: Mapping[str, Any]) -> type[Any]:
     cls.__init__ = __init__
     cls.__signature__ = signature
     _install_classmethods(cls, builtins.set(all_fields))
+    if effective_validate_assignment:
+        _install_assignment_validation(cls)
     return cls
 
 
 def dataclass(
     cls: type[Any] | None = None,
     /,
+    *,
+    validate_assignment: bool | None = None,
     **options: Any,
 ) -> Any:
     """Implement the public ``z.dataclass`` decorator."""
     def decorate(target: type[Any]) -> type[Any]:
-        return _decorate(target, options)
+        return _decorate(
+            target,
+            options,
+            validate_assignment=validate_assignment,
+        )
 
     return decorate if cls is None else decorate(cls)

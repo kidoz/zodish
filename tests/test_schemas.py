@@ -4183,6 +4183,180 @@ class SchemaTests(unittest.TestCase):
             z.codecs.dataclass(PostOnly).parse({"value": 1}).result, 2,
         )
 
+    def test_validated_dataclass_assignment_validation(self):
+        @z.dataclass(validate_assignment=True)
+        class User:
+            name: Annotated[str, z.string().trim().min(1)]
+            age: Annotated[int, z.integer().min(0)]
+            nickname: str | None = None
+
+        user = User(" Alex ", 30)
+        self.assertEqual(user.name, "Alex")
+        user.name = " Bob "
+        self.assertEqual(user.name, "Bob")
+        user.age = 0
+        with self.assertRaises(ValidationError) as caught:
+            user.age = -1
+        self.assertEqual(caught.exception.issues[0].path, ("age",))
+        self.assertEqual(user.age, 0)
+        with self.assertRaises(TypeError):
+            user.age = MISSING
+        self.assertEqual(user.age, 0)
+        user.nickname = "Al"
+        self.assertEqual(user.nickname, "Al")
+        user.extra = "allowed"
+        self.assertEqual(user.extra, "allowed")
+
+        with self.assertRaises(ValidationError):
+            user.name = "   "
+        self.assertEqual(user.name, "Bob")
+        self.assertEqual(
+            dataclasses.replace(user, age=1).age, 1,
+        )
+        with self.assertRaises(ValidationError):
+            dataclasses.replace(user, age=-1)
+
+        validation_calls: list[int] = []
+
+        @z.dataclass(validate_assignment=True)
+        class Counted:
+            value: Annotated[
+                int,
+                z.integer().overwrite(
+                    lambda value: validation_calls.append(value) or value,
+                ),
+            ]
+
+        Counted(1)
+        self.assertEqual(validation_calls, [1])
+        counted = Counted(1)
+        validation_calls.clear()
+        counted.value = 2
+        self.assertEqual(validation_calls, [2])
+
+        @z.dataclass(validate_assignment=True)
+        class Items:
+            values: Annotated[list[int], z.array(z.integer().min(0))]
+
+        items = Items([1])
+        with self.assertRaises(ValidationError) as caught:
+            items.values = [1, -1]
+        self.assertEqual(caught.exception.issues[0].path, ("values", 1))
+        self.assertEqual(items.values, [1])
+
+        @z.dataclass(validate_assignment=True)
+        class Event:
+            when: Annotated[dt.datetime, z.codecs.iso_datetime()]
+
+        event = Event(dt.datetime(2026, 1, 1))
+        event.when = dt.datetime(2026, 1, 2)
+        self.assertEqual(event.when, dt.datetime(2026, 1, 2))
+        with self.assertRaises(ValidationError):
+            event.when = "2026-01-03T00:00:00"
+
+        @z.dataclass(validate_assignment=True)
+        class Guarded:
+            value: Annotated[int, z.unknown()]
+
+        guarded = Guarded(1)
+        with self.assertRaises(TypeError):
+            guarded.value = "wrong"
+        self.assertEqual(guarded.value, 1)
+
+        @z.dataclass
+        class Plain:
+            value: int
+
+        plain = Plain(1)
+        plain.value = "unvalidated"
+        self.assertEqual(plain.value, "unvalidated")
+
+        with self.assertRaises(TypeError):
+            @z.dataclass(frozen=True, validate_assignment=True)
+            class Frozen:
+                value: int
+
+        @z.dataclass(slots=True, validate_assignment=True)
+        class Slotted:
+            value: Annotated[int, z.integer().min(0)]
+
+        slotted = Slotted(1)
+        slotted.value = 2
+        with self.assertRaises(ValidationError):
+            slotted.value = -1
+        self.assertEqual(slotted.value, 2)
+        with self.assertRaises(AttributeError):
+            slotted.extra = "not a slot"
+
+        @z.dataclass(validate_assignment=True)
+        class PostInit:
+            value: int
+            doubled: Annotated[int, z.integer().min(0)] = dataclasses.field(
+                init=False, default=0,
+            )
+            result: Annotated[int, z.integer().min(0)] = dataclasses.field(
+                init=False,
+            )
+
+            def __post_init__(self) -> None:
+                self.doubled = self.value * 2
+                self.result = self.value + 1
+
+        post = PostInit(2)
+        self.assertEqual(post.doubled, 4)
+        self.assertEqual(post.result, 3)
+        with self.assertRaises(ValidationError):
+            post.doubled = -1
+        with self.assertRaises(ValidationError):
+            post.result = -1
+        self.assertEqual(post.doubled, 4)
+        self.assertEqual(post.result, 3)
+
+        @z.dataclass(validate_assignment=True)
+        class BadPostInit:
+            value: int
+
+            def __post_init__(self) -> None:
+                self.value = "bad"
+
+        with self.assertRaises(ValidationError):
+            BadPostInit(1)
+
+        @z.dataclass(validate_assignment=True)
+        class Base:
+            value: Annotated[int, z.integer().min(0)]
+
+        @z.dataclass
+        class Child(Base):
+            other: Annotated[int, z.integer().min(0)] = 0
+
+        child = Child(1)
+        child.other = 2
+        with self.assertRaises(ValidationError):
+            child.value = -1
+        with self.assertRaises(ValidationError):
+            child.other = -1
+
+        @z.dataclass(validate_assignment=False)
+        class UnvalidatedChild(Base):
+            other: int = 0
+
+        unvalidated = UnvalidatedChild(1)
+        unvalidated.value = -1
+        unvalidated.other = "unvalidated"
+        self.assertEqual(unvalidated.value, -1)
+        self.assertEqual(unvalidated.other, "unvalidated")
+
+        @dataclasses.dataclass
+        class Existing:
+            value: int
+
+        Wrapped = z.dataclass(Existing, validate_assignment=True)
+        wrapped = Wrapped(1)
+        with self.assertRaises(ValidationError):
+            wrapped.value = "wrong"
+        self.assertEqual(wrapped.value, 1)
+
     def test_validated_dataclass_classmethods(self):
         @z.dataclass
         class User:

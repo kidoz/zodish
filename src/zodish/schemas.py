@@ -1549,7 +1549,12 @@ class ValidatedModel:
 
 
 @overload
-def dataclass[T](cls: type[T], /) -> type[T]: ...
+def dataclass[T](
+    cls: type[T],
+    /,
+    *,
+    validate_assignment: bool | None = ...,
+) -> type[T]: ...
 
 
 @overload
@@ -1565,6 +1570,7 @@ def dataclass[T](
     kw_only: bool = ...,
     slots: bool = ...,
     weakref_slot: bool = ...,
+    validate_assignment: bool | None = ...,
 ) -> Callable[[type[T]], type[T]]: ...
 
 
@@ -1578,6 +1584,8 @@ def dataclass[T](
 
     Field annotations are compiled into one native object schema. Constructor
     arguments are decoded values; use ``z.codecs.dataclass`` for encoded input.
+    Set ``validate_assignment=True`` to validate later field assignments; the
+    default is inherited by decorated subclasses.
     """
     from ._validated_dataclasses import dataclass as _validated_dataclass
 
