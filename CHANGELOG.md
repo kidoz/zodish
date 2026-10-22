@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documented and type-checked the Python shapes consumed by the native
   evaluator (`_node`, `Issue` fields, `ValidationError.issues`/`_from_bundle`,
   and raw issue tuples) in `zodish/_boundary.py`.
+- Documented `.regex()` backtracking risk, nested-union worst-case cost, and
+  GIL-holding behavior for long synchronous parses.
 - Release workflows pin third-party actions to commit SHAs, attest build
   provenance for wheels and sdists, and require an explicit tag for manual
   publishes. Benchmark result snapshots are excluded from the sdist, and the

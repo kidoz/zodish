@@ -110,6 +110,23 @@ the cost of a Python call. Common exact synchronous callback result types bypass
 async inspection; other result types still receive full awaitable and
 async-generator checks. The rest of a parse stays in Rust.
 
+## Python boundary contract
+
+Rust reads a small set of Python attributes by name. These are part of the
+native boundary, not implementation details:
+
+- a lazy factory returns an object with `_node: NativeSchema`;
+- `Issue` exposes `code`, `message`, `path`, `branches`, and `params`;
+- `ValidationError` exposes `issues` and the `_from_bundle(bundle)` classmethod;
+- `NativeIssueBundle.to_raw()` returns `(code, message, path, branches, params)`
+  tuples in that positional order;
+- `NativeSchema("object", ...)` expects `(keys, policy, catchall, input_keys)`
+  as its four positional arguments.
+
+`zodish/_boundary.py` encodes these shapes as protocols and checks the concrete
+classes against them. Change the Python definitions and the Rust accessors
+together.
+
 ## Bidirectional codecs
 
 A codec wraps an encoded schema, a decoded schema, and two Python callbacks.
@@ -185,7 +202,14 @@ iteration, the recursive row benefits from per-parse lazy resolution, object
 parsing skips the unknown-key scan and input copy when every input key belongs
 to the shape, and failures defer Python `Issue` materialization and message
 formatting until they are read. Materializing `.issues` builds and caches the
-`Issue` objects on first access. Results depend on the host, Python version, and
+`Issue` objects on first access.
+
+On GIL builds the native evaluator holds the GIL for the entire synchronous
+parse, so long parses of very large inputs can block other Python threads.
+There is no GIL-release path. Free-threaded wheels do not use a GIL, but the
+parse still runs on the calling thread.
+
+Results depend on the host, Python version, and
 native build profile; the harness has no pass/fail thresholds.
 
 A [release comparison of the Rust module split](../../benchmarks/results/2026-10-21-macos-arm64-rust-decomposition.md)

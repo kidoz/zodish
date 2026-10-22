@@ -266,6 +266,12 @@ class StringSchema(Schema[str, str]):
         return self.min(length, message=message).max(length, message=message)
 
     def regex(self, pattern: str | re.Pattern[str], message: str = "Invalid format") -> Self:
+        """Match a Python regular expression.
+
+        Patterns run through Python's ``re`` engine and can backtrack
+        catastrophically on crafted input. Do not use untrusted patterns;
+        prefer the built-in format helpers for untrusted data.
+        """
         return self._regex(pattern, message, "regex")
 
     def email(self, *, message: str = "Invalid email address") -> Self:
@@ -1143,6 +1149,12 @@ def union(*options: Schema[Any, Any]) -> UnionSchema[Any, Any]: ...
 
 
 def union(*options: Schema[Any, Any]) -> UnionSchema[Any, Any]:
+    """Try options in order and return the first success.
+
+    Every failing branch is evaluated, so deeply nested unions can grow
+    exponentially. Prefer ``discriminated_union`` when branches share a
+    literal discriminator.
+    """
     if not options:
         raise ValueError("Union requires at least one schema")
     if not all(isinstance(option, Schema) for option in options):
@@ -1170,7 +1182,7 @@ def discriminated_union(
     key: str,
     options: Mapping[str, Schema[Any, Any]],
 ) -> DiscriminatedUnionSchema:
-    """Dispatch on a dictionary key; option values are branch schemas."""
+    """Dispatch on a dictionary key; only the selected branch is evaluated."""
     if not isinstance(key, str):
         raise TypeError("Discriminator key must be a string")
     items = builtins.tuple(options.items())

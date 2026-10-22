@@ -44,6 +44,10 @@ formats.
 | `.trim()`, `.lower()`, `.upper()` | Value normalization |
 | `.stringbool(...)` | Coerce configured strings to `bool` |
 
+`.regex()` delegates to Python `re.search`; an author-supplied pattern can
+backtrack exponentially on crafted input. The built-in format helpers use fixed
+patterns and do not take pattern input.
+
 `.http_url()` accepts only `http` and `https` schemes. `.hex()` accepts one or
 more hexadecimal digits and does not require an even length. `.cidrv4()` and
 `.cidrv6()` validate address syntax and the prefix range; host bits may be set.
@@ -120,6 +124,10 @@ reversibly encodable when both key and value schemas are reversible.
 | `z.preprocess(fn, schema)` | Convert input before validation |
 | `z.preprocess_async(fn, schema)` | Await input conversion before validation |
 | `z.lazy(factory)` | Recursive schema; the factory is resolved once per lazy node per parse |
+
+Non-discriminated unions evaluate every failing branch. Deeply nested unions can
+grow exponentially; prefer `z.discriminated_union()` when branches share a
+literal discriminator.
 
 ## Methods on every schema
 

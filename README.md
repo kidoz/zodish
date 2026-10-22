@@ -226,7 +226,7 @@ z.union(z.string(), z.integer())
 z.string().or_(z.integer())
 ```
 
-Unions validate each branch in order and return the first success; a failure includes every branch's issues in `branches`. `z.enum()` reports a single `invalid_value` issue.
+Unions validate each branch in order and return the first success; a failure includes every branch's issues in `branches`. Every failing branch is evaluated before failure is reported, so deeply nested non-discriminated unions can grow exponentially with nesting depth. Use `z.discriminated_union()` when branches share a literal discriminator. `z.enum()` reports a single `invalid_value` issue.
 
 ### Discriminated unions
 
@@ -525,6 +525,12 @@ node.parse({"name": "root", "children": [{"name": "leaf"}]})
 ```
 
 Inputs must be acyclic. The native evaluator raises `RecursionError` at 256 nested schema-node evaluations, including wrappers, to bound Rust stack use. It also raises `RecursionError` when the remaining thread stack is too small, so a callback that re-enters `parse` on a small-stack thread fails cleanly instead of exhausting the native stack. A lazy node resolves its factory once per parse and reuses that schema for the rest of the parse; a later parse invokes the factory again. Python callbacks may additionally hit Python's recursion limit. Containers are shallow-snapshotted before traversal so callbacks can mutate the original list or dictionary without invalidating the iteration. Email validation checks basic syntax only; regexes use Python's `re.search` behavior. This core implements async composition, callback families, JSON parsing, async codecs, async dataclass codecs, and async encoding, but it does not implement async lazy factories, JSON Schema import, or all Zod formats. See [Async support](docs/explanation/async-support.md).
+
+## Limits and security notes
+
+- `.regex()` evaluates author-supplied Python patterns with `re.search`. A pathological pattern can backtrack catastrophically on crafted input; never use untrusted patterns. The built-in format helpers use fixed patterns.
+- Nested non-discriminated unions evaluate every failing branch, so worst-case cost grows exponentially with nesting. Use `z.discriminated_union()` when branches share a discriminator.
+- On GIL builds, native evaluation holds the GIL for the duration of a synchronous parse. Very large inputs can block other Python threads; there is no GIL-release path. Free-threaded wheels do not use a GIL, but evaluation still runs on the calling thread.
 
 ## Metadata
 
