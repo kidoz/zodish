@@ -3907,7 +3907,7 @@ def _export_base(
             schema, node, path, target, io, unrepresentable, relax_strip,
         )
     if kind == "record":
-        if isinstance(schema, KeyedRecordSchema):
+        if isinstance(schema, (KeyedRecordSchema, MapSchema)):
             key_schema: Schema[Any, Any] | None = schema.key_schema
             value_schema = schema.value_schema
         elif isinstance(schema, RecordSchema):

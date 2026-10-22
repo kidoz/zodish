@@ -3404,6 +3404,25 @@ class JSONSchemaTests(unittest.TestCase):
             },
         )
         self.assertEqual(
+            to_json_schema(z.map(z.string(), z.integer().describe("Count"))),
+            {
+                "type": "object",
+                "propertyNames": {"type": "string"},
+                "additionalProperties": {
+                    "type": "integer", "description": "Count",
+                },
+            },
+        )
+        self.assertEqual(
+            to_json_schema(z.record(z.integer().describe("Count"))),
+            {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "integer", "description": "Count",
+                },
+            },
+        )
+        self.assertEqual(
             to_json_schema(z.tuple(z.string()).rest(z.integer())),
             {
                 "type": "array",
