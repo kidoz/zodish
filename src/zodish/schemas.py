@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import binascii
 import builtins
+import copy as _copy
 import dataclasses
 import datetime as _datetime
 import decimal as _decimal
@@ -968,9 +969,9 @@ class Schema[Out, In = Out]:
         return self.nullable().optional()
 
     def default(self, value: In) -> Schema[Out, In]:
-        """Validate a fresh copy of the default when input is missing."""
+        """Snapshot ``value`` and validate a fresh copy for missing input."""
         return Schema[Out, In](
-            NativeSchema("default", (self._node,), (value,)),
+            NativeSchema("default", (self._node,), (_copy.deepcopy(value),)),
             _inner=self,
             _meta=self._meta,
         )
