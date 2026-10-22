@@ -164,8 +164,8 @@ comes from the substituted annotations and schemas.
 Recursive or unresolved aliases and variadic parameters (`TypeVarTuple` and
 `ParamSpec`) raise `TypeError`; use `fields=` for an explicit schema in those
 cases. Finite nesting such as `Items[Items[Age]]` is supported. This resolves
-aliases; parameterized dataclass classes such as `Box[int]` remain unsupported.
-An alias remains a Python type annotation. For an ordinary dataclass,
+aliases; parameterized dataclass codec targets such as `Box[int]` remain
+unsupported. An alias remains a Python type annotation. For an ordinary dataclass,
 validation happens through the dataclass codec; calling `User(...)` directly
 uses the ordinary constructor and does not validate its arguments. Use
 [`@z.dataclass`](#validate-direct-construction) when construction itself should
@@ -260,11 +260,16 @@ A validated class may inherit from multiple dataclass bases (ordinary or
 validated) plus non-dataclass mixins. Standard dataclass MRO field-order,
 duplicate-field, and diamond rules apply. Inherited fields, defaults,
 factories, overrides, `InitVar`, `init=False` fields, and `__post_init__` are
-validated with the subclass's annotations. Generic or parameterized bases and a
-base with the `init=False` option or a custom `__init__` are rejected. An
-undecorated subclass of a validated class is not validated; the codec rejects
-it, and applying stdlib `@dataclasses.dataclass` to it does not restore
-validation. Decorate the subclass with `@z.dataclass` to validate its fields.
+validated with the subclass's annotations. Parameterized dataclass bases bind
+concrete type arguments into inherited fields; a generic validated class's own
+unbound type parameters validate as `Any`. Use a decorated parameterized
+subclass such as `class IntBox(Box[int])` for concrete runtime validation;
+`Box[int](...)` itself cannot see the runtime type argument. Variadic generic
+parameters and recursive self-references are rejected, as are bases with the
+`init=False` option or a custom `__init__`. An undecorated subclass of a
+validated class is not validated; the codec rejects it, and applying stdlib
+`@dataclasses.dataclass` to it does not restore validation. Decorate the
+subclass with `@z.dataclass` to validate its fields.
 
 `@z.dataclass` uses `dataclass_transform`, so type checkers see typed
 constructor arguments and attributes. Literal `frozen=True` and `kw_only=True`

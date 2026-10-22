@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `to_json_schema` methods backed by a cached `z.codecs.dataclass` schema.
   `z.ValidatedModel` provides typed classmethods; decorated classes also receive
   them at runtime unless a user-defined method or field name wins.
+- Validated dataclasses support generic classes and parameterized dataclass
+  bases. Unbound class type parameters validate as `Any`; decorated
+  parameterized subclasses substitute concrete type arguments into inherited
+  fields and codecs. Variadic generic parameters remain unsupported.
 - Validated dataclasses support one or more dataclass bases (ordinary or
   validated), including diamond inheritance, plus non-dataclass mixins, field
   overrides/additions, inherited defaults/factories, `__post_init__`,

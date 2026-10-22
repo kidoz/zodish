@@ -319,11 +319,15 @@ A validated class may inherit from multiple dataclass bases (ordinary or
 validated) plus non-dataclass mixins. Standard dataclass MRO field-order,
 duplicate-field, and diamond rules apply. Inherited fields, defaults, factories,
 overrides, `InitVar`, `init=False` fields, and `__post_init__` are validated
-with the subclass's annotations. Generic or parameterized bases and a base with
-the `init=False` option or a custom `__init__` are rejected. An undecorated
-subclass is not validated; the codec rejects it, and stdlib
-`@dataclasses.dataclass` on the subclass does not restore validation. Decorate
-the subclass with `@z.dataclass`.
+with the subclass's annotations. Parameterized dataclass bases bind concrete
+type arguments into inherited fields; a generic class's own unbound type
+parameters validate as `Any`. Use a decorated parameterized subclass such as
+`class IntBox(Box[int])` for concrete runtime validation; `Box[int](...)` itself
+cannot see the runtime type argument. Variadic generic parameters and recursive
+self-references are rejected, as are bases with the `init=False` option or a
+custom `__init__`. An undecorated subclass is not validated; the codec rejects
+it, and stdlib `@dataclasses.dataclass` on the subclass does not restore
+validation. Decorate the subclass with `@z.dataclass`.
 
 Supported options include `frozen`, `slots`, `weakref_slot=True` with slots,
 `kw_only`, `repr`, `eq`, `order`, `unsafe_hash`, and `match_args`. A
