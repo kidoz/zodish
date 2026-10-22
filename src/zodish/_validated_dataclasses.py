@@ -8,6 +8,7 @@ assembler without calling the validating initializer.
 
 from __future__ import annotations
 
+import annotationlib
 import builtins
 import dataclasses
 import functools
@@ -70,6 +71,7 @@ class _ValidatedDataclass:
     validate_assignment: bool
     async_fields: bool
     type_bindings: Mapping[typing.TypeVar, _annotations._DataclassAnnotation]
+    recursive: bool
 
 
 def marker_for(cls: type[Any]) -> _ValidatedDataclass | None:
@@ -80,8 +82,14 @@ def marker_for(cls: type[Any]) -> _ValidatedDataclass | None:
 
 def codec_for(cls: type[Any]) -> CodecSchema[Any, Any]:
     """Return the cached dataclass codec for a validated class."""
-    if marker_for(cls) is None:
+    marker = marker_for(cls)
+    if marker is None:
         raise TypeError("ValidatedModel methods require @z.dataclass")
+    if marker.recursive:
+        raise TypeError(
+            "Recursive validated dataclasses do not support codec "
+            "decoding or encoding; construct nested instances directly",
+        )
     cached = cls.__dict__.get("__zodish_codec_cache__")
     if isinstance(cached, CodecSchema):
         return cached
@@ -253,6 +261,7 @@ def _compile_field_schema(
         name,
         stack=(cls,),
         bindings=bindings,
+        decoded_dataclasses=True,
     )
     if not isinstance(schema, Schema):
         raise TypeError(f"Field {name!r} must be a schema")
@@ -416,6 +425,61 @@ def _class_type_bindings(
                 bindings=bindings,
             )
     return bindings
+
+
+def _annotation_references_recursive(
+    annotation: Any,
+    classes: builtins.tuple[type[Any], ...],
+    bindings: Mapping[typing.TypeVar, _annotations._DataclassAnnotation],
+    seen: builtins.set[int],
+) -> bool:
+    if annotation is _UNSET or annotation is Ellipsis:
+        return False
+    if isinstance(annotation, typing.TypeVar):
+        if id(annotation) in seen:
+            return False
+        seen.add(id(annotation))
+        bound = bindings.get(annotation)
+        if bound is None:
+            return False
+        return _annotation_references_recursive(
+            bound.annotation,
+            classes,
+            bound.bindings or bindings,
+            seen,
+        )
+    if annotation in classes:
+        return True
+    if isinstance(annotation, type) and dataclasses.is_dataclass(annotation):
+        marker = marker_for(annotation)
+        if marker is not None and marker.recursive:
+            return True
+    origin = typing.get_origin(annotation)
+    args = typing.get_args(annotation)
+    if origin is typing.Annotated and args:
+        return _annotation_references_recursive(
+            args[0], classes, bindings, seen,
+        )
+    if origin in classes:
+        return True
+    if origin is not None and dataclasses.is_dataclass(origin):
+        marker = marker_for(typing.cast(type[Any], origin))
+        if marker is not None and marker.recursive:
+            return True
+    if isinstance(annotation, typing.TypeAliasType):
+        if id(annotation) in seen:
+            return False
+        seen.add(id(annotation))
+        return _annotation_references_recursive(
+            annotation.__value__, classes, bindings, seen,
+        )
+    return builtins.any(
+        _annotation_references_recursive(
+            arg, classes, bindings, seen,
+        )
+        for arg in args
+        if arg is not Ellipsis
+    )
 
 
 def _inherited_assignment_validation(cls: type[Any]) -> bool:
@@ -613,7 +677,13 @@ def _decorate(
         else async_fields
     )
 
-    init_signature = inspect.signature(cls.__init__)
+    try:
+        init_signature = inspect.signature(cls.__init__)
+    except (NameError, TypeError):
+        init_signature = inspect.signature(
+            cls.__init__,
+            annotation_format=annotationlib.Format.FORWARDREF,
+        )
     init_parameters = list(init_signature.parameters.values())
     if init_parameters and init_parameters[0].name == "self":
         init_parameters = init_parameters[1:]
@@ -666,6 +736,15 @@ def _decorate(
 
     hints = _annotations.dataclass_type_hints(cls)
     type_bindings = _class_type_bindings(cls)
+    recursive = builtins.any(
+        _annotation_references_recursive(
+            hints.get(name, _UNSET),
+            cls.__mro__,
+            type_bindings,
+            builtins.set(),
+        )
+        for name in all_fields
+    )
     construction_schemas: dict[str, Schema[Any, Any]] = {}
     guards: dict[str, Schema[Any, Any] | None] = {}
     annotation_guards: dict[str, Schema[Any, Any] | None] = {}
@@ -753,6 +832,7 @@ def _decorate(
         validate_assignment=effective_validate_assignment,
         async_fields=effective_async_fields,
         type_bindings=type_bindings,
+        recursive=recursive,
     )
     original_init = cls.__init__
 

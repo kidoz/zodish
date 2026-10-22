@@ -12,6 +12,7 @@ import dataclasses
 import datetime as _datetime
 import decimal as _decimal
 import pathlib as _pathlib
+import sys
 import types
 import typing
 from collections.abc import Mapping, Sequence
@@ -30,12 +31,54 @@ class _DataclassAnnotation:
     bindings: Mapping[typing.TypeVar, _DataclassAnnotation] = field(default_factory=dict)
 
 
+def _fallback_type_hints(cls: type[Any]) -> dict[str, Any]:
+    """Resolve deferred self-references that ``get_type_hints`` cannot.
+
+    PEP 649 evaluates annotations from the class's ``__annotate__`` function.
+    Before a decorator assigns the class to its module name, that function can
+    still fail on a self-reference. Resolve each MRO class with its class and
+    base names in the local namespace, preserving inherited annotations.
+    """
+    localns = {base.__name__: base for base in cls.__mro__}
+    resolved: dict[str, Any] = {}
+    for base in reversed(cls.__mro__):
+        if base is object:
+            continue
+        raw = annotationlib.get_annotations(
+            base, format=annotationlib.Format.FORWARDREF,
+        )
+        module = sys.modules.get(base.__module__)
+        globalns = vars(module) if module is not None else {}
+        base_localns = dict(localns)
+        base_localns.update(vars(base))
+        for name, annotation in raw.items():
+            if isinstance(annotation, str):
+                annotation = typing.ForwardRef(annotation)
+            resolved[name] = typing._eval_type(  # type: ignore[attr-defined]
+                annotation,
+                globalns,
+                base_localns,
+                type_params=getattr(base, "__type_params__", ()),
+                owner=base,
+            )
+    return resolved
+
+
 def dataclass_type_hints(cls: type[Any]) -> dict[str, Any]:
     """Resolve annotations without discarding schema metadata."""
     try:
-        return typing.get_type_hints(cls, include_extras=True)
-    except (NameError, TypeError) as error:
-        raise TypeError("Cannot resolve dataclass annotations") from error
+        return typing.get_type_hints(
+            cls,
+            localns={cls.__name__: cls},
+            include_extras=True,
+        )
+    except (NameError, TypeError):
+        try:
+            return _fallback_type_hints(cls)
+        except (NameError, TypeError) as fallback_error:
+            raise TypeError(
+                "Cannot resolve dataclass annotations",
+            ) from fallback_error
 
 
 def typed_dict_keys(typ: type[Any]) -> builtins.tuple[frozenset[str], frozenset[str]]:
@@ -160,6 +203,7 @@ def infer_dataclass_field(
     stack: builtins.tuple[type[Any], ...],
     context: _DataclassAnnotation | None = None,
     type_only: bool = False,
+    decoded_dataclasses: bool = False,
 ) -> _schemas.Schema[Any, Any]:
     """Build a field schema while retaining alias bindings and dataclass ancestry.
 
@@ -176,7 +220,12 @@ def infer_dataclass_field(
 
     def child(item: Any) -> _schemas.Schema[Any, Any]:
         return infer_dataclass_field(
-            item, name, stack=stack, context=context, type_only=type_only,
+            item,
+            name,
+            stack=stack,
+            context=context,
+            type_only=type_only,
+            decoded_dataclasses=decoded_dataclasses,
         )
 
     if annotation is Any or annotation is builtins.object:
@@ -288,6 +337,12 @@ def infer_dataclass_field(
             f"Field {name!r} uses a bare tuple annotation; "
             "use fixed-length tuple[...] syntax",
         )
+    if (
+        (type_only or decoded_dataclasses)
+        and origin is not None
+        and dataclasses.is_dataclass(origin)
+    ):
+        return _schemas.instance_of(cast(type[Any], origin))
     if not isinstance(annotation, type):
         supertype = getattr(annotation, "__supertype__", None)
         if supertype is not None:
@@ -299,7 +354,7 @@ def infer_dataclass_field(
     if type_only and typing.is_typeddict(annotation):
         return _schemas.record(_schemas.unknown())
     if dataclasses.is_dataclass(annotation):
-        if type_only:
+        if type_only or decoded_dataclasses:
             return _schemas.instance_of(annotation)
         return _codecs._Codecs.dataclass(annotation, _stack=stack)
     if issubclass(annotation, Enum):
@@ -385,6 +440,7 @@ def dataclass_field_schema(
     *,
     stack: builtins.tuple[type[Any], ...],
     bindings: Mapping[typing.TypeVar, _DataclassAnnotation] | None = None,
+    decoded_dataclasses: bool = False,
 ) -> builtins.tuple[_schemas.Schema[Any, Any], Any, bool]:
     """Return the field schema, resolved annotation, and explicit-schema flag."""
     context = _DataclassAnnotation(
@@ -396,7 +452,11 @@ def dataclass_field_schema(
         schema = metadata[0]
     else:
         schema = infer_dataclass_field(
-            context.annotation, name, stack=stack, context=context,
+            context.annotation,
+            name,
+            stack=stack,
+            context=context,
+            decoded_dataclasses=decoded_dataclasses,
         )
     explicit = bool(metadata) or _has_nested_schema_metadata(
         context.annotation, name, context,

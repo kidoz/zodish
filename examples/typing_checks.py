@@ -613,6 +613,19 @@ class GenericValidated[generic_type]:
 
 
 @z.dataclass
+class RecursiveValidated:
+    value: int
+    child: RecursiveValidated | None = None
+
+
+recursive_validated = RecursiveValidated(
+    value=1,
+    child=RecursiveValidated(value=2),
+)
+assert_type(recursive_validated.child, RecursiveValidated | None)
+
+
+@z.dataclass
 class IntValidated(GenericValidated[int]):
     pass
 

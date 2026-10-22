@@ -4109,6 +4109,101 @@ class SchemaTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             Both(left=1, right=2)
 
+    def test_validated_dataclass_recursive(self):
+        @z.dataclass
+        class Node:
+            value: Annotated[int, z.integer().min(0)]
+            child: "Node | None" = None  # noqa: UP037
+
+        node = Node(1, Node(2, Node(3)))
+        self.assertEqual(node.child.value, 2)
+        self.assertEqual(node.child.child.value, 3)
+        self.assertIsNone(node.child.child.child)
+        with self.assertRaises(ValidationError):
+            Node(1, 2)
+        with self.assertRaises(ValidationError):
+            Node(-1)
+
+        replaced = dataclasses.replace(node, value=4)
+        self.assertEqual(replaced.value, 4)
+        self.assertIs(replaced.child, node.child)
+
+        for call in (
+            lambda: z.codecs.dataclass(Node),
+            lambda: Node.parse({"value": 1}),
+            lambda: Node.encode(node),
+            lambda: Node.to_json_schema(),
+        ):
+            with self.subTest(call=call), self.assertRaisesRegex(
+                TypeError, "Recursive validated dataclasses",
+            ):
+                call()
+
+        @z.dataclass
+        class Tree:
+            value: int
+            children: list[Tree] = dataclasses.field(default_factory=list)
+
+        tree = Tree(1, [Tree(2), Tree(3, [Tree(4)])])
+        self.assertEqual(tree.children[1].children[0].value, 4)
+        with self.assertRaises(ValidationError):
+            Tree(1, [1])
+        with self.assertRaises(TypeError):
+            z.codecs.dataclass(Tree)
+
+        @z.dataclass
+        class Parent:
+            root: Node
+
+        parent = Parent(root=node)
+        self.assertIs(parent.root, node)
+        with self.assertRaises(ValidationError):
+            Parent(root={"value": 1})
+        with self.assertRaisesRegex(TypeError, "Recursive validated dataclasses"):
+            z.codecs.dataclass(Parent)
+
+        @z.dataclass
+        class SubNode(Node):
+            extra: int = 0
+
+        sub_node = SubNode(1, Node(2), 3)
+        self.assertEqual(sub_node.child.value, 2)
+        self.assertEqual(sub_node.extra, 3)
+        with self.assertRaises(ValidationError):
+            SubNode(1, {"value": 2}, 3)
+        with self.assertRaisesRegex(TypeError, "Recursive validated dataclasses"):
+            z.codecs.dataclass(SubNode)
+
+        @z.dataclass(validate_assignment=True)
+        class AssignNode:
+            value: int
+            child: AssignNode | None = None
+
+        assigned = AssignNode(1)
+        assigned.child = AssignNode(2)
+        self.assertEqual(assigned.child.value, 2)
+        with self.assertRaises(ValidationError):
+            assigned.child = {"value": 2}
+
+        @z.dataclass(frozen=True, slots=True)
+        class FrozenNode:
+            value: int
+            child: FrozenNode | None = None
+
+        frozen = FrozenNode(1, FrozenNode(2))
+        self.assertEqual(frozen.child.value, 2)
+        self.assertFalse(hasattr(frozen, "__dict__"))
+
+        @z.dataclass
+        class GenericNode[T]:
+            value: T
+            child: GenericNode[T] | None = None
+
+        generic_node = GenericNode(value=1, child=GenericNode(value=2))
+        self.assertEqual(generic_node.child.value, 2)
+        with self.assertRaisesRegex(TypeError, "Recursive validated dataclasses"):
+            z.codecs.dataclass(GenericNode)
+
     def test_validated_dataclass_multiple_bases(self):
         @dataclasses.dataclass
         class LeftBase:

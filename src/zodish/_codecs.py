@@ -899,6 +899,11 @@ class _Codecs:
         )
 
         marker = marker_for(cls)
+        if marker is not None and marker.recursive:
+            raise TypeError(
+                "Recursive validated dataclasses do not support codec "
+                "decoding or encoding; construct nested instances directly",
+            )
         fields_by_name: Mapping[str, dataclasses.Field[Any]]
         has_default: Mapping[str, bool]
         if marker is None:
