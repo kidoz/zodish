@@ -2124,6 +2124,54 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
             await async_limit(await asynchronous_schema()),
         )
 
+    async def test_deduplicated_paths_match_sync_results(self):
+        def sync_callback(value):
+            if value == "bad":
+                return Issue("custom", "bad value", ("inner",))
+            return None
+
+        async def async_callback(value):
+            return sync_callback(value)
+
+        async def passthrough(value):
+            return value
+
+        def issues(failure):
+            return [
+                (issue.code, issue.message, issue.path)
+                for issue in failure.error.issues
+            ]
+
+        sync_refine = z.string().super_refine(sync_callback)
+        async_refine = z.string().transform_async(passthrough).super_refine(
+            sync_callback,
+        )
+        self.assertEqual(
+            issues(sync_refine.safe_parse("bad")),
+            issues(await async_refine.safe_parse_async("bad")),
+        )
+
+        sync_refine = z.string().super_refine(sync_callback)
+        async_refine = z.string().super_refine_async(async_callback)
+        self.assertEqual(
+            issues(sync_refine.safe_parse("bad")),
+            issues(await async_refine.safe_parse_async("bad")),
+        )
+
+        sync_branch = z.object({"kind": z.literal("a"), "value": z.string()})
+        async_branch = z.object({
+            "kind": z.literal("a"),
+            "value": z.string().transform_async(passthrough),
+        })
+        sync_union = z.discriminated_union("kind", {"a": sync_branch})
+        async_union = z.discriminated_union("kind", {"a": async_branch})
+        for value in ({}, {"kind": "b"}, {"kind": "a", "value": 1}):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    issues(sync_union.safe_parse(value)),
+                    issues(await async_union.safe_parse_async(value)),
+                )
+
     async def test_cyclic_issue_branches_raise_recursion_error(self):
         issue = Issue("custom", "boom")
         object.__setattr__(issue, "branches", ((issue,),))
