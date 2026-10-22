@@ -19,6 +19,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, cast
 
+from . import _codecs as _codecs
 from . import schemas as _schemas
 
 
@@ -191,22 +192,22 @@ def infer_dataclass_field(
             return _schemas.none()
         if len(options) == 1:
             combined: _schemas.Schema[Any, Any] = options[0]
-        elif any(isinstance(item, _schemas.CodecSchema) for item in options):
-            combined = _schemas._union_codec(options)
+        elif any(isinstance(item, _codecs.CodecSchema) for item in options):
+            combined = _codecs._union_codec(options)
         else:
             combined = _schemas.union(*options)
         if len(non_none) != len(args):
             combined = (
-                _schemas._nullable_codec(combined)
-                if isinstance(combined, _schemas.CodecSchema)
+                _codecs._nullable_codec(combined)
+                if isinstance(combined, _codecs.CodecSchema)
                 else combined.nullable()
             )
         return combined
     if origin is list or origin is Sequence:
         item = child(args[0]) if args else _schemas.unknown()
         return (
-            _schemas._array_codec(item)
-            if isinstance(item, _schemas.CodecSchema)
+            _codecs._array_codec(item)
+            if isinstance(item, _codecs.CodecSchema)
             else _schemas.array(item)
         )
     if origin is dict or origin is Mapping:
@@ -222,8 +223,8 @@ def infer_dataclass_field(
             )
         value = child(value_type)
         return (
-            _schemas._record_codec(value)
-            if isinstance(value, _schemas.CodecSchema)
+            _codecs._record_codec(value)
+            if isinstance(value, _codecs.CodecSchema)
             else _schemas.record(value)
         )
     if origin is builtins.tuple:
@@ -241,8 +242,8 @@ def infer_dataclass_field(
             return _schemas.tuple()
         items = [child(item) for item in args]
         return (
-            _schemas._tuple_codec(items)
-            if any(isinstance(item, _schemas.CodecSchema) for item in items)
+            _codecs._tuple_codec(items)
+            if any(isinstance(item, _codecs.CodecSchema) for item in items)
             else _schemas.tuple(*items)
         )
     if annotation is list or annotation is Sequence:
@@ -263,7 +264,7 @@ def infer_dataclass_field(
             f"{annotation!r}",
         )
     if dataclasses.is_dataclass(annotation):
-        return _schemas._Codecs.dataclass(annotation, _stack=stack)
+        return _codecs._Codecs.dataclass(annotation, _stack=stack)
     if issubclass(annotation, Enum):
         return _schemas.native_enum(annotation)
     if issubclass(annotation, bool):
