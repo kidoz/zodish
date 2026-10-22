@@ -37,9 +37,13 @@ and release the same cached references.
 `rust/values.rs` shares Python value predicates, numeric multiple checks,
 coercion, error-value formatting, JSON-value compatibility checks, dictionary
 merging, and copying across validation paths. `rust/schema/evaluate.rs` owns
-synchronous traversal, container snapshots, primitive fast paths, issue
-aggregation, and depth checks. Async sessions reuse that evaluator for
-synchronous subtrees and share its primitive-kind classification.
+synchronous dispatch, primitive validation, composition, and depth checks.
+`rust/schema/evaluate/containers.rs` owns synchronous sequence and mapping
+evaluation, container snapshots, result construction, issue aggregation, and
+primitive fast paths. Its two evaluation methods are visible only within the
+evaluator module; its snapshot buffer and list fast-path helper stay private.
+Async sessions reuse the synchronous evaluator for synchronous subtrees and
+share the primitive-kind classification in `evaluate.rs`.
 `rust/schema.rs` defines `NativeSchema`, its unknown-key policy, constructor,
 capability flags, Python-facing methods, and GC integration. Its parse entry
 points call sync validation in `schema/evaluate.rs` and JSON decoding and fast

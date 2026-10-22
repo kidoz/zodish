@@ -586,7 +586,7 @@ to_json_schema(schema, target="openapi-3.0", io="input")
 
 ## Architecture
 
-The core lives in `rust/lib.rs`. Python schema builders construct native nodes; `parse()` enters the Rust evaluator once. Rust handles schema traversal, primitive validation, collection construction, bounds, optional/default handling, unions, and issue aggregation. There is no Python validation fallback. User callbacks, Python regular expressions, string case/whitespace operations, and `deepcopy` use Python operations to preserve their existing behavior. The public result/error classes and static typing remain Python code.
+The Rust core starts at `rust/lib.rs`, which declares modules and registers the Python extension. `rust/schema/evaluate.rs` dispatches synchronous validation, with container evaluation in `rust/schema/evaluate/containers.rs`; `rust/session.rs` and its child modules handle async sessions. Python schema builders construct native nodes; `parse()` enters the Rust evaluator once. Rust handles schema traversal, primitive validation, collection construction, bounds, optional/default handling, unions, and issue aggregation. There is no Python validation fallback. User callbacks, Python regular expressions, string case/whitespace operations, and `deepcopy` use Python operations to preserve their existing behavior. The public result/error classes and static typing remain Python code.
 
 ## Performance
 

@@ -28,6 +28,7 @@ SDIST_REQUIRED = {
     "rust/schema.rs",
     "rust/schema/checks.rs",
     "rust/schema/evaluate.rs",
+    "rust/schema/evaluate/containers.rs",
     "rust/schema/json.rs",
     "rust/schema/kind.rs",
     "rust/session.rs",
