@@ -41,9 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Self-referential validated dataclasses support direct construction with
   nested instances and codec `parse`/`encode` with nested encoded dictionaries,
   including `Node | None`, `list[Node]`, frozen/slots, assignment validation,
-  deferred annotations, containing classes, generic recursion, and recursive
-  JSON Schema export with `$ref` definitions. Async recursive codecs remain
-  unsupported.
+  deferred annotations, containing classes, generic recursion, recursive JSON
+  Schema export with `$ref` definitions, and async field codecs through
+  `parse_async`/`encode_async`.
 - Validated dataclasses support one or more dataclass bases (ordinary or
   validated), including diamond inheritance, plus non-dataclass mixins, field
   overrides/additions, inherited defaults/factories, `__post_init__`,

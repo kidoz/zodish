@@ -329,10 +329,10 @@ it, and stdlib `@dataclasses.dataclass` on the subclass does not restore
 validation. Decorate the subclass with `@z.dataclass`.
 
 Self-referential fields such as `Node | None` or `list[Node]` support direct
-construction with already-validated instances, codec `parse`/`encode` with
-nested encoded dictionaries, and JSON Schema export with recursive `$ref`
-definitions. Recursive async codecs are not supported. Deferred and quoted
-self-references resolve during decoration.
+construction with already-validated instances, synchronous and async codec
+`parse`/`encode` with nested encoded dictionaries, and JSON Schema export with
+recursive `$ref` definitions. Deferred and quoted self-references resolve during
+decoration.
 
 Supported options include `frozen`, `slots`, `weakref_slot=True` with slots,
 `kw_only`, `repr`, `eq`, `order`, `unsafe_hash`, and `match_args`. A
