@@ -57,6 +57,63 @@ jobs:
       - run: python examples/quickstart.py
       - run: python benchmarks/bench_parse.py --smoke
       - run: python benchmarks/bench_async.py --smoke
+  free-threaded-package:
+    name: free-threaded package (${{ matrix.os }} / ${{ matrix.target }} / ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64
+            python: '3.14t'
+          - os: ubuntu-latest
+            target: x86_64
+            python: '3.15t'
+          - os: ubuntu-24.04-arm
+            target: aarch64
+            python: '3.14t'
+          - os: ubuntu-24.04-arm
+            target: aarch64
+            python: '3.15t'
+          - os: macos-latest
+            target: aarch64
+            python: '3.14t'
+          - os: macos-latest
+            target: aarch64
+            python: '3.15t'
+          - os: macos-15-intel
+            target: x86_64
+            python: '3.14t'
+          - os: macos-15-intel
+            target: x86_64
+            python: '3.15t'
+          - os: windows-latest
+            target: x64
+            python: '3.14t'
+          - os: windows-latest
+            target: x64
+            python: '3.15t'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: dtolnay/rust-toolchain@stable
+      - run: python -m pip install 'maturin>=1.15,<2'
+      - name: Build free-threaded wheel
+        run: >-
+          maturin build --release --locked --interpreter python
+          --compatibility pypi --out dist
+      - name: Smoke-test the free-threaded wheel
+        run: |
+          python -m pip install --no-index --no-deps --force-reinstall dist/*.whl
+          python examples/verify_native.py
+          python -m unittest discover -s tests -v
+          python examples/quickstart.py
   package:
     name: package (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
