@@ -536,7 +536,7 @@ impl AsyncSession {
                     depth: depth + 1,
                 }))
             }
-            Kind::Array | Kind::Set | Kind::Tuple => {
+            Kind::Array | Kind::Set | Kind::SetEncode | Kind::Tuple => {
                 self.start_array(py, &ctx, node, &node_ref, value, path, depth)
             }
             Kind::Object => self.start_object(py, &ctx, node, &node_ref, value, path, depth),

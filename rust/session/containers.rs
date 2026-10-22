@@ -313,7 +313,8 @@ impl AsyncSession {
         depth: usize,
     ) -> PyResult<AsyncNext> {
         let is_tuple = matches!(node.kind, Kind::Tuple);
-        let is_set = matches!(node.kind, Kind::Set);
+        let is_set = matches!(node.kind, Kind::Set | Kind::SetEncode);
+        let encode_set = matches!(node.kind, Kind::SetEncode);
         let bound = value.bind(py);
         if bound.is(&ctx.missing) {
             let outcome = ctx.fail("required", "Required", &path);
@@ -415,6 +416,7 @@ impl AsyncSession {
             issues: Vec::new(),
             is_tuple,
             is_set,
+            encode_set,
             fixed,
             rest,
         }));
@@ -430,7 +432,9 @@ impl AsyncSession {
             if !frame.issues.is_empty() {
                 return Ok(deliver_at(Err(Error::Invalid(frame.issues)), frame.path));
             }
-            let outcome = if frame.is_set {
+            let outcome = if frame.encode_set {
+                Ok(PyList::new(py, frame.result)?.into_any().unbind())
+            } else if frame.is_set {
                 let set = PySet::empty(py)?;
                 for value in frame.result {
                     set.add(value.bind(py))?;

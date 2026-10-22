@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `z.set` schemas now export as JSON Schema arrays with `uniqueItems: true`,
+  map length constraints to `minItems`/`maxItems`, and reverse-encode to lists
+  when their item schema is reversible.
+- `z.map` schemas reverse-encode through keyed records when both key and value
+  schemas are reversible.
+
 ## [0.9.0] - 2026-10-22
 
 ### Added

@@ -382,9 +382,10 @@ impl NativeSchema {
                     ctx.fail_with("invalid_type", &format!("Expected {name}"), path, params)
                 }
             }
-            Kind::Array | Kind::Set | Kind::Tuple => {
+            Kind::Array | Kind::Set | Kind::SetEncode | Kind::Tuple => {
                 let is_tuple = matches!(self.kind, Kind::Tuple);
-                let is_set = matches!(self.kind, Kind::Set);
+                let is_set = matches!(self.kind, Kind::Set | Kind::SetEncode);
+                let encode_set = matches!(self.kind, Kind::SetEncode);
                 if is_set {
                     if !value.is_instance_of::<PySet>() {
                         let params = PyDict::new(py);
@@ -500,7 +501,9 @@ impl NativeSchema {
                 if !issues.is_empty() {
                     return Err(Error::Invalid(issues));
                 }
-                if is_set {
+                if encode_set {
+                    Ok(PyList::new(py, result)?.into_any().unbind())
+                } else if is_set {
                     let set = PySet::empty(py)?;
                     for value in result {
                         set.add(value.bind(py))?;

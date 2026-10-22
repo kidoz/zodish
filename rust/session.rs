@@ -126,6 +126,7 @@ struct ArrayFrame {
     issues: Vec<Issue>,
     is_tuple: bool,
     is_set: bool,
+    encode_set: bool,
     fixed: usize,
     rest: Option<Py<NativeSchema>>,
 }

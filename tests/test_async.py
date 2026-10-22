@@ -368,6 +368,24 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(bad_value, Failure)
         self.assertEqual(bad_value.error.issues[0].path, ("a",))
 
+    async def test_async_set_and_map_encoding(self):
+        async def decode(value):
+            return int(value)
+
+        async def encode(value):
+            return str(value)
+
+        codec = z.codec_async(
+            z.string(), z.integer(), decode=decode, encode=encode,
+        )
+        encoded_set = await z.set(codec).encode_async({1, 2})
+        self.assertIsInstance(encoded_set, list)
+        self.assertEqual(set(encoded_set), {"1", "2"})
+        self.assertEqual(
+            await z.map(z.string(), codec).encode_async({"a": 1}),
+            {"a": "1"},
+        )
+
     async def test_async_matches_sync_across_schema_families(self):
         async def always(value):
             return True

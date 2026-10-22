@@ -3181,6 +3181,20 @@ def _array_encode_node(
     return result
 
 
+def _set_encode_node(
+    schema: SetSchema[Any, Any], item: NativeSchema,
+) -> NativeSchema:
+    constraints: list[builtins.tuple[str, builtins.tuple[Any, ...]]] = []
+    node = schema._node
+    while node.kind in _CONSTRAINT_KINDS:
+        constraints.append((node.kind, node.args))
+        node = node.children[0]
+    result = NativeSchema("set_encode", (item,), ())
+    for kind, args in reversed(constraints):
+        result = NativeSchema(kind, (result,), args)
+    return result
+
+
 def _encode_node_for(schema: Schema[Any, Any]) -> NativeSchema | None:
     if isinstance(schema, CodecSchema):
         return schema._encode_node
@@ -3189,6 +3203,11 @@ def _encode_node_for(schema: Schema[Any, Any]) -> NativeSchema | None:
         if item_node is None:
             return None
         return _array_encode_node(schema, item_node)
+    if isinstance(schema, SetSchema):
+        item_node = _encode_node_for(schema.item)
+        if item_node is None:
+            return None
+        return _set_encode_node(schema, item_node)
     if isinstance(schema, ObjectSchema):
         property_nodes: list[NativeSchema] = []
         for prop in schema.shape.values():
@@ -3215,7 +3234,7 @@ def _encode_node_for(schema: Schema[Any, Any]) -> NativeSchema | None:
                 builtins.tuple(schema.shape),
             ),
         )
-    if isinstance(schema, KeyedRecordSchema):
+    if isinstance(schema, (KeyedRecordSchema, MapSchema)):
         key_node = _encode_node_for(schema.key_schema)
         value_node = _encode_node_for(schema.value_schema)
         if key_node is None or value_node is None:
@@ -3840,13 +3859,13 @@ def _export_base(
                 unrepresentable,
             )
         return {"enum": values}
-    if kind == "array":
+    if kind in ("array", "set"):
         item = (
             schema.item
-            if isinstance(schema, ArraySchema)
+            if isinstance(schema, (ArraySchema, SetSchema))
             else Schema[Any, Any](node.children[0])
         )
-        return {
+        result: JSONSchema = {
             "type": "array",
             "items": _export_schema(
                 item,
@@ -3857,6 +3876,9 @@ def _export_base(
                 relax_strip,
             ),
         }
+        if kind == "set":
+            result["uniqueItems"] = True
+        return result
     if kind == "object":
         return _export_object(
             schema, node, path, target, io, unrepresentable, relax_strip,
@@ -4206,7 +4228,7 @@ def _apply_constraints(
                 )
             multiple_values.append(node.args[0])
         elif kind in ("length_min", "length_max"):
-            if base_kind not in ("string", "array"):
+            if base_kind not in ("string", "array", "set"):
                 return _unsupported(
                     path, f"{kind} is not representable for {base_kind}",
                     unrepresentable,
@@ -4357,7 +4379,7 @@ def _apply_constraints(
             result["pattern"] = patterns[0]
         elif patterns:
             extra_checks.extend({"pattern": pattern} for pattern in patterns)
-    elif base_kind == "array":
+    elif base_kind in ("array", "set"):
         if min_items is not None:
             result["minItems"] = min_items
         if max_items is not None:

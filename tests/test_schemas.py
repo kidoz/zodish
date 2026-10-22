@@ -447,8 +447,16 @@ class SchemaTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             z.map(z.string(), "bad")
 
-        with self.assertRaises(UnrepresentableError):
-            z.set(z.integer()).to_json_schema()
+        self.assertEqual(
+            z.set(z.integer()).min(1).max(3).to_json_schema(),
+            {
+                "type": "array",
+                "items": {"type": "integer"},
+                "uniqueItems": True,
+                "minItems": 1,
+                "maxItems": 3,
+            },
+        )
         self.assertEqual(
             z.map(z.string(), z.integer()).to_json_schema(),
             {
@@ -457,10 +465,26 @@ class SchemaTests(unittest.TestCase):
                 "additionalProperties": {"type": "integer"},
             },
         )
+
+        encoded_set = z.set(z.integer()).encode({1, 2})
+        self.assertIsInstance(encoded_set, list)
+        self.assertEqual(set(encoded_set), {1, 2})
+        self.assertEqual(
+            z.map(z.string(), z.integer()).encode({"a": 1}), {"a": 1},
+        )
+        codec = z.codec(z.string(), z.integer(), decode=int, encode=str)
+        self.assertEqual(
+            set(z.set(codec).encode({1, 2})), {"1", "2"},
+        )
+        self.assertEqual(
+            z.map(z.string(), codec).encode({"a": 1}), {"a": "1"},
+        )
         with self.assertRaises(TypeError):
-            z.set(z.integer()).encode({1})
+            z.set(z.integer().transform(lambda value: value + 1)).encode({1})
         with self.assertRaises(TypeError):
-            z.map(z.string(), z.integer()).encode({"a": 1})
+            z.map(
+                z.string(), z.integer().transform(lambda value: value + 1),
+            ).encode({"a": 1})
 
     def test_set_and_bytes_lengths(self):
         values = z.set(z.integer()).min(2).max(3)
