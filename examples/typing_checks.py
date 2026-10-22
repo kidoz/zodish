@@ -607,6 +607,24 @@ RuntimeModel = z.create_model("RuntimeModel", {"name": z.string()})
 assert_type(RuntimeModel, type[Any])
 
 
+@z.dataclass
+class GenericValidated[generic_type]:
+    value: generic_type
+
+
+@z.dataclass
+class IntValidated(GenericValidated[int]):
+    pass
+
+
+generic_validated = GenericValidated[int](value=1)
+assert_type(generic_validated.value, int)
+int_validated = IntValidated(value=1)
+assert_type(int_validated.value, int)
+if TYPE_CHECKING:
+    IntValidated(value="wrong")  # type: ignore[arg-type]
+
+
 async def _positive_async(value: int) -> bool:
     return value > 0
 

@@ -4033,10 +4033,81 @@ class SchemaTests(unittest.TestCase):
         class GenericBase(Generic[type_var]):
             value: type_var
 
-        with self.assertRaises(TypeError):
-            @z.dataclass
-            class GenericSub(GenericBase[int]):
-                extra: int = 0
+        @z.dataclass
+        class GenericSub(GenericBase[int]):
+            extra: int = 0
+
+        self.assertEqual(GenericSub(value=1).value, 1)
+        self.assertEqual(GenericSub.parse({"value": 2}).extra, 0)
+        with self.assertRaises(ValidationError):
+            GenericSub(value="wrong")
+        with self.assertRaises(ValidationError):
+            GenericSub.parse({"value": "wrong"})
+
+    def test_validated_dataclass_generics(self):
+        type_var = TypeVar("T")
+        other_var = TypeVar("U")
+
+        @z.dataclass
+        class Box(Generic[type_var]):
+            value: type_var
+            label: Annotated[str, z.string().min(1)] = "x"
+
+        box = Box(value=object())
+        self.assertEqual(box.label, "x")
+        self.assertEqual(Box.parse({"value": 1}).value, 1)
+        with self.assertRaises(ValidationError):
+            Box(value=1, label="")
+
+        @z.dataclass
+        class IntBox(Box[int]):
+            pass
+
+        self.assertEqual(IntBox(value=1).value, 1)
+        self.assertEqual(IntBox.parse({"value": 2}).value, 2)
+        with self.assertRaises(ValidationError):
+            IntBox(value="wrong")
+        with self.assertRaises(ValidationError):
+            IntBox.parse({"value": "wrong"})
+
+        @z.dataclass
+        class ListBox(Box[list[int]]):
+            pass
+
+        self.assertEqual(ListBox(value=[1]).value, [1])
+        with self.assertRaises(ValidationError):
+            ListBox(value=["wrong"])
+        with self.assertRaises(ValidationError):
+            ListBox.parse({"value": ["wrong"]})
+
+        @z.dataclass(validate_assignment=True)
+        class ValidatedIntBox(Box[int]):
+            pass
+
+        validated_box = ValidatedIntBox(value=1)
+        with self.assertRaises(ValidationError):
+            validated_box.value = "wrong"
+        self.assertEqual(validated_box.value, 1)
+
+        @dataclasses.dataclass
+        class Left(Generic[type_var]):
+            left: type_var
+
+        @dataclasses.dataclass
+        class Right(Generic[other_var]):
+            right: other_var
+
+        @z.dataclass
+        class Both(Left[int], Right[str]):
+            pass
+
+        both = Both(left=1, right="x")
+        self.assertEqual(both.left, 1)
+        self.assertEqual(both.right, "x")
+        with self.assertRaises(ValidationError):
+            Both(left="wrong", right="x")
+        with self.assertRaises(ValidationError):
+            Both(left=1, right=2)
 
     def test_validated_dataclass_multiple_bases(self):
         @dataclasses.dataclass

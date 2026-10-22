@@ -384,11 +384,14 @@ def dataclass_field_schema(
     name: str,
     *,
     stack: builtins.tuple[type[Any], ...],
+    bindings: Mapping[typing.TypeVar, _DataclassAnnotation] | None = None,
 ) -> builtins.tuple[_schemas.Schema[Any, Any], Any, bool]:
     """Return the field schema, resolved annotation, and explicit-schema flag."""
-    context, metadata = _resolve_annotation(
-        _DataclassAnnotation(annotation), name,
+    context = _DataclassAnnotation(
+        annotation,
+        bindings={} if bindings is None else bindings,
     )
+    context, metadata = _resolve_annotation(context, name)
     if metadata:
         schema = metadata[0]
     else:

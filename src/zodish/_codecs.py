@@ -875,7 +875,11 @@ class _Codecs:
         the encoded and decoded forms. Fields with ``init=False`` are ignored.
         """
         # Inference uses the schema builders, so import it after they exist.
-        from ._annotations import dataclass_type_hints, infer_dataclass_field
+        from ._annotations import (
+            _DataclassAnnotation,
+            dataclass_type_hints,
+            infer_dataclass_field,
+        )
 
         if not isinstance(cls, type) or not dataclasses.is_dataclass(cls):
             raise TypeError("dataclass codec expects a dataclass type")
@@ -972,7 +976,16 @@ class _Codecs:
                     )
                 if _is_initvar_field(fields_by_name[name]):
                     annotation = _initvar_annotation(annotation, name)
-                schema = infer_dataclass_field(annotation, name, stack=stack)
+                context = (
+                    _DataclassAnnotation(
+                        annotation, bindings=marker.type_bindings,
+                    )
+                    if marker is not None
+                    else None
+                )
+                schema = infer_dataclass_field(
+                    annotation, name, stack=stack, context=context,
+                )
             if not isinstance(schema, Schema):
                 raise TypeError(f"Field {name!r} must be a schema")
             schemas_by_name[name] = schema

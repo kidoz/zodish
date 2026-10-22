@@ -69,6 +69,7 @@ class _ValidatedDataclass:
     assignment_schemas: Mapping[str, Schema[Any, Any]]
     validate_assignment: bool
     async_fields: bool
+    type_bindings: Mapping[typing.TypeVar, _annotations._DataclassAnnotation]
 
 
 def marker_for(cls: type[Any]) -> _ValidatedDataclass | None:
@@ -237,6 +238,7 @@ def _compile_field_schema(
     annotation: Any,
     *,
     allow_async: bool,
+    bindings: Mapping[typing.TypeVar, _annotations._DataclassAnnotation],
 ) -> tuple[
     Schema[Any, Any],
     Schema[Any, Any] | None,
@@ -247,7 +249,10 @@ def _compile_field_schema(
     if _is_initvar_field(field):
         annotation = _initvar_annotation(annotation, name)
     schema, resolved, explicit = _annotations.dataclass_field_schema(
-        annotation, name, stack=(cls,),
+        annotation,
+        name,
+        stack=(cls,),
+        bindings=bindings,
     )
     if not isinstance(schema, Schema):
         raise TypeError(f"Field {name!r} must be a schema")
@@ -265,7 +270,13 @@ def _compile_field_schema(
             "codec boundary instead",
         )
     candidate = _annotations.infer_dataclass_field(
-        annotation, name, stack=(cls,), type_only=True,
+        annotation,
+        name,
+        stack=(cls,),
+        context=_annotations._DataclassAnnotation(
+            annotation, bindings=bindings,
+        ),
+        type_only=True,
     )
     expected_text = _annotation_text(resolved)
     annotation_guard = (
@@ -302,17 +313,6 @@ def _reject_unsupported_inheritance(cls: type[Any]) -> None:
             raise TypeError(
                 "Validated dataclasses do not support a dataclass base "
                 "with a custom __init__",
-            )
-    if getattr(cls, "__parameters__", ()):
-        raise TypeError(
-            "Validated dataclasses do not support generic classes",
-        )
-    for base in getattr(cls, "__orig_bases__", ()):
-        origin = typing.get_origin(base)
-        if origin is not None and dataclasses.is_dataclass(origin):
-            raise TypeError(
-                "Validated dataclasses do not support parameterized "
-                "dataclass bases",
             )
 
 
@@ -381,6 +381,41 @@ def _resolved_values(
 def _is_generated_init(init: Any) -> bool:
     code = getattr(init, "__code__", None)
     return code is not None and code.co_filename == "<string>"
+
+
+def _class_type_bindings(
+    cls: type[Any],
+) -> Mapping[typing.TypeVar, _annotations._DataclassAnnotation]:
+    """Bind class and dataclass-base type parameters for field inference."""
+    bindings: dict[typing.TypeVar, _annotations._DataclassAnnotation] = {}
+    for base in cls.__mro__:
+        for parameter in getattr(base, "__parameters__", ()):
+            if not isinstance(parameter, typing.TypeVar):
+                raise TypeError(
+                    "Validated dataclasses do not support variadic generic "
+                    "classes",
+                )
+            bindings.setdefault(
+                parameter, _annotations._DataclassAnnotation(Any),
+            )
+    for alias in getattr(cls, "__orig_bases__", ()):
+        origin = typing.get_origin(alias)
+        if origin is None or not dataclasses.is_dataclass(origin):
+            continue
+        parameters = getattr(origin, "__parameters__", ())
+        for parameter, argument in zip(
+            parameters, typing.get_args(alias), strict=False,
+        ):
+            if not isinstance(parameter, typing.TypeVar):
+                raise TypeError(
+                    "Validated dataclasses do not support variadic generic "
+                    "bases",
+                )
+            bindings[parameter] = _annotations._DataclassAnnotation(
+                argument,
+                bindings=bindings,
+            )
+    return bindings
 
 
 def _inherited_assignment_validation(cls: type[Any]) -> bool:
@@ -630,6 +665,7 @@ def _decorate(
         )
 
     hints = _annotations.dataclass_type_hints(cls)
+    type_bindings = _class_type_bindings(cls)
     construction_schemas: dict[str, Schema[Any, Any]] = {}
     guards: dict[str, Schema[Any, Any] | None] = {}
     annotation_guards: dict[str, Schema[Any, Any] | None] = {}
@@ -647,6 +683,7 @@ def _decorate(
             field,
             annotation,
             allow_async=effective_async_fields,
+            bindings=type_bindings,
         )
         field_has_default = (
             field.default is not dataclasses.MISSING
@@ -695,6 +732,7 @@ def _decorate(
                 field,
                 annotation,
                 allow_async=effective_async_fields,
+                bindings=type_bindings,
             )
             assignment_schemas[field.name] = construction
 
@@ -714,6 +752,7 @@ def _decorate(
         assignment_schemas=assignment_schemas,
         validate_assignment=effective_validate_assignment,
         async_fields=effective_async_fields,
+        type_bindings=type_bindings,
     )
     original_init = cls.__init__
 
