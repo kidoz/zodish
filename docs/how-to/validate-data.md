@@ -25,14 +25,16 @@ Use `.wire()` on a field when the boundary uses a different key than your
 parsed output:
 
 ```python
-user = z.object({
+from datetime import datetime
+
+wire_user = z.object({
     "user_name": z.string().min(1).wire("userName"),
     "created_at": z.codecs.iso_datetime().wire("createdAt"),
 }).strict()
 
-user.parse({"userName": "Alex", "createdAt": "2026-10-21T12:00:00"})
+wire_user.parse({"userName": "Alex", "createdAt": "2026-10-21T12:00:00"})
 # {"user_name": "Alex", "created_at": datetime(2026, 10, 21, 12, 0)}
-user.encode({"user_name": "Alex", "created_at": datetime(2026, 10, 21, 12, 0)})
+wire_user.encode({"user_name": "Alex", "created_at": datetime(2026, 10, 21, 12, 0)})
 # {"userName": "Alex", "createdAt": "2026-10-21T12:00:00"}
 ```
 

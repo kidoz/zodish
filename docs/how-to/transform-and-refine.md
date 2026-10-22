@@ -99,6 +99,8 @@ Use `z.preprocess(fn, schema)` for intentional input conversion, such as parsing
 a string before validating the result:
 
 ```python
+import json
+
 z.preprocess(json.loads, z.object({"id": z.integer()}))
 ```
 
