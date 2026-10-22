@@ -1,225 +1,184 @@
-//! Native operation names and construction-time arity validation.
+//! Native operation names, arity, and capability metadata.
+//!
+//! `define_kinds!` is the single Rust source for the `Kind` enum, operation
+//! names, construction-time arity, and the capability flags used by the
+//! evaluator. Add a new kind here; Python-side builders and export logic still
+//! need their own entries.
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
-#[derive(Clone, Copy)]
-pub(crate) enum Kind {
-    String,
-    Number,
-    Integer,
-    Boolean,
-    Unknown,
-    None,
-    ExactInstance,
-    Json,
-    NativeEnum,
-    Literal,
-    Enum,
-    Instance,
-    Array,
-    Set,
-    SetEncode,
-    Object,
-    Union,
-    DiscriminatedUnion,
-    Intersection,
-    Record,
-    Tuple,
-    Lazy,
-    Optional,
-    NonOptional,
-    RequiredOutput,
-    Nullable,
-    Wire,
-    Default,
-    DefaultFactory,
-    Refine,
-    SuperRefine,
-    Transform,
-    AsyncRefine,
-    AsyncSuperRefine,
-    AsyncTransform,
-    AsyncPreprocess,
-    AsyncDefaultFactory,
-    AsyncCatch,
-    AsyncOverwrite,
-    Overwrite,
-    Catch,
-    Coerce,
-    StringBool,
-    Preprocess,
-    Pipe,
-    LengthMin,
-    LengthMax,
-    Min,
-    Max,
-    ExclusiveMin,
-    ExclusiveMax,
-    MultipleOf,
-    Positive,
-    Integral,
-    Regex,
-    StartsWith,
-    EndsWith,
-    Includes,
-    Ipv6,
-    Cidrv4,
-    Cidrv6,
-    Trim,
-    Lower,
-    Upper,
-    Cleared,
+/// Accepted child count at construction time.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ChildArity {
+    Exact(usize),
+    AtLeastOne,
+    Any,
 }
 
-impl Kind {
-    pub(crate) fn name(&self) -> &'static str {
-        match self {
-            Self::String => "string",
-            Self::Number => "number",
-            Self::Integer => "integer",
-            Self::Boolean => "boolean",
-            Self::Unknown => "unknown",
-            Self::None => "none",
-            Self::ExactInstance => "exact_instance",
-            Self::Json => "json",
-            Self::NativeEnum => "native_enum",
-            Self::Literal => "literal",
-            Self::Enum => "enum",
-            Self::Instance => "instance",
-            Self::Array => "array",
-            Self::Set => "set",
-            Self::SetEncode => "set_encode",
-            Self::Object => "object",
-            Self::Union => "union",
-            Self::DiscriminatedUnion => "discriminated_union",
-            Self::Intersection => "intersection",
-            Self::Record => "record",
-            Self::Tuple => "tuple",
-            Self::Lazy => "lazy",
-            Self::Optional => "optional",
-            Self::NonOptional => "nonoptional",
-            Self::RequiredOutput => "required_output",
-            Self::Nullable => "nullable",
-            Self::Wire => "wire",
-            Self::Default => "default",
-            Self::DefaultFactory => "default_factory",
-            Self::Refine => "refine",
-            Self::SuperRefine => "super_refine",
-            Self::Transform => "transform",
-            Self::AsyncRefine => "async_refine",
-            Self::AsyncSuperRefine => "async_super_refine",
-            Self::AsyncTransform => "async_transform",
-            Self::AsyncPreprocess => "async_preprocess",
-            Self::AsyncDefaultFactory => "async_default_factory",
-            Self::AsyncCatch => "async_catch",
-            Self::AsyncOverwrite => "async_overwrite",
-            Self::Overwrite => "overwrite",
-            Self::Catch => "catch",
-            Self::Coerce => "coerce",
-            Self::StringBool => "string_bool",
-            Self::Preprocess => "preprocess",
-            Self::Pipe => "pipe",
-            Self::LengthMin => "length_min",
-            Self::LengthMax => "length_max",
-            Self::Min => "min",
-            Self::Max => "max",
-            Self::ExclusiveMin => "exclusive_min",
-            Self::ExclusiveMax => "exclusive_max",
-            Self::MultipleOf => "multiple_of",
-            Self::Positive => "positive",
-            Self::Integral => "integral",
-            Self::Regex => "regex",
-            Self::StartsWith => "starts_with",
-            Self::EndsWith => "ends_with",
-            Self::Includes => "includes",
-            Self::Ipv6 => "ipv6",
-            Self::Cidrv4 => "cidrv4",
-            Self::Cidrv6 => "cidrv6",
-            Self::Trim => "trim",
-            Self::Lower => "lower",
-            Self::Upper => "upper",
-            Self::Cleared => "cleared",
-        }
-    }
+/// How JSON fast-path support is derived for a kind.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum JsonFast {
+    Always,
+    InheritFirstChild,
+    ObjectFields,
+    Never,
+}
 
-    pub(crate) fn from_name(name: &str, children: usize, args: usize) -> PyResult<Self> {
-        // Validate arity before any node is accepted; evaluation never indexes
-        // unchecked user-supplied vectors.
-        let (kind, expected_children, expected_args) = match name {
-            "string" => (Self::String, Some(0), 0),
-            "number" => (Self::Number, Some(0), 0),
-            "integer" => (Self::Integer, Some(0), 0),
-            "boolean" => (Self::Boolean, Some(0), 0),
-            "unknown" => (Self::Unknown, Some(0), 0),
-            "none" => (Self::None, Some(0), 0),
-            "exact_instance" => (Self::ExactInstance, Some(0), 1),
-            "json" => (Self::Json, Some(0), 0),
-            "native_enum" => (Self::NativeEnum, Some(0), 1),
-            "literal" => (Self::Literal, Some(0), 1),
-            "enum" => (Self::Enum, Some(0), 1),
-            "instance" => (Self::Instance, Some(0), 1),
-            "array" => (Self::Array, Some(1), 0),
-            "set" => (Self::Set, Some(1), 0),
-            "set_encode" => (Self::SetEncode, Some(1), 0),
-            "object" => (Self::Object, None, 4),
-            "union" if children > 0 => (Self::Union, None, 0),
-            "discriminated_union" if children > 0 => (Self::DiscriminatedUnion, None, 2),
-            "intersection" => (Self::Intersection, Some(2), 0),
-            "record" => (Self::Record, Some(1), 1),
-            "tuple" => (Self::Tuple, None, 1),
-            "lazy" => (Self::Lazy, Some(0), 1),
-            "optional" => (Self::Optional, Some(1), 0),
-            "nonoptional" => (Self::NonOptional, Some(1), 0),
-            "required_output" => (Self::RequiredOutput, Some(1), 0),
-            "nullable" => (Self::Nullable, Some(1), 0),
-            "wire" => (Self::Wire, Some(1), 1),
-            "default" => (Self::Default, Some(1), 1),
-            "default_factory" => (Self::DefaultFactory, Some(1), 1),
-            "refine" => (Self::Refine, Some(1), 3),
-            "super_refine" => (Self::SuperRefine, Some(1), 1),
-            "transform" => (Self::Transform, Some(1), 1),
-            "async_refine" => (Self::AsyncRefine, Some(1), 3),
-            "async_super_refine" => (Self::AsyncSuperRefine, Some(1), 1),
-            "async_transform" => (Self::AsyncTransform, Some(1), 1),
-            "async_preprocess" => (Self::AsyncPreprocess, Some(1), 1),
-            "async_default_factory" => (Self::AsyncDefaultFactory, Some(1), 1),
-            "async_catch" => (Self::AsyncCatch, Some(1), 1),
-            "async_overwrite" => (Self::AsyncOverwrite, Some(1), 1),
-            "overwrite" => (Self::Overwrite, Some(1), 1),
-            "catch" => (Self::Catch, Some(1), 1),
-            "coerce" => (Self::Coerce, Some(1), 1),
-            "string_bool" => (Self::StringBool, Some(1), 4),
-            "preprocess" => (Self::Preprocess, Some(1), 1),
-            "pipe" => (Self::Pipe, Some(2), 0),
-            "length_min" => (Self::LengthMin, Some(1), 2),
-            "length_max" => (Self::LengthMax, Some(1), 2),
-            "min" => (Self::Min, Some(1), 2),
-            "max" => (Self::Max, Some(1), 2),
-            "exclusive_min" => (Self::ExclusiveMin, Some(1), 2),
-            "exclusive_max" => (Self::ExclusiveMax, Some(1), 2),
-            "multiple_of" => (Self::MultipleOf, Some(1), 2),
-            "positive" => (Self::Positive, Some(1), 1),
-            "integral" => (Self::Integral, Some(1), 1),
-            "regex" => (Self::Regex, Some(1), 3),
-            "starts_with" => (Self::StartsWith, Some(1), 2),
-            "ends_with" => (Self::EndsWith, Some(1), 2),
-            "includes" => (Self::Includes, Some(1), 2),
-            "ipv6" => (Self::Ipv6, Some(1), 1),
-            "cidrv4" => (Self::Cidrv4, Some(1), 1),
-            "cidrv6" => (Self::Cidrv6, Some(1), 1),
-            "trim" => (Self::Trim, Some(1), 0),
-            "lower" => (Self::Lower, Some(1), 0),
-            "upper" => (Self::Upper, Some(1), 0),
-            _ => {
-                return Err(PyValueError::new_err(format!(
-                    "Invalid native operation: {name}"
-                )));
-            }
-        };
-        if expected_children.is_some_and(|count| children != count) || args != expected_args {
-            return Err(PyValueError::new_err("Invalid native schema arity"));
+pub(crate) struct KindSpec {
+    pub(crate) kind: Kind,
+    pub(crate) name: &'static str,
+    pub(crate) children: ChildArity,
+    pub(crate) args: usize,
+    pub(crate) async_leaf: bool,
+    pub(crate) primitive: bool,
+    pub(crate) json_fast: JsonFast,
+}
+
+macro_rules! define_kinds {
+    ($( $variant:ident => ($name:literal, $children:expr, $args:literal, $async_leaf:literal, $primitive:literal, $json_fast:expr $(,)?) ),* $(,)?) => {
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        pub(crate) enum Kind {
+            $($variant,)*
         }
-        Ok(kind)
+
+        const KIND_SPECS: &[KindSpec] = &[
+            $(KindSpec {
+                kind: Kind::$variant,
+                name: $name,
+                children: $children,
+                args: $args,
+                async_leaf: $async_leaf,
+                primitive: $primitive,
+                json_fast: $json_fast,
+            },)*
+        ];
+
+        impl Kind {
+            pub(crate) fn spec(self) -> &'static KindSpec {
+                let spec = &KIND_SPECS[self as usize];
+                debug_assert!(spec.kind == self, "kind registry order is stale");
+                spec
+            }
+
+            pub(crate) fn name(self) -> &'static str {
+                self.spec().name
+            }
+
+            pub(crate) fn from_name(
+                name: &str,
+                children: usize,
+                args: usize,
+            ) -> PyResult<Self> {
+                let Some(spec) = KIND_SPECS.iter().find(|spec| spec.name == name) else {
+                    return Err(PyValueError::new_err(format!(
+                        "Invalid native operation: {name}"
+                    )));
+                };
+                if spec.kind == Kind::Cleared {
+                    return Err(PyValueError::new_err(format!(
+                        "Invalid native operation: {name}"
+                    )));
+                }
+                let children_ok = match spec.children {
+                    ChildArity::Exact(count) => children == count,
+                    ChildArity::AtLeastOne => children > 0,
+                    ChildArity::Any => true,
+                };
+                if !children_ok || args != spec.args {
+                    return Err(PyValueError::new_err("Invalid native schema arity"));
+                }
+                Ok(spec.kind)
+            }
+        }
+    };
+}
+
+define_kinds! {
+    // variant => (name, children, args, async_leaf, primitive, json_fast)
+    String => ("string", ChildArity::Exact(0), 0, false, true, JsonFast::Always),
+    Number => ("number", ChildArity::Exact(0), 0, false, true, JsonFast::Never),
+    Integer => ("integer", ChildArity::Exact(0), 0, false, true, JsonFast::Always),
+    Boolean => ("boolean", ChildArity::Exact(0), 0, false, true, JsonFast::Always),
+    Unknown => ("unknown", ChildArity::Exact(0), 0, false, true, JsonFast::Never),
+    None => ("none", ChildArity::Exact(0), 0, false, true, JsonFast::Always),
+    ExactInstance => ("exact_instance", ChildArity::Exact(0), 1, false, false, JsonFast::Never),
+    Json => ("json", ChildArity::Exact(0), 0, false, false, JsonFast::Never),
+    NativeEnum => ("native_enum", ChildArity::Exact(0), 1, false, false, JsonFast::Never),
+    Literal => ("literal", ChildArity::Exact(0), 1, false, false, JsonFast::Always),
+    Enum => ("enum", ChildArity::Exact(0), 1, false, false, JsonFast::Always),
+    Instance => ("instance", ChildArity::Exact(0), 1, false, false, JsonFast::Never),
+    Array => ("array", ChildArity::Exact(1), 0, false, false, JsonFast::InheritFirstChild),
+    Set => ("set", ChildArity::Exact(1), 0, false, false, JsonFast::Never),
+    SetEncode => ("set_encode", ChildArity::Exact(1), 0, false, false, JsonFast::Never),
+    Object => ("object", ChildArity::Any, 4, false, false, JsonFast::ObjectFields),
+    Union => ("union", ChildArity::AtLeastOne, 0, false, false, JsonFast::Never),
+    DiscriminatedUnion => ("discriminated_union", ChildArity::AtLeastOne, 2, false, false, JsonFast::Never),
+    Intersection => ("intersection", ChildArity::Exact(2), 0, false, false, JsonFast::Never),
+    Record => ("record", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
+    Tuple => ("tuple", ChildArity::Any, 1, false, false, JsonFast::Never),
+    Lazy => ("lazy", ChildArity::Exact(0), 1, true, false, JsonFast::Never),
+    Optional => ("optional", ChildArity::Exact(1), 0, false, false, JsonFast::InheritFirstChild),
+    NonOptional => ("nonoptional", ChildArity::Exact(1), 0, false, false, JsonFast::InheritFirstChild),
+    RequiredOutput => ("required_output", ChildArity::Exact(1), 0, false, false, JsonFast::InheritFirstChild),
+    Nullable => ("nullable", ChildArity::Exact(1), 0, false, false, JsonFast::InheritFirstChild),
+    Wire => ("wire", ChildArity::Exact(1), 1, false, false, JsonFast::InheritFirstChild),
+    Default => ("default", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
+    DefaultFactory => ("default_factory", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
+    Refine => ("refine", ChildArity::Exact(1), 3, false, false, JsonFast::Never),
+    SuperRefine => ("super_refine", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
+    Transform => ("transform", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
+    AsyncRefine => ("async_refine", ChildArity::Exact(1), 3, true, false, JsonFast::Never),
+    AsyncSuperRefine => ("async_super_refine", ChildArity::Exact(1), 1, true, false, JsonFast::Never),
+    AsyncTransform => ("async_transform", ChildArity::Exact(1), 1, true, false, JsonFast::Never),
+    AsyncPreprocess => ("async_preprocess", ChildArity::Exact(1), 1, true, false, JsonFast::Never),
+    AsyncDefaultFactory => ("async_default_factory", ChildArity::Exact(1), 1, true, false, JsonFast::Never),
+    AsyncCatch => ("async_catch", ChildArity::Exact(1), 1, true, false, JsonFast::Never),
+    AsyncOverwrite => ("async_overwrite", ChildArity::Exact(1), 1, true, false, JsonFast::Never),
+    Overwrite => ("overwrite", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
+    Catch => ("catch", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
+    Coerce => ("coerce", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
+    StringBool => ("string_bool", ChildArity::Exact(1), 4, false, false, JsonFast::Never),
+    Preprocess => ("preprocess", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
+    Pipe => ("pipe", ChildArity::Exact(2), 0, false, false, JsonFast::Never),
+    LengthMin => ("length_min", ChildArity::Exact(1), 2, false, false, JsonFast::InheritFirstChild),
+    LengthMax => ("length_max", ChildArity::Exact(1), 2, false, false, JsonFast::InheritFirstChild),
+    Min => ("min", ChildArity::Exact(1), 2, false, false, JsonFast::InheritFirstChild),
+    Max => ("max", ChildArity::Exact(1), 2, false, false, JsonFast::InheritFirstChild),
+    ExclusiveMin => ("exclusive_min", ChildArity::Exact(1), 2, false, false, JsonFast::InheritFirstChild),
+    ExclusiveMax => ("exclusive_max", ChildArity::Exact(1), 2, false, false, JsonFast::InheritFirstChild),
+    MultipleOf => ("multiple_of", ChildArity::Exact(1), 2, false, false, JsonFast::InheritFirstChild),
+    Positive => ("positive", ChildArity::Exact(1), 1, false, false, JsonFast::InheritFirstChild),
+    Integral => ("integral", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
+    Regex => ("regex", ChildArity::Exact(1), 3, false, false, JsonFast::Never),
+    StartsWith => ("starts_with", ChildArity::Exact(1), 2, false, false, JsonFast::Never),
+    EndsWith => ("ends_with", ChildArity::Exact(1), 2, false, false, JsonFast::Never),
+    Includes => ("includes", ChildArity::Exact(1), 2, false, false, JsonFast::Never),
+    Ipv6 => ("ipv6", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
+    Cidrv4 => ("cidrv4", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
+    Cidrv6 => ("cidrv6", ChildArity::Exact(1), 1, false, false, JsonFast::Never),
+    Trim => ("trim", ChildArity::Exact(1), 0, false, false, JsonFast::Never),
+    Lower => ("lower", ChildArity::Exact(1), 0, false, false, JsonFast::Never),
+    Upper => ("upper", ChildArity::Exact(1), 0, false, false, JsonFast::Never),
+    Cleared => ("cleared", ChildArity::Any, 0, false, false, JsonFast::Never),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn registry_is_in_enum_order_and_has_unique_names() {
+        assert_eq!(KIND_SPECS.len(), Kind::Cleared as usize + 1);
+        let mut names = HashSet::new();
+        for (index, spec) in KIND_SPECS.iter().enumerate() {
+            assert_eq!(spec.kind as usize, index);
+            assert!(
+                names.insert(spec.name),
+                "duplicate kind name: {}",
+                spec.name
+            );
+        }
     }
 }

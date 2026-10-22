@@ -374,8 +374,5 @@ impl NativeSchema {
 }
 
 pub(crate) fn is_primitive_kind(kind: Kind) -> bool {
-    matches!(
-        kind,
-        Kind::String | Kind::Integer | Kind::Number | Kind::Boolean | Kind::None | Kind::Unknown
-    )
+    kind.spec().primitive
 }

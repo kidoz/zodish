@@ -22,7 +22,7 @@ pub(crate) use checks::{
     evaluate_string_bool, interpret_super_refine, select_discriminated_branch,
 };
 pub(crate) use evaluate::is_primitive_kind;
-pub(crate) use kind::Kind;
+pub(crate) use kind::{JsonFast, Kind};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum UnknownKeys {
@@ -148,29 +148,15 @@ impl NativeSchema {
                 }
             }
         }
-        let json_fast = match kind {
-            Kind::String | Kind::Integer | Kind::Boolean | Kind::None => true,
-            Kind::Literal | Kind::Enum => true,
-            Kind::Positive
-            | Kind::LengthMin
-            | Kind::LengthMax
-            | Kind::Min
-            | Kind::Max
-            | Kind::ExclusiveMin
-            | Kind::ExclusiveMax
-            | Kind::MultipleOf
-            | Kind::Nullable
-            | Kind::Wire
-            | Kind::Optional
-            | Kind::NonOptional
-            | Kind::RequiredOutput => children
+        let json_fast = match kind.spec().json_fast {
+            JsonFast::Always => true,
+            JsonFast::InheritFirstChild => children
                 .first()
                 .map(|child| child.try_borrow(py).map(|child| child.json_fast))
                 .transpose()
                 .map_err(PyErr::from)?
                 .unwrap_or(false),
-            Kind::Array => children[0].try_borrow(py).map_err(PyErr::from)?.json_fast,
-            Kind::Object => {
+            JsonFast::ObjectFields => {
                 let mut all_fast = true;
                 for child in &children {
                     if !child.try_borrow(py).map_err(PyErr::from)?.json_fast {
@@ -180,24 +166,15 @@ impl NativeSchema {
                 }
                 matches!(unknown_keys, UnknownKeys::Strip | UnknownKeys::Strict) && all_fast
             }
-            _ => false,
+            JsonFast::Never => false,
         };
         // Schema edges stored in arguments (object catchall, record key, tuple
         // rest) also determine async capability. Lazy factories are unknown
         // until evaluation, so treat their subtrees conservatively.
-        let mut has_async = matches!(
-            kind,
-            Kind::AsyncRefine
-                | Kind::AsyncSuperRefine
-                | Kind::AsyncTransform
-                | Kind::AsyncPreprocess
-                | Kind::AsyncDefaultFactory
-                | Kind::AsyncCatch
-                | Kind::AsyncOverwrite
-                | Kind::Lazy
-        ) || children
-            .iter()
-            .any(|child| child.try_borrow(py).is_ok_and(|child| child.has_async));
+        let mut has_async = kind.spec().async_leaf
+            || children
+                .iter()
+                .any(|child| child.try_borrow(py).is_ok_and(|child| child.has_async));
         if !has_async {
             for arg in &args {
                 let arg = arg.bind(py);

@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Synchronous and asynchronous evaluators now share `super_refine`,
   `string_bool`, and discriminated-union interpretation logic, preventing
   semantic drift between parse modes.
+- Added a single Rust kind registry covering operation names, arity, and
+  async/primitive/JSON-fast capability flags; schema-kind bookkeeping no longer
+  duplicates those tables.
 - Release workflows pin third-party actions to commit SHAs, attest build
   provenance for wheels and sdists, and require an explicit tag for manual
   publishes. Benchmark result snapshots are excluded from the sdist, and the
