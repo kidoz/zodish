@@ -233,6 +233,20 @@ class Issue:
     def __hash__(self) -> int:
         return hash((self.code, self.message, self.path, self.branches))
 
+    def __reduce__(
+        self,
+    ) -> builtins.tuple[type[Issue], builtins.tuple[Any, ...]]:
+        return (
+            type(self),
+            (
+                self.code,
+                self.message,
+                self.path,
+                self.branches,
+                dict(self.params),
+            ),
+        )
+
     def to_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = dict(self.params)
         result.update({
@@ -295,6 +309,9 @@ def _map_issue(issue: Issue, mapper: ErrorMap) -> Issue:
     return replace(issue, message=message, branches=branches)
 
 
+_VALIDATION_ERROR_MESSAGE = "Validation failed"
+
+
 class ValidationError(ValueError):
     _issues: builtins.tuple[Issue, ...] | None
     _raw_issues: builtins.tuple[builtins.tuple[Any, ...], ...] | None
@@ -309,7 +326,12 @@ class ValidationError(ValueError):
         self._bundle = None
         self._error_mapper = None
         self._mapped = False
-        super().__init__()
+        super().__init__(_VALIDATION_ERROR_MESSAGE)
+
+    def __reduce__(
+        self,
+    ) -> builtins.tuple[type[ValidationError], builtins.tuple[builtins.tuple[Issue, ...]]]:
+        return (type(self), (self.issues,))
 
     @classmethod
     def _from_raw(
@@ -323,7 +345,7 @@ class ValidationError(ValueError):
         error._bundle = None
         error._error_mapper = None
         error._mapped = False
-        ValueError.__init__(error)
+        ValueError.__init__(error, _VALIDATION_ERROR_MESSAGE)
         return error
 
     @classmethod
@@ -335,7 +357,7 @@ class ValidationError(ValueError):
         error._bundle = bundle
         error._error_mapper = None
         error._mapped = False
-        ValueError.__init__(error)
+        ValueError.__init__(error, _VALIDATION_ERROR_MESSAGE)
         return error
 
     def _set_error_mapper(self, mapper: ErrorMap | None) -> None:

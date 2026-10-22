@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   remains excluded from schema equality and hashing.
 - Native async sessions close and release references when a resume raises,
   instead of remaining stuck in a running state.
+- `ValidationError` now carries a message in `args`, and validation errors and
+  issues can be pickled and deep-copied.
 
 ### Changed
 

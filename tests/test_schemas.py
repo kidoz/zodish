@@ -1,3 +1,4 @@
+import copy
 import dataclasses
 import datetime as dt
 import decimal
@@ -5,6 +6,7 @@ import enum
 import json
 import math
 import pathlib
+import pickle
 import re
 import unittest
 from typing import (
@@ -211,6 +213,20 @@ class SchemaTests(unittest.TestCase):
         self.assertIsInstance(
             beyond_i64.safe_parse(2 * float_divisor + 1), Failure,
         )
+
+    def test_validation_errors_and_issues_pickle(self):
+        error = z.string().safe_parse(1).error
+        restored = pickle.loads(pickle.dumps(error))
+        self.assertEqual(
+            [(issue.code, issue.message) for issue in restored.issues],
+            [(issue.code, issue.message) for issue in error.issues],
+        )
+        self.assertEqual(error.args, ("Validation failed",))
+
+        issue = Issue("custom", "x", params={"values": [1]})
+        self.assertEqual(pickle.loads(pickle.dumps(issue)), issue)
+        self.assertEqual(copy.deepcopy(issue), issue)
+        self.assertEqual(copy.deepcopy(error).issues, error.issues)
 
     def test_issue_hashing_uses_core_fields(self):
         issue = Issue("custom", "x", params={"values": [1]})
