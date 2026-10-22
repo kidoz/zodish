@@ -275,6 +275,7 @@ the same session protocol.
 | `@z.dataclass(frozen=True, slots=True, kw_only=True, ...)` | Pass dataclass options through |
 | `@z.dataclass(validate_assignment=True)` | Validate later declared-field assignments |
 | `z.dataclass(ExistingDataclass)` | Wrap an existing supported dataclass |
+| `z.create_model(name, fields, *, defaults=None, ...)` | Create a validated dataclass from runtime field schemas |
 | `z.ValidatedModel` | Typed mixin for class-level codec methods |
 | `Cls.parse`, `safe_parse`, `validate` | Decode encoded input through the cached codec |
 | `Cls.parse_json`, `safe_parse_json`, `validate_json` | Decode JSON input |
@@ -358,7 +359,19 @@ already occupies the name. Inherit `z.ValidatedModel` for statically typed
 classmethods; otherwise use `z.codecs.dataclass(Cls)` when typing is required.
 Calling a `ValidatedModel` method on a class without `@z.dataclass` raises
 `TypeError`. Async classmethods do not make direct construction asynchronous or
-permit async field schemas. See
+permit async field schemas.
+
+`z.create_model(name, fields, *, defaults=None, validate_assignment=None,
+**options)` creates a keyword-only validated dataclass from a mapping of field
+names to schemas or from a plain strip `z.object` schema's shape. Fields are
+required unless `defaults` supplies a decoded value or a plain field schema has
+a top-level `.default()`/`.default_factory()`; for codec fields, supply the
+decoded default through `defaults`. Omitted mutable defaults are copied per
+instance. Optional field schemas without a default and object schemas with
+non-strip policies or catchalls are rejected. Frozen, slots, assignment
+validation, class-level methods, codecs, and JSON Schema use the normal
+validated-dataclass behavior. Dynamic field attributes are statically `Any`; use
+a normal `@z.dataclass` when static field types are required. See
 [Validate direct construction](../how-to/use-codecs.md#validate-direct-construction).
 
 ## JSON Schema export

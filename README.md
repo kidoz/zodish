@@ -460,7 +460,10 @@ contract. Decorated classes also expose class-level boundary methods:
 `encode`, `safe_encode`, async encode, and `to_json_schema`. They delegate to a
 cached `z.codecs.dataclass(User)`. Inherit `z.ValidatedModel` to expose these
 methods to type checkers; every decorated class receives them at runtime unless
-a user-defined method or field name already occupies the name. See the
+a user-defined method or field name already occupies the name. For fields
+discovered at runtime, `z.create_model("User", fields, defaults=...)` creates a
+keyword-only validated dataclass with the same codecs, classmethods, JSON
+Schema, and assignment options; field attributes are statically `Any`. See the
 [validated construction guide](docs/how-to/use-codecs.md#validate-direct-construction).
 
 Codec combinators preserve both directions:

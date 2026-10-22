@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   field-prefixed paths and leave the previous value unchanged. The option is
   inherited by decorated subclasses, requires a non-frozen dataclass, and
   leaves construction-only behavior unchanged by default.
+- `z.create_model()` creates keyword-only validated dataclasses from runtime
+  field-schema mappings or a plain strip `z.object` shape. It supports explicit
+  and inferred defaults, mutable-default copying, codecs, classmethods, JSON
+  Schema, frozen/slots, and assignment validation; dynamic field types are
+  statically `Any`.
 - Validated dataclasses expose class-level `parse`, safe/async, JSON, `encode`,
   and `to_json_schema` methods backed by a cached `z.codecs.dataclass` schema.
   `z.ValidatedModel` provides typed classmethods; decorated classes also receive

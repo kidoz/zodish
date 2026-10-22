@@ -310,6 +310,35 @@ subclasses and can be disabled with `validate_assignment=False`. `copy`,
 `pickle`, and direct `object.__new__` remain outside the assignment-validation
 contract.
 
+### Create models at runtime
+
+Use `z.create_model` when fields are discovered at runtime:
+
+```python
+User = z.create_model(
+    "User",
+    {
+        "name": z.string().min(1),
+        "age": z.integer().min(0),
+        "nickname": z.string().nullable(),
+    },
+    defaults={"nickname": None},
+)
+
+user = User(name="Alex", age=30)
+```
+
+`fields` maps field names to schemas or is a plain `z.object(...)` schema; only
+its shape is used. Dynamic models are keyword-only. Fields are required unless
+`defaults` supplies a decoded value or a plain field schema has a top-level
+`.default()`/`.default_factory()`; for codec fields, supply the decoded default
+through `defaults`. Omitted mutable defaults are copied per instance. An optional field schema without a constructor default raises
+`ValueError`. Only plain strip object schemas are accepted; object-level
+policies and refinements are not represented by the generated constructor.
+`validate_assignment`, `frozen`, `slots`, and other dataclass options pass
+through. Generated classes have the same class methods as declared validated
+classes, but type checkers see the result as `type[Any]`.
+
 ### Class-level boundary methods
 
 Every decorated class exposes classmethods backed by a cached
