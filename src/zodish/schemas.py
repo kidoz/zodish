@@ -1021,7 +1021,10 @@ class Schema[Out, In = Out]:
         )
 
     def catch[U](self, fallback: U | Callable[[], U]) -> Schema[Out | U, In]:
-        """Return a fallback when validation fails; callback errors propagate."""
+        """Return a fallback when validation fails; callback errors propagate.
+
+        A callable fallback is invoked with no arguments.
+        """
         if callable(fallback):
             fallback = _sync_callback(fallback, "catch fallback")
         return Schema[Out | U, In](
