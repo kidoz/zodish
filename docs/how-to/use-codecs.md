@@ -241,10 +241,10 @@ default factories, `frozen`, `slots`, `weakref_slot=True` with slots,
 Custom `__init__`, `__new__`, and `__setattr__`; dataclass-level `init=False`;
 `preprocess`; `transform`, `coerce`, `stringbool`, and `pipe` field schemas; and
 async field schemas without `async_fields=True` are rejected at decoration. Use
-`.overwrite()` for
-type-preserving normalization or a codec for type-changing conversions. Lazy
-field schemas are also rejected because their async capability is not statically
-known.
+`__post_init__` for post-validation normalization, classmethod factories for
+alternate constructor signatures, and `.overwrite()` or a codec for conversions.
+Lazy field schemas are also rejected because their async capability is not
+statically known.
 
 `InitVar` parameters are validated, passed to `__post_init__` in declaration
 order, and not stored or encoded. InitVar defaults are validated. `init=False`

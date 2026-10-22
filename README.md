@@ -445,7 +445,9 @@ plus non-dataclass mixins. Standard dataclass MRO field-order and
 duplicate-field rules apply. Custom `__init__`/`__new__`/`__setattr__`,
 dataclass-level `init=False`, variadic generic classes/bases, undecorated
 subclasses, `transform`/`coerce`/`stringbool`/`pipe` field schemas, and async
-field schemas without `async_fields=True` are rejected. Generic classes bind
+field schemas without `async_fields=True` are rejected. Use `__post_init__` for
+post-validation normalization, classmethod factories for alternate signatures,
+field codecs for conversions, and `z.create_model` for runtime fields. Generic classes bind
 unbound type parameters to `Any`; a decorated parameterized subclass such as
 `class IntBox(Box[int])` substitutes concrete type arguments into inherited
 fields. `Box[int](...)` itself cannot see the runtime type argument.

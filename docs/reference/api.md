@@ -301,9 +301,9 @@ default, a `MISSING` default, `preprocess` schemas, `transform`, `coerce`,
 `stringbool`, and `pipe` schemas, lazy schemas whose async capability is not
 statically known, async field schemas without `async_fields=True`, custom
 `__init__`, `__new__`, and `__setattr__`, and dataclass-level `init=False` are
-rejected at decoration. Use
-`.overwrite()` for type-preserving normalization or a codec for type-changing
-conversions.
+rejected at decoration. Use `__post_init__` for post-validation normalization,
+classmethod factories for alternate signatures, and `.overwrite()` or a codec
+for conversions.
 
 `InitVar` parameters are validated, passed to `__post_init__` in declaration
 order, and are not stored or encoded. InitVar defaults are validated. An
