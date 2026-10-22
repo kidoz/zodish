@@ -19,6 +19,14 @@ from ._codecs import (
     _CompoundCodecSchema,
     _JsonTextSchema,
 )
+from ._core import (
+    JSONSchema,
+    JSONSchemaIO,
+    JSONSchemaTarget,
+    Schema,
+    UnrepresentablePolicy,
+    _field_wire,
+)
 from ._errors import Path, UnrepresentableError
 from ._native import NativeSchema
 from .schemas import (
@@ -28,20 +36,14 @@ from .schemas import (
     ArraySchema,
     DiscriminatedUnionSchema,
     IntersectionSchema,
-    JSONSchema,
-    JSONSchemaIO,
-    JSONSchemaTarget,
     KeyedRecordSchema,
     MapSchema,
     ObjectSchema,
     RecordSchema,
-    Schema,
     SetSchema,
     TupleSchema,
     TypedObjectSchema,
     UnionSchema,
-    UnrepresentablePolicy,
-    _field_wire,
 )
 
 
