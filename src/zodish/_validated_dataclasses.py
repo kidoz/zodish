@@ -61,6 +61,8 @@ class _ValidatedDataclass:
     initvar_names: builtins.tuple[str, ...]
     non_init_names: builtins.tuple[str, ...]
     constructor_names: builtins.tuple[str, ...]
+    constructor_fields: Mapping[str, dataclasses.Field[Any]]
+    non_init_fields: Mapping[str, dataclasses.Field[Any]]
     construction_schemas: Mapping[str, Schema[Any, Any]]
     constructor_schema: Schema[Any, Any]
     guards: Mapping[str, Schema[Any, Any] | None]
@@ -504,13 +506,9 @@ async def _acreate(
     if marker is None:
         raise TypeError("ValidatedModel methods require @z.dataclass")
     bound = cls.__signature__.bind(*args, **kwargs)
-    constructor_fields = {
-        name: marker.fields[name] for name in marker.constructor_names
-    }
-    non_init_fields = {
-        name: marker.fields[name] for name in marker.non_init_names
-    }
-    values = _resolved_values(bound, constructor_fields, non_init_fields)
+    values = _resolved_values(
+        bound, marker.constructor_fields, marker.non_init_fields,
+    )
     parsed = await marker.constructor_schema.parse_async(values)
     missing_outputs = [
         name
@@ -818,6 +816,8 @@ def _decorate(
         initvar_names=initvar_names,
         non_init_names=non_init_names,
         constructor_names=constructor_names,
+        constructor_fields=constructor_fields,
+        non_init_fields=non_init_default_fields,
         construction_schemas=construction_schemas,
         constructor_schema=constructor_schema,
         guards=guards,

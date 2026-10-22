@@ -1,6 +1,7 @@
 """Async validation tests for native continuation composition."""
 
 import asyncio
+import dataclasses
 import gc
 import threading
 import unittest
@@ -937,6 +938,169 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
             @z.dataclass(async_fields=True)
             class InvalidTransform:
                 value: Annotated[int, z.integer().transform_async(bump)]
+
+    async def test_validated_dataclass_native_async_differential(self):
+        async def positive(value: int) -> bool:
+            return value > 0
+
+        def sync_positive(value: int) -> bool:
+            return value > 0
+
+        @z.dataclass(async_fields=True)
+        class AsyncItem:
+            value: Annotated[int, z.integer().refine_async(positive)]
+            label: str = "item"
+
+        @z.dataclass
+        class SyncItem:
+            value: Annotated[int, z.integer().refine(sync_positive)]
+            label: str = "item"
+
+        async_codec = z.codecs.dataclass(AsyncItem)
+        sync_codec = z.codecs.dataclass(SyncItem)
+        self.assertEqual(async_codec._node.kind, "dataclass_decode")
+        self.assertEqual(async_codec._encode_node.kind, "dataclass_encode")
+        self.assertTrue(async_codec._node.has_async)
+        self.assertFalse(sync_codec._node.has_async)
+
+        async_value = await async_codec.decode_async({"value": 2})
+        sync_value = sync_codec.decode({"value": 2})
+        self.assertEqual((async_value.value, async_value.label), (2, "item"))
+        self.assertEqual((sync_value.value, sync_value.label), (2, "item"))
+        self.assertEqual(
+            await async_codec.encode_async(async_value),
+            sync_codec.encode(sync_value),
+        )
+
+        async_failure = await async_codec.safe_decode_async({"value": -1})
+        sync_failure = sync_codec.safe_decode({"value": -1})
+        self.assertIsInstance(async_failure, Failure)
+        self.assertIsInstance(sync_failure, Failure)
+        self.assertEqual(
+            [
+                (issue.code, issue.message, issue.path)
+                for issue in async_failure.error.issues
+            ],
+            [
+                (issue.code, issue.message, issue.path)
+                for issue in sync_failure.error.issues
+            ],
+        )
+        multi = await async_codec.safe_decode_async({"value": -1, "label": 5})
+        self.assertIsInstance(multi, Failure)
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in multi.error.issues],
+            [("custom", ("value",)), ("invalid_type", ("label",))],
+        )
+        corrupted = await AsyncItem.acreate(value=2)
+        object.__setattr__(corrupted, "value", -1)
+        encode_failure = await async_codec.safe_encode_async(corrupted)
+        self.assertIsInstance(encode_failure, Failure)
+        self.assertEqual(
+            [issue.path for issue in encode_failure.error.issues],
+            [("value",)],
+        )
+
+    async def test_validated_dataclass_async_output_guard(self):
+        async def accept(value: str) -> bool:
+            return True
+
+        @z.dataclass(async_fields=True)
+        class Guarded:
+            value: int
+            label: Annotated[str, z.string().refine_async(accept)] = "x"
+
+        codec = z.codecs.dataclass(Guarded, fields={
+            "value": z.codec(
+                z.unknown(), z.unknown(), decode=lambda v: v, encode=lambda v: v,
+            ),
+        })
+        self.assertEqual(codec._node.kind, "dataclass_decode")
+        self.assertTrue(codec._node.has_async)
+        decoded = await codec.decode_async({"value": 1})
+        self.assertEqual((decoded.value, decoded.label), (1, "x"))
+        with self.assertRaises(TypeError) as caught:
+            await codec.decode_async({"value": "wrong"})
+        self.assertIn("produced str", str(caught.exception))
+
+    async def test_validated_dataclass_async_callback_counts(self):
+        calls: list[str] = []
+
+        async def decode_count(value: int) -> int:
+            calls.append("decode")
+            return value + 1
+
+        async def encode_count(value: int) -> int:
+            calls.append("encode")
+            return value
+
+        @z.dataclass
+        class Counted:
+            value: int
+            scale: dataclasses.InitVar[int] = 1
+            doubled: int = dataclasses.field(init=False, default=0)
+
+            def __post_init__(self, scale: int) -> None:
+                calls.append("post_init")
+                object.__setattr__(self, "doubled", self.value * scale)
+
+        codec = z.codecs.dataclass(Counted, fields={
+            "value": z.codec_async(
+                z.integer(), z.integer(), decode=decode_count, encode=encode_count,
+            ),
+        })
+        self.assertEqual(codec._node.kind, "dataclass_decode")
+        self.assertTrue(codec._node.has_async)
+        value = await codec.decode_async({"value": 1, "scale": 2})
+        self.assertEqual((value.value, value.doubled), (2, 4))
+        self.assertEqual(calls, ["decode", "post_init"])
+        encoded = await codec.encode_async(value)
+        self.assertEqual(calls, ["decode", "post_init", "encode"])
+        self.assertEqual(encoded, {"value": 2})
+        defaulted = await codec.decode_async({"value": 3})
+        self.assertEqual((defaulted.value, defaulted.doubled), (4, 4))
+        self.assertEqual(calls, ["decode", "post_init", "encode", "decode", "post_init"])
+
+    async def test_validated_dataclass_async_recursive_native(self):
+        async def non_empty(value: str) -> bool:
+            return bool(value)
+
+        @z.dataclass(async_fields=True)
+        class Tree:
+            name: Annotated[str, z.string().refine_async(non_empty)]
+            child: Tree | None = None
+
+        codec = z.codecs.dataclass(Tree)
+        self.assertEqual(codec._node.kind, "dataclass_decode")
+        self.assertTrue(codec._node.has_async)
+        value = await codec.decode_async({"name": "a", "child": {"name": "b"}})
+        self.assertEqual(value.child.name, "b")
+        self.assertEqual(
+            await codec.encode_async(value),
+            {"name": "a", "child": {"name": "b", "child": None}},
+        )
+        failure = await codec.safe_decode_async({"name": "a", "child": {"name": ""}})
+        self.assertIsInstance(failure, Failure)
+        self.assertEqual(
+            [issue.path for issue in failure.error.issues],
+            [("child", "name")],
+        )
+
+        @z.dataclass
+        class SyncTree:
+            name: str
+            child: SyncTree | None = None
+
+        sync_codec = z.codecs.dataclass(SyncTree)
+        self.assertEqual(sync_codec._node.kind, "dataclass_decode")
+        sync_value = sync_codec.decode({"name": "a", "child": {"name": "b"}})
+        self.assertEqual(sync_value.child.name, "b")
+        async_value = await sync_codec.decode_async({"name": "a", "child": {"name": "b"}})
+        self.assertEqual(async_value, sync_value)
+        self.assertEqual(
+            await sync_codec.encode_async(async_value),
+            sync_codec.encode(sync_value),
+        )
 
     async def test_validated_dataclass_recursive_async_codec(self):
         async def decode(value: str) -> int:

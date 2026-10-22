@@ -161,6 +161,8 @@ define_kinds! {
     Trim => ("trim", ChildArity::Exact(1), 0, false, false, JsonFast::Never),
     Lower => ("lower", ChildArity::Exact(1), 0, false, false, JsonFast::Never),
     Upper => ("upper", ChildArity::Exact(1), 0, false, false, JsonFast::Never),
+    DataclassDecode => ("dataclass_decode", ChildArity::Any, 10, false, false, JsonFast::Never),
+    DataclassEncode => ("dataclass_encode", ChildArity::Any, 2, false, false, JsonFast::Never),
     Cleared => ("cleared", ChildArity::Any, 0, false, false, JsonFast::Never),
 }
 

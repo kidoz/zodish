@@ -1,6 +1,7 @@
 //! Synchronous schema dispatch, primitive validation, composition, and depth checks.
 
 mod containers;
+mod dataclass;
 
 use pyo3::exceptions::{PyRecursionError, PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
@@ -16,6 +17,11 @@ use crate::stack::ensure_stack;
 use crate::values::{
     coerce_value, deepcopy, enum_message, is_json_value, literal_description, merge_dicts,
     safe_param,
+};
+
+pub(crate) use dataclass::{
+    FLAG_HAS_DEFAULT, FLAG_HAS_DEFAULT_NODE, FLAG_IS_INITVAR, assemble_instance,
+    missing_default_error, resolve_default,
 };
 
 impl NativeSchema {
@@ -328,6 +334,8 @@ impl NativeSchema {
                 self.evaluate_sequence(ctx, value, path, depth)
             }
             Kind::Object | Kind::Record => self.evaluate_mapping(ctx, value, path, depth),
+            Kind::DataclassDecode => self.evaluate_dataclass_decode(ctx, value, path, depth),
+            Kind::DataclassEncode => self.evaluate_dataclass_encode(ctx, value, path, depth),
             Kind::DiscriminatedUnion => {
                 let key = self.args[0].bind(py);
                 let options = self.args[1]

@@ -1559,25 +1559,121 @@ class _Codecs:
                     schemas_by_name[name] for name in stored_names
                 )
             )
-        decode_transform = NativeSchema(
-            "async_transform" if decode_async_needed else "transform",
-            (decode_input_schema._node,),
-            (decode_value_async if decode_async_needed else decode_value,),
-        )
-        decode_node = NativeSchema(
-            "pipe",
-            (decode_transform, output_schema._node),
-            (),
-        )
-        encode_transform = NativeSchema(
-            "async_transform" if encode_async_needed else "transform",
-            (output_schema._node,),
-            (encode_value_async if encode_async_needed else encode_value,),
-        )
+        if marker is not None:
+            placeholder = unknown()._node
+            decode_children: list[NativeSchema] = []
+            field_flags: list[int] = []
+            field_default_values: list[Any] = []
+            field_default_factories: list[Any] = []
+            input_names: list[str] = []
+            for name in names:
+                schema = schemas_by_name[name]
+                supplied = (
+                    schema._node
+                    if isinstance(schema, CodecSchema)
+                    else input_schemas[name]._node
+                )
+                input_names.append(
+                    name
+                    if isinstance(schema, CodecSchema)
+                    else _field_wire(input_schemas[name]._node) or name
+                )
+                guard = marker.annotation_guards[name]
+                if guard is not None and (
+                    name in overrides or marker.guards[name] is not None
+                ):
+                    supplied = NativeSchema(
+                        "output_guard",
+                        (supplied, guard._node.children[1]),
+                        guard._node.args,
+                    )
+                decode_children.append(supplied)
+                decode_children.append(
+                    marker.construction_schemas[name]._node
+                    if has_default[name]
+                    else placeholder
+                )
+                field_flags.append(
+                    (1 | 4 if has_default[name] else 0)
+                    | (2 if name in initvar_names else 0)
+                )
+                field = fields_by_name[name]
+                field_default_values.append(
+                    MISSING
+                    if field.default is dataclasses.MISSING
+                    else field.default
+                )
+                field_default_factories.append(
+                    None
+                    if field.default_factory is dataclasses.MISSING
+                    else field.default_factory
+                )
+            non_init_default_values: list[Any] = []
+            non_init_default_factories: list[Any] = []
+            for name in non_init_names:
+                decode_children.append(marker.construction_schemas[name]._node)
+                field = fields_by_name[name]
+                non_init_default_values.append(
+                    MISSING
+                    if field.default is dataclasses.MISSING
+                    else field.default
+                )
+                non_init_default_factories.append(
+                    None
+                    if field.default_factory is dataclasses.MISSING
+                    else field.default_factory
+                )
+            decode_node = NativeSchema(
+                "dataclass_decode",
+                builtins.tuple(decode_children),
+                (
+                    cls,
+                    builtins.tuple(names),
+                    builtins.tuple(field_flags),
+                    builtins.tuple(field_default_values),
+                    builtins.tuple(field_default_factories),
+                    builtins.tuple(non_init_names),
+                    getattr(cls, "__post_init__", None) is not None,
+                    builtins.tuple(non_init_default_values),
+                    builtins.tuple(non_init_default_factories),
+                    builtins.tuple(input_names),
+                ),
+            )
+        else:
+            decode_transform = NativeSchema(
+                "async_transform" if decode_async_needed else "transform",
+                (decode_input_schema._node,),
+                (decode_value_async if decode_async_needed else decode_value,),
+            )
+            decode_node = NativeSchema(
+                "pipe",
+                (decode_transform, output_schema._node),
+                (),
+            )
+        if marker is not None:
+            encode_children: list[NativeSchema] = []
+            for name in stored_names:
+                schema = schemas_by_name[name]
+                encode_children.append(
+                    schema._encode_node
+                    if isinstance(schema, CodecSchema)
+                    else input_schemas[name]._node
+                )
+            encode_node = NativeSchema(
+                "dataclass_encode",
+                builtins.tuple(encode_children),
+                (cls, builtins.tuple(stored_names)),
+            )
+        else:
+            encode_node = NativeSchema(
+                "async_transform" if encode_async_needed else "transform",
+                (output_schema._node,),
+                (encode_value_async if encode_async_needed else encode_value,),
+            )
 
         result = _CompoundCodecSchema[DataclassT, dict[str, Any]](
             decode_node,
-            _encode_node=encode_transform,
+            _encode_node=encode_node,
             _input_schema=input_schema,
             _output_schema=output_schema,
             _json_output_schema=output_json_schema,

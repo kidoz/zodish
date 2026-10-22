@@ -1,6 +1,7 @@
 //! Async container continuations grouped by object, sequence, and record traversal.
 //! Frame/state definitions remain in the parent session; this module shares paths.
 
+mod dataclass;
 mod object;
 mod record;
 mod sequence;

@@ -160,6 +160,46 @@ struct ObjectFrame {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+enum DataclassDecodeStage {
+    // Evaluating the supplied-value child of the init field at `cursor`.
+    Supplied,
+    // Evaluating the default-validation child of the init field at `cursor`.
+    Default,
+    // Evaluating the validation child of the init=False field at `cursor`.
+    NonInit,
+}
+
+struct DataclassDecodeFrame {
+    node: Py<NativeSchema>,
+    path: Path,
+    depth: usize,
+    names: Vec<Py<PyAny>>,
+    input_names: Vec<Py<PyAny>>,
+    flags: Vec<u8>,
+    raws: Vec<Option<Py<PyAny>>>,
+    non_init_names: Vec<Py<PyAny>>,
+    // Snapshot keys retained for the post-field invalid_key scan; unknown
+    // string keys are stripped, so values are never needed.
+    extra_keys: Vec<Py<PyAny>>,
+    stored: Py<PyDict>,
+    initvar_values: Vec<Py<PyAny>>,
+    issues: Vec<Issue>,
+    cursor: usize,
+    stage: DataclassDecodeStage,
+}
+
+struct DataclassEncodeFrame {
+    node: Py<NativeSchema>,
+    path: Path,
+    depth: usize,
+    value: Py<PyAny>,
+    names: Vec<Py<PyAny>>,
+    cursor: usize,
+    result: Py<PyDict>,
+    issues: Vec<Issue>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum RecordStage {
     Key,
     KeyWaiting,
@@ -225,6 +265,8 @@ enum AsyncFrame {
     Array(ArrayFrame),
     Object(ObjectFrame),
     Record(RecordFrame),
+    DataclassDecode(DataclassDecodeFrame),
+    DataclassEncode(DataclassEncodeFrame),
     Union(UnionFrame),
     Intersection(IntersectionFrame),
 }

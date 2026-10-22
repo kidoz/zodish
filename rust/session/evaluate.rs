@@ -507,6 +507,12 @@ impl AsyncSession {
             }
             Kind::Object => self.start_object(py, &ctx, node, &node_ref, value, path, depth),
             Kind::Record => self.start_record(py, &ctx, node, &node_ref, value, path, depth),
+            Kind::DataclassDecode => {
+                self.start_dataclass_decode(py, &ctx, node, &node_ref, value, path, depth)
+            }
+            Kind::DataclassEncode => {
+                self.start_dataclass_encode(py, &ctx, node, &node_ref, value, path, depth)
+            }
             Kind::Union => self.start_union(py, node, &node_ref, value, path, depth),
             Kind::Intersection => {
                 self.start_intersection(py, &ctx, node, &node_ref, value, path, depth)

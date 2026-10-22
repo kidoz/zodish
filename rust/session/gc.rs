@@ -128,6 +128,48 @@ pub(super) fn visit_async_frame(
                 visit.call(key)?;
             }
         }
+        AsyncFrame::DataclassDecode(frame) => {
+            visit.call(&frame.node)?;
+            for part in &frame.path {
+                part.visit(visit)?;
+            }
+            for name in &frame.names {
+                visit.call(name)?;
+            }
+            for name in &frame.input_names {
+                visit.call(name)?;
+            }
+            for raw in frame.raws.iter().flatten() {
+                visit.call(raw)?;
+            }
+            for name in &frame.non_init_names {
+                visit.call(name)?;
+            }
+            for key in &frame.extra_keys {
+                visit.call(key)?;
+            }
+            visit.call(&frame.stored)?;
+            for value in &frame.initvar_values {
+                visit.call(value)?;
+            }
+            for issue in &frame.issues {
+                visit_issue(issue, visit)?;
+            }
+        }
+        AsyncFrame::DataclassEncode(frame) => {
+            visit.call(&frame.node)?;
+            for part in &frame.path {
+                part.visit(visit)?;
+            }
+            visit.call(&frame.value)?;
+            for name in &frame.names {
+                visit.call(name)?;
+            }
+            visit.call(&frame.result)?;
+            for issue in &frame.issues {
+                visit_issue(issue, visit)?;
+            }
+        }
         AsyncFrame::Union(frame) => {
             visit.call(&frame.node)?;
             visit.call(&frame.value)?;

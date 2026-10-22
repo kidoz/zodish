@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use pyo3::class::{PyTraverseError, PyVisit};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyString, PyTuple, PyType};
+use pyo3::types::{PyBool, PyInt, PyString, PyTuple, PyType};
 
 use crate::errors::ErrorTemplate;
 use crate::runtime::Context;
@@ -21,7 +21,10 @@ use json::parse_json_value;
 pub(crate) use checks::{
     evaluate_string_bool, interpret_super_refine, select_discriminated_branch,
 };
-pub(crate) use evaluate::is_primitive_kind;
+pub(crate) use evaluate::{
+    FLAG_HAS_DEFAULT, FLAG_HAS_DEFAULT_NODE, FLAG_IS_INITVAR, assemble_instance, is_primitive_kind,
+    missing_default_error, resolve_default,
+};
 pub(crate) use kind::{JsonFast, Kind};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -146,6 +149,70 @@ impl NativeSchema {
                         "Invalid native discriminated union options",
                     ));
                 }
+            }
+        }
+        if matches!(kind, Kind::DataclassDecode) {
+            let valid = (|| {
+                if !args[0].bind(py).is_instance_of::<PyType>() {
+                    return false;
+                }
+                let tuples = [
+                    args[1].bind(py).cast::<PyTuple>(),
+                    args[2].bind(py).cast::<PyTuple>(),
+                    args[3].bind(py).cast::<PyTuple>(),
+                    args[4].bind(py).cast::<PyTuple>(),
+                    args[5].bind(py).cast::<PyTuple>(),
+                    args[7].bind(py).cast::<PyTuple>(),
+                    args[8].bind(py).cast::<PyTuple>(),
+                    args[9].bind(py).cast::<PyTuple>(),
+                ];
+                let [
+                    Ok(names),
+                    Ok(flags),
+                    Ok(default_values),
+                    Ok(default_factories),
+                    Ok(non_init_names),
+                    Ok(non_init_default_values),
+                    Ok(non_init_default_factories),
+                    Ok(input_names),
+                ] = tuples
+                else {
+                    return false;
+                };
+                names.len() == flags.len()
+                    && names.len() == default_values.len()
+                    && names.len() == default_factories.len()
+                    && names.len() == input_names.len()
+                    && non_init_names.len() == non_init_default_values.len()
+                    && non_init_names.len() == non_init_default_factories.len()
+                    && children.len() == 2 * names.len() + non_init_names.len()
+                    && args[6].bind(py).is_instance_of::<PyBool>()
+                    && names
+                        .iter()
+                        .chain(non_init_names.iter())
+                        .chain(input_names.iter())
+                        .all(|name| name.is_instance_of::<PyString>())
+                    && flags.iter().all(|flag| flag.is_instance_of::<PyInt>())
+            })();
+            if !valid {
+                return Err(PyValueError::new_err(
+                    "Invalid native dataclass decode shape",
+                ));
+            }
+        }
+        if matches!(kind, Kind::DataclassEncode) {
+            let valid = args[0].bind(py).is_instance_of::<PyType>()
+                && match args[1].bind(py).cast::<PyTuple>() {
+                    Ok(names) => {
+                        names.len() == children.len()
+                            && names.iter().all(|name| name.is_instance_of::<PyString>())
+                    }
+                    Err(_) => false,
+                };
+            if !valid {
+                return Err(PyValueError::new_err(
+                    "Invalid native dataclass encode shape",
+                ));
             }
         }
         let json_fast = match kind.spec().json_fast {

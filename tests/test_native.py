@@ -1,5 +1,6 @@
 """Integration checks for behavior across the Python/Rust boundary."""
 
+import dataclasses
 import gc
 import importlib.machinery
 import json
@@ -734,6 +735,125 @@ print("all cases ok")
         self.assertEqual(
             [issue.path for issue in caught.exception.issues],
             [("value",), ("text",)],
+        )
+
+    def test_validated_dataclass_codec_node_kinds(self):
+        @z.dataclass
+        class Point:
+            x: int
+            y: int
+
+        codec = z.codecs.dataclass(Point)
+        self.assertEqual(codec._node.kind, "dataclass_decode")
+        self.assertEqual(codec._encode_node.kind, "dataclass_encode")
+        self.assertFalse(codec._node.has_async)
+        for children, args in (
+            ((), ()),
+            ((z.integer()._node, z.unknown()._node), ()),
+            (
+                (z.integer()._node, z.unknown()._node),
+                (Point, ("x",), (0,), (MISSING,), (None,), (), False, (), ()),
+            ),
+            (
+                (z.integer()._node, z.unknown()._node),
+                (Point, ("x",), (0,), (MISSING,), (None,), (), False, (), (), (1,)),
+            ),
+        ):
+            with self.subTest(children=children, args=args), self.assertRaises(ValueError):
+                _native.NativeSchema("dataclass_decode", children, args)
+        with self.assertRaises(ValueError):
+            _native.NativeSchema(
+                "dataclass_encode", (z.integer()._node,), (Point, ("x", "y")),
+            )
+
+    def test_validated_dataclass_codec_gc_cycle(self):
+        @z.dataclass
+        class Cyclic:
+            value: int
+
+        codec = z.codecs.dataclass(Cyclic)
+        self.assertEqual(codec.decode({"value": 1}), Cyclic(1))
+        class_ref = weakref.ref(Cyclic)
+        codec_ref = weakref.ref(codec)
+        del codec
+        del Cyclic
+        gc.collect()
+        self.assertIsNone(class_ref())
+        self.assertIsNone(codec_ref())
+
+    def test_validated_dataclass_codec_large_and_unicode_values(self):
+        @z.dataclass
+        class Big:
+            value: int
+            text: str
+
+        codec = z.codecs.dataclass(Big)
+        huge = 10**5000
+        decoded = codec.decode({"value": huge, "text": "héllo wörld ✓"})
+        self.assertEqual(decoded, Big(huge, "héllo wörld ✓"))
+        self.assertEqual(
+            codec.encode(decoded),
+            {"value": huge, "text": "héllo wörld ✓"},
+        )
+
+    def test_validated_dataclass_decode_input_mutation_snapshot(self):
+        @z.dataclass
+        class Pair:
+            a: int
+            b: int
+
+        data: dict[str, object] = {"a": 1, "b": 2}
+
+        def mutate(value: int) -> int:
+            data.pop("b")
+            data["extra"] = 9
+            return value
+
+        codec = z.codecs.dataclass(Pair, fields={
+            "a": z.codec(z.integer(), z.integer(), decode=mutate, encode=lambda v: v),
+            "b": z.integer(),
+        })
+        self.assertEqual(codec.decode(data), Pair(1, 2))
+        self.assertNotIn("b", data)
+
+    def test_validated_dataclass_decode_missing_default_channels(self):
+        @z.dataclass
+        class FactoryMissing:
+            value: int = dataclasses.field(default_factory=lambda: MISSING)
+
+        codec = z.codecs.dataclass(FactoryMissing)
+        self.assertEqual(codec._node.kind, "dataclass_decode")
+        with self.assertRaises(TypeError) as factory_caught:
+            codec.decode({})
+        self.assertEqual(
+            str(factory_caught.exception),
+            "Field 'value' factory produced MISSING",
+        )
+
+        node = _native.NativeSchema(
+            "dataclass_decode",
+            (
+                z.integer()._node,
+                z.integer().transform(lambda _: MISSING)._node,
+            ),
+            (
+                FactoryMissing,
+                ("value",),
+                (1 | 4,),
+                (3,),
+                (None,),
+                (),
+                False,
+                (),
+                (),
+                ("value",),
+            ),
+        )
+        with self.assertRaises(TypeError) as default_caught:
+            node.parse({}, MISSING, Issue, ValidationError)
+        self.assertEqual(
+            str(default_caught.exception),
+            "Field 'value' default produced MISSING",
         )
 
 

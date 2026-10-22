@@ -76,6 +76,8 @@ impl AsyncSession {
             AsyncFrame::Array(frame) => self.resume_array(py, frame, outcome),
             AsyncFrame::Object(frame) => self.resume_object(py, frame, outcome),
             AsyncFrame::Record(frame) => self.resume_record(py, frame, outcome),
+            AsyncFrame::DataclassDecode(frame) => self.resume_dataclass_decode(py, frame, outcome),
+            AsyncFrame::DataclassEncode(frame) => self.resume_dataclass_encode(py, frame, outcome),
             AsyncFrame::Union(frame) => self.resume_union(py, frame, outcome),
             AsyncFrame::Intersection(frame) => self.resume_intersection(py, frame, outcome),
         }
@@ -94,6 +96,8 @@ impl AsyncSession {
             AsyncFrame::Array(frame) => self.advance_array(py, frame),
             AsyncFrame::Object(frame) => self.advance_object(py, frame),
             AsyncFrame::Record(frame) => self.advance_record(py, frame),
+            AsyncFrame::DataclassDecode(frame) => self.advance_dataclass_decode(py, frame),
+            AsyncFrame::DataclassEncode(frame) => self.advance_dataclass_encode(py, frame),
             AsyncFrame::Union(frame) => self.advance_union(py, frame),
             AsyncFrame::Intersection(frame) => self.advance_intersection(py, frame),
             _ => Err(PyRuntimeError::new_err(
