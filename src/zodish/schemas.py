@@ -1414,6 +1414,12 @@ class ValidatedModel:
         return cast(bool, _validated_model_codec(cls).validate(value))
 
     @classmethod
+    async def acreate(cls, *args: Any, **kwargs: Any) -> Self:
+        from ._validated_dataclasses import _acreate
+
+        return cast(Self, await _acreate(cls, *args, **kwargs))
+
+    @classmethod
     def parse_json(
         cls,
         data: str | builtins.bytes | bytearray,
@@ -1557,6 +1563,7 @@ def dataclass[T](
     /,
     *,
     validate_assignment: bool | None = ...,
+    async_fields: bool | None = ...,
 ) -> type[T]: ...
 
 
@@ -1574,6 +1581,7 @@ def dataclass[T](
     slots: bool = ...,
     weakref_slot: bool = ...,
     validate_assignment: bool | None = ...,
+    async_fields: bool | None = ...,
 ) -> Callable[[type[T]], type[T]]: ...
 
 
@@ -1588,7 +1596,8 @@ def dataclass[T](
     Field annotations are compiled into one native object schema. Constructor
     arguments are decoded values; use ``z.codecs.dataclass`` for encoded input.
     Set ``validate_assignment=True`` to validate later field assignments; the
-    default is inherited by decorated subclasses.
+    default is inherited by decorated subclasses. Set ``async_fields=True`` to
+    allow asynchronous field schemas and construct with ``await Model.acreate``.
     """
     from ._validated_dataclasses import dataclass as _validated_dataclass
 
@@ -1626,6 +1635,7 @@ def create_model(
     *,
     defaults: Mapping[str, Any] | None = None,
     validate_assignment: bool | None = None,
+    async_fields: bool | None = None,
     **options: Any,
 ) -> type[Any]:
     """Create a validated dataclass from runtime field schemas.
@@ -1636,7 +1646,8 @@ def create_model(
     top-level ``.default`` or ``.default_factory`` on a plain field schema is
     also honored. For codec fields, supply the decoded default through
     ``defaults``. Encoded input still uses ``z.codecs.dataclass(Model)`` or the
-    generated class methods.
+    generated class methods. Set ``async_fields=True`` to construct with
+    ``await Model.acreate(...)`` and asynchronous field schemas.
     """
     if (
         not isinstance(name, str)
@@ -1727,6 +1738,7 @@ def create_model(
         _validated_dataclass(
             dynamic,
             validate_assignment=validate_assignment,
+            async_fields=async_fields,
         ),
     )
 

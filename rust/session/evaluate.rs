@@ -11,8 +11,8 @@ use pyo3::types::{PyDict, PyTuple};
 use super::callbacks::check_awaitable;
 use super::{
     ASYNC_TOKEN_COUNTER, AsyncCallbackFrame, AsyncFrame, AsyncNext, AsyncPending, AsyncPendingKind,
-    AsyncSession, AsyncTask, CatchFrame, PipeFrame, PostChildFrame, RefineFrame, StringBoolFrame,
-    SuperRefineFrame, clone_path,
+    AsyncSession, AsyncTask, CatchFrame, OutputGuardFrame, PipeFrame, PostChildFrame, RefineFrame,
+    StringBoolFrame, SuperRefineFrame, clone_path,
 };
 use crate::MAX_DEPTH;
 use crate::errors::{Error, Path};
@@ -448,6 +448,21 @@ impl AsyncSession {
                 self.frames.push(AsyncFrame::PostChild(PostChildFrame {
                     node: node.clone_ref(py),
                     path: clone_path(py, &path),
+                }));
+                drop(node_ref);
+                Ok(AsyncNext::Task(AsyncTask::Eval {
+                    node: child,
+                    value,
+                    path,
+                    depth: depth + 1,
+                }))
+            }
+            Kind::OutputGuard => {
+                let child = node_ref.children[0].clone_ref(py);
+                self.frames.push(AsyncFrame::OutputGuard(OutputGuardFrame {
+                    node: node.clone_ref(py),
+                    path: clone_path(py, &path),
+                    depth,
                 }));
                 drop(node_ref);
                 Ok(AsyncNext::Task(AsyncTask::Eval {

@@ -108,6 +108,12 @@ struct PostChildFrame {
     path: Path,
 }
 
+struct OutputGuardFrame {
+    node: Py<NativeSchema>,
+    path: Path,
+    depth: usize,
+}
+
 struct StringBoolFrame {
     node: Py<NativeSchema>,
     path: Path,
@@ -213,6 +219,7 @@ enum AsyncFrame {
     Refine(RefineFrame),
     SuperRefine(SuperRefineFrame),
     PostChild(PostChildFrame),
+    OutputGuard(OutputGuardFrame),
     StringBool(StringBoolFrame),
     Pipe(PipeFrame),
     Array(ArrayFrame),

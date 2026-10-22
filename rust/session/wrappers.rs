@@ -3,13 +3,14 @@
 
 use std::sync::atomic::Ordering;
 
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 
 use super::callbacks::check_awaitable;
 use super::{
     ASYNC_TOKEN_COUNTER, AsyncFrame, AsyncNext, AsyncPending, AsyncPendingKind, AsyncSession,
-    AsyncTask, CatchFrame, PipeFrame, PostChildFrame, RefineFrame, StringBoolFrame,
-    SuperRefineFrame, clone_path, deliver_at,
+    AsyncTask, CatchFrame, OutputGuardFrame, PipeFrame, PostChildFrame, RefineFrame,
+    StringBoolFrame, SuperRefineFrame, clone_path, deliver_at,
 };
 use crate::errors::{Error, PathPart, Result};
 use crate::schema::{evaluate_string_bool, interpret_super_refine};
@@ -134,6 +135,41 @@ impl AsyncSession {
                 let node = frame.node.bind(py).try_borrow().map_err(PyErr::from)?;
                 let ctx = self.context(py)?;
                 let result = node.evaluate_post_child(&ctx, parsed.bind(py), &path);
+                drop(node);
+                Ok(deliver_at(result, path))
+            }
+            Err(error) => Ok(deliver_at(Err(error), path)),
+        }
+    }
+
+    pub(super) fn resume_output_guard(
+        &mut self,
+        py: Python<'_>,
+        frame: OutputGuardFrame,
+        outcome: Result<Py<PyAny>>,
+    ) -> PyResult<AsyncNext> {
+        let path = frame.path;
+        match outcome {
+            Ok(parsed) => {
+                let node = frame.node.bind(py).try_borrow().map_err(PyErr::from)?;
+                let result = (|| -> Result<Py<PyAny>> {
+                    let guard = node.children[1].try_borrow(py).map_err(PyErr::from)?;
+                    let ctx = self.context(py)?;
+                    let mut guard_path = clone_path(py, &path);
+                    match guard.validate(&ctx, parsed.bind(py), &mut guard_path, frame.depth + 1) {
+                        Ok(_) => Ok(parsed.bind(py).clone().unbind()),
+                        Err(Error::Invalid(_)) => {
+                            let field: String = node.args[0].bind(py).extract()?;
+                            let expected: String = node.args[1].bind(py).extract()?;
+                            let actual = parsed.bind(py).get_type().name()?.to_string();
+                            Err(PyTypeError::new_err(format!(
+                                "field {field:?} produced {actual}, expected {expected}"
+                            ))
+                            .into())
+                        }
+                        Err(error) => Err(error),
+                    }
+                })();
                 drop(node);
                 Ok(deliver_at(result, path))
             }

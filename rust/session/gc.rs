@@ -43,6 +43,12 @@ pub(super) fn visit_async_frame(
                 part.visit(visit)?;
             }
         }
+        AsyncFrame::OutputGuard(frame) => {
+            visit.call(&frame.node)?;
+            for part in &frame.path {
+                part.visit(visit)?;
+            }
+        }
         AsyncFrame::StringBool(frame) => {
             visit.call(&frame.node)?;
             for part in &frame.path {

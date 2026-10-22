@@ -607,6 +607,23 @@ RuntimeModel = z.create_model("RuntimeModel", {"name": z.string()})
 assert_type(RuntimeModel, type[Any])
 
 
+async def _positive_async(value: int) -> bool:
+    return value > 0
+
+
+@z.dataclass(async_fields=True)
+class AsyncValidated(z.ValidatedModel):
+    value: Annotated[int, z.integer().refine_async(_positive_async)]
+
+
+if TYPE_CHECKING:
+    async def _typed_async_construction() -> None:
+        assert_type(
+            await AsyncValidated.acreate(value=1),
+            AsyncValidated,
+        )
+
+
 @z.dataclass
 class TypedValidatedModel(z.ValidatedModel):
     name: str

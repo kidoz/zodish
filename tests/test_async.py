@@ -846,6 +846,98 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
             class AsyncField:
                 value: Annotated[int, z.integer().transform_async(bump)]
 
+    async def test_validated_dataclass_async_construction(self):
+        calls: list[int] = []
+
+        async def positive(value: int) -> bool:
+            calls.append(value)
+            return value > 0
+
+        @z.dataclass(async_fields=True)
+        class Item:
+            value: Annotated[int, z.integer().refine_async(positive)]
+            label: str = "item"
+
+        with self.assertRaises(TypeError):
+            Item(value=1)
+        item = await Item.acreate(value=1)
+        self.assertEqual(item.value, 1)
+        self.assertEqual(item.label, "item")
+        self.assertEqual(calls, [1])
+        with self.assertRaises(ValidationError):
+            await Item.acreate(value=-1)
+        with self.assertRaises(TypeError):
+            await Item.acreate()
+        with self.assertRaises(TypeError):
+            await Item.acreate(value=1, extra=2)
+        parsed_encoded = await Item.parse_async({"value": 2})
+        self.assertEqual(parsed_encoded.value, 2)
+        with self.assertRaises(ValidationError):
+            await Item.parse_async({"value": -1})
+
+        async def accept(value: object) -> bool:
+            return True
+
+        @z.dataclass(async_fields=True)
+        class Guarded:
+            value: Annotated[int, z.unknown().refine_async(accept)]
+
+        self.assertEqual((await Guarded.acreate(value=1)).value, 1)
+        with self.assertRaisesRegex(TypeError, "produced str"):
+            await Guarded.acreate(value="wrong")
+
+        @z.dataclass
+        class Child(Item):
+            extra: int = 0
+
+        child = await Child.acreate(value=2)
+        self.assertEqual(child.extra, 0)
+        with self.assertRaises(TypeError):
+            Child(value=2)
+
+        @z.dataclass(async_fields=True)
+        class SyncAllowed:
+            value: int
+
+        self.assertEqual(SyncAllowed(value=1).value, 1)
+        self.assertEqual((await SyncAllowed.acreate(value=2)).value, 2)
+
+        @z.dataclass
+        class SyncValue:
+            value: int
+
+        self.assertEqual((await SyncValue.acreate(value=3)).value, 3)
+
+        DynamicAsync = z.create_model("DynamicAsync", {
+            "value": z.integer().refine_async(positive),
+        }, async_fields=True)
+        with self.assertRaises(TypeError):
+            DynamicAsync(value=1)
+        self.assertEqual(
+            (await DynamicAsync.acreate(value=1)).value, 1,
+        )
+
+        @z.dataclass(async_fields=True, frozen=True, slots=True)
+        class FrozenAsync:
+            value: Annotated[int, z.integer().refine_async(positive)]
+
+        frozen_async = await FrozenAsync.acreate(value=1)
+        self.assertEqual(frozen_async.value, 1)
+        self.assertFalse(hasattr(frozen_async, "__dict__"))
+
+        with self.assertRaises(TypeError):
+            @z.dataclass(async_fields=True, validate_assignment=True)
+            class InvalidAssignment:
+                value: Annotated[int, z.integer().refine_async(positive)]
+
+        async def bump(value: int) -> int:
+            return value + 1
+
+        with self.assertRaises(TypeError):
+            @z.dataclass(async_fields=True)
+            class InvalidTransform:
+                value: Annotated[int, z.integer().transform_async(bump)]
+
     async def test_validated_dataclass_async_codec_decode(self):
         calls: list[str] = []
 

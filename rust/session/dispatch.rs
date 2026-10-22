@@ -70,6 +70,7 @@ impl AsyncSession {
             AsyncFrame::Refine(frame) => self.resume_refine(py, frame, outcome),
             AsyncFrame::SuperRefine(frame) => self.resume_super_refine(py, frame, outcome),
             AsyncFrame::PostChild(frame) => self.resume_post_child(py, frame, outcome),
+            AsyncFrame::OutputGuard(frame) => self.resume_output_guard(py, frame, outcome),
             AsyncFrame::StringBool(frame) => self.resume_string_bool(py, frame, outcome),
             AsyncFrame::Pipe(frame) => self.resume_pipe(py, frame, outcome),
             AsyncFrame::Array(frame) => self.resume_array(py, frame, outcome),

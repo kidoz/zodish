@@ -28,6 +28,7 @@ from ._native import NativeSchema
 _MARKER_ATTR = "__zodish_validated_dataclass__"
 _UNSUPPORTED_CONSTRUCTION_KINDS = frozenset({
     "preprocess", "transform", "coerce", "string_bool", "pipe",
+    "async_preprocess", "async_transform",
 })
 _SCALAR_KINDS = frozenset({"string", "integer", "number", "boolean", "none"})
 _INIT_PARAMETER_KINDS = (
@@ -60,12 +61,14 @@ class _ValidatedDataclass:
     non_init_names: builtins.tuple[str, ...]
     constructor_names: builtins.tuple[str, ...]
     construction_schemas: Mapping[str, Schema[Any, Any]]
+    constructor_schema: Schema[Any, Any]
     guards: Mapping[str, Schema[Any, Any] | None]
     annotation_guards: Mapping[str, Schema[Any, Any] | None]
     fields: Mapping[str, dataclasses.Field[Any]]
     has_default: Mapping[str, bool]
     assignment_schemas: Mapping[str, Schema[Any, Any]]
     validate_assignment: bool
+    async_fields: bool
 
 
 def marker_for(cls: type[Any]) -> _ValidatedDataclass | None:
@@ -232,6 +235,8 @@ def _compile_field_schema(
     name: str,
     field: dataclasses.Field[Any],
     annotation: Any,
+    *,
+    allow_async: bool,
 ) -> tuple[
     Schema[Any, Any],
     Schema[Any, Any] | None,
@@ -247,10 +252,11 @@ def _compile_field_schema(
     if not isinstance(schema, Schema):
         raise TypeError(f"Field {name!r} must be a schema")
     base = _codec_output_schema(schema) or schema
-    if base._node.has_async:
+    if base._node.has_async and not allow_async:
         raise TypeError(
             f"Field {name!r} uses asynchronous validation; "
-            "construction is synchronous",
+            "use async_fields=True and await Model.acreate(...), or keep "
+            "construction synchronous",
         )
     if _contains_kind(base._node, _UNSUPPORTED_CONSTRUCTION_KINDS):
         raise TypeError(
@@ -385,6 +391,52 @@ def _inherited_assignment_validation(cls: type[Any]) -> bool:
     return False
 
 
+def _inherited_async_fields(cls: type[Any]) -> bool:
+    for base in cls.__mro__[1:]:
+        marker = marker_for(base)
+        if marker is not None and marker.async_fields:
+            return True
+    return False
+
+
+async def _acreate(
+    cls: type[Any],
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
+    """Construct a validated dataclass from decoded values asynchronously."""
+    marker = marker_for(cls)
+    if marker is None:
+        raise TypeError("ValidatedModel methods require @z.dataclass")
+    bound = cls.__signature__.bind(*args, **kwargs)
+    constructor_fields = {
+        name: marker.fields[name] for name in marker.constructor_names
+    }
+    non_init_fields = {
+        name: marker.fields[name] for name in marker.non_init_names
+    }
+    values = _resolved_values(bound, constructor_fields, non_init_fields)
+    parsed = await marker.constructor_schema.parse_async(values)
+    missing_outputs = [
+        name
+        for name in marker.construction_schemas
+        if name not in parsed or parsed[name] is MISSING
+    ]
+    if missing_outputs:
+        raise TypeError(
+            "Fields produced MISSING: "
+            + ", ".join(builtins.map(repr, missing_outputs)),
+        )
+    initvar_values = [parsed[name] for name in marker.initvar_names]
+    stored_values = {
+        name: parsed[name]
+        for name in (*marker.stored_names, *marker.non_init_names)
+    }
+    instance = object.__new__(cls)
+    _assign(instance, stored_values, initvar_values)
+    return instance
+
+
 def _validated_setattr(self: Any, name: str, value: Any) -> None:
     """Validate a declared stored-field assignment before setting it."""
     marker = marker_for(type(self))
@@ -433,6 +485,7 @@ _CLASSMETHOD_NAMES = (
     "parse",
     "safe_parse",
     "validate",
+    "acreate",
     "parse_json",
     "safe_parse_json",
     "validate_json",
@@ -468,9 +521,14 @@ def _decorate(
     options: Mapping[str, Any],
     *,
     validate_assignment: bool | None = None,
+    async_fields: bool | None = None,
 ) -> type[Any]:
     if marker_for(cls) is not None:
-        if options or validate_assignment is not None:
+        if (
+            options
+            or validate_assignment is not None
+            or async_fields is not None
+        ):
             raise TypeError(
                 "Applied options to an already validated dataclass",
             )
@@ -513,6 +571,12 @@ def _decorate(
             raise TypeError(
                 "validate_assignment requires a non-frozen dataclass",
             )
+
+    effective_async_fields = (
+        _inherited_async_fields(cls)
+        if async_fields is None
+        else async_fields
+    )
 
     init_signature = inspect.signature(cls.__init__)
     init_parameters = list(init_signature.parameters.values())
@@ -578,7 +642,11 @@ def _decorate(
         if annotation is _UNSET:
             raise TypeError(f"Cannot infer a schema for field {name!r}")
         construction, guard, annotation_guard, base = _compile_field_schema(
-            cls, name, field, annotation,
+            cls,
+            name,
+            field,
+            annotation,
+            allow_async=effective_async_fields,
         )
         field_has_default = (
             field.default is not dataclasses.MISSING
@@ -598,6 +666,15 @@ def _decorate(
         annotation_guards[name] = annotation_guard
         has_default[name] = field_has_default
 
+    has_async = builtins.any(
+        schema._node.has_async for schema in construction_schemas.values()
+    )
+    if has_async and effective_validate_assignment:
+        raise TypeError(
+            "validate_assignment is not supported with asynchronous "
+            "construction schemas",
+        )
+
     assignment_schemas = {
         name: schema
         for name, schema in construction_schemas.items()
@@ -613,7 +690,11 @@ def _decorate(
                     f"Cannot infer a schema for field {field.name!r}",
                 )
             construction, _, _, _ = _compile_field_schema(
-                cls, field.name, field, annotation,
+                cls,
+                field.name,
+                field,
+                annotation,
+                allow_async=effective_async_fields,
             )
             assignment_schemas[field.name] = construction
 
@@ -625,17 +706,24 @@ def _decorate(
         non_init_names=non_init_names,
         constructor_names=constructor_names,
         construction_schemas=construction_schemas,
+        constructor_schema=constructor_schema,
         guards=guards,
         annotation_guards=annotation_guards,
         fields={name: field for name, field in all_fields.items()},
         has_default=has_default,
         assignment_schemas=assignment_schemas,
         validate_assignment=effective_validate_assignment,
+        async_fields=effective_async_fields,
     )
     original_init = cls.__init__
 
     @functools.wraps(original_init)
     def __init__(self: Any, *args: Any, **kwargs: Any) -> None:
+        if has_async:
+            raise TypeError(
+                "This validated dataclass has asynchronous field schemas; "
+                "use await Model.acreate(...) instead",
+            )
         bound = signature.bind(*args, **kwargs)
         values = _resolved_values(
             bound, constructor_fields, non_init_default_fields,
@@ -672,6 +760,7 @@ def dataclass(
     /,
     *,
     validate_assignment: bool | None = None,
+    async_fields: bool | None = None,
     **options: Any,
 ) -> Any:
     """Implement the public ``z.dataclass`` decorator."""
@@ -680,6 +769,7 @@ def dataclass(
             target,
             options,
             validate_assignment=validate_assignment,
+            async_fields=async_fields,
         )
 
     return decorate if cls is None else decorate(cls)
