@@ -47,9 +47,9 @@ include = [
   { path = "benchmarks/*.py", format = "sdist" },
   { path = "benchmarks/README.md", format = "sdist" },
   { path = "benchmarks/requirements.lock", format = "sdist" },
-  { path = "benchmarks/results/*", format = "sdist" },
   { path = ".github/workflows/*.yml", format = "sdist" },
 ]
+exclude = ["benchmarks/results/**"]
 
 [tool.ruff]
 target-version = "py314"

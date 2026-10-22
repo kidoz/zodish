@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recursive schemas and callbacks that re-enter `parse` raise `RecursionError`
   on small-stack threads instead of crashing the interpreter.
 
+### Changed
+
+- Release workflows pin third-party actions to commit SHAs, attest build
+  provenance for wheels and sdists, and require an explicit tag for manual
+  publishes. Benchmark result snapshots are excluded from the sdist, and the
+  benchmark lock records artifact hashes.
+
 ## [0.10.0] - 2026-10-22
 
 ### Added
