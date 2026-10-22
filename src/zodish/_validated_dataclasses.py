@@ -71,6 +71,18 @@ def marker_for(cls: type[Any]) -> _ValidatedDataclass | None:
     return marker if isinstance(marker, _ValidatedDataclass) else None
 
 
+def codec_for(cls: type[Any]) -> CodecSchema[Any, Any]:
+    """Return the cached dataclass codec for a validated class."""
+    if marker_for(cls) is None:
+        raise TypeError("ValidatedModel methods require @z.dataclass")
+    cached = cls.__dict__.get("__zodish_codec_cache__")
+    if isinstance(cached, CodecSchema):
+        return cached
+    codec = _schemas.codecs.dataclass(cls)
+    type.__setattr__(cls, "__zodish_codec_cache__", codec)
+    return codec
+
+
 def assemble_validated(
     cls: type[Any],
     values: Mapping[str, Any],
@@ -336,6 +348,40 @@ def _reject_allocation_hooks(cls: type[Any]) -> None:
         )
 
 
+_CLASSMETHOD_NAMES = (
+    "parse",
+    "safe_parse",
+    "validate",
+    "parse_json",
+    "safe_parse_json",
+    "validate_json",
+    "parse_async",
+    "safe_parse_async",
+    "validate_async",
+    "parse_json_async",
+    "safe_parse_json_async",
+    "encode",
+    "safe_encode",
+    "encode_async",
+    "safe_encode_async",
+    "to_json_schema",
+)
+
+
+def _install_classmethods(
+    cls: type[Any],
+    field_names: builtins.set[str],
+) -> None:
+    for name in _CLASSMETHOD_NAMES:
+        if name in field_names or name in cls.__dict__:
+            continue
+        if builtins.any(name in base.__dict__ for base in cls.__mro__[1:]):
+            continue
+        descriptor = inspect.getattr_static(_schemas.ValidatedModel, name)
+        if isinstance(descriptor, classmethod):
+            setattr(cls, name, classmethod(descriptor.__func__))
+
+
 def _decorate(cls: type[Any], options: Mapping[str, Any]) -> type[Any]:
     if marker_for(cls) is not None:
         if options:
@@ -530,6 +576,7 @@ def _decorate(cls: type[Any], options: Mapping[str, Any]) -> type[Any]:
     setattr(cls, _MARKER_ATTR, marker)
     cls.__init__ = __init__
     cls.__signature__ = signature
+    _install_classmethods(cls, builtins.set(all_fields))
     return cls
 
 

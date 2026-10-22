@@ -31,6 +31,7 @@ from zodish import (
     Schema,
     Success,
     UnrepresentableError,
+    ValidatedModel,
     ValidationError,
     to_json_schema,
     z,
@@ -4181,6 +4182,90 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(
             z.codecs.dataclass(PostOnly).parse({"value": 1}).result, 2,
         )
+
+    def test_validated_dataclass_classmethods(self):
+        @z.dataclass
+        class User:
+            name: Annotated[str, z.string().min(1)]
+            age: int = 0
+
+        self.assertEqual(User.parse({"name": "Alex"}), User("Alex"))
+        self.assertIsInstance(User.safe_parse({"name": "Alex"}), Success)
+        self.assertIsInstance(User.safe_parse({"name": ""}), Failure)
+        self.assertTrue(User.validate({"name": "Alex"}))
+        self.assertFalse(User.validate({"name": ""}))
+        self.assertEqual(
+            User.parse_json('{"name": "Alex"}'), User("Alex"),
+        )
+        self.assertTrue(
+            User.safe_parse_json('{"name": "Alex"}').success,
+        )
+        self.assertTrue(User.validate_json(b'{"name": "Alex"}'))
+        self.assertEqual(
+            User.encode(User("Alex")), {"name": "Alex", "age": 0},
+        )
+        self.assertIsInstance(User.safe_encode(User("Alex")), Success)
+        self.assertEqual(User.to_json_schema()["type"], "object")
+        self.assertEqual(
+            User.to_json_schema(
+                target="openapi-3.0", io="input",
+            )["type"],
+            "object",
+        )
+        with self.assertRaises(ValidationError):
+            User.parse({"name": ""})
+
+        @z.dataclass
+        class Model(ValidatedModel):
+            name: str
+
+        self.assertEqual(Model.parse({"name": "Alex"}), Model("Alex"))
+        self.assertEqual(Model.encode(Model("Alex")), {"name": "Alex"})
+        self.assertEqual(Model.to_json_schema()["type"], "object")
+
+        @z.dataclass(frozen=True, slots=True)
+        class SlottedModel(ValidatedModel):
+            name: str
+
+        self.assertFalse(hasattr(SlottedModel("Alex"), "__dict__"))
+        self.assertEqual(
+            SlottedModel.parse({"name": "Alex"}), SlottedModel("Alex"),
+        )
+
+        class Undecorated(ValidatedModel):
+            pass
+
+        with self.assertRaises(TypeError):
+            Undecorated.parse({})
+
+        @z.dataclass
+        class Custom:
+            name: str
+
+            @classmethod
+            def parse(cls, value):
+                return "custom"
+
+        self.assertEqual(Custom.parse({"name": "x"}), "custom")
+
+        @z.dataclass
+        class FieldCollision:
+            parse: str
+
+        self.assertEqual(FieldCollision(parse="x").parse, "x")
+
+        @z.dataclass
+        class WithInitVar:
+            name: str
+            token: dataclasses.InitVar[str]
+            seen: str = dataclasses.field(init=False, default="")
+
+            def __post_init__(self, token: str) -> None:
+                self.seen = token
+
+        parsed = WithInitVar.parse({"name": "Alex", "token": "t"})
+        self.assertEqual(parsed.seen, "t")
+        self.assertEqual(WithInitVar.encode(parsed), {"name": "Alex"})
 
     def test_public_annotations_resolve(self):
         self.assertIn("params", get_type_hints(z.Issue))

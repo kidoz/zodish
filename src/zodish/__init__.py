@@ -9,6 +9,7 @@ from .schemas import (
     Schema,
     Success,
     UnrepresentableError,
+    ValidatedModel,
     ValidationError,
     to_json_schema,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "Schema",
     "Success",
     "UnrepresentableError",
+    "ValidatedModel",
     "ValidationError",
     "to_json_schema",
     "z",

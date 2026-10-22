@@ -889,6 +889,53 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
             nested.event.created, datetime(2026, 10, 20, 12, 30),
         )
 
+    async def test_validated_dataclass_classmethods_async(self):
+        @z.dataclass
+        class User:
+            name: str
+
+        parsed = await User.parse_async({"name": "Alex"})
+        self.assertEqual(parsed.name, "Alex")
+        self.assertTrue(
+            (await User.safe_parse_async({"name": "Alex"})).success,
+        )
+        self.assertFalse((await User.safe_parse_async({})).success)
+        self.assertTrue(await User.validate_async({"name": "Alex"}))
+        self.assertEqual(
+            (await User.parse_json_async('{"name": "Alex"}')).name,
+            "Alex",
+        )
+        self.assertTrue(
+            (await User.safe_parse_json_async('{"name": "Alex"}')).success,
+        )
+        self.assertEqual(
+            await User.encode_async(User("Alex")), {"name": "Alex"},
+        )
+        self.assertTrue(
+            (await User.safe_encode_async(User("Alex"))).success,
+        )
+
+        async def decode(value):
+            return datetime.fromisoformat(value)
+
+        async def encode(value):
+            return value.isoformat()
+
+        @z.dataclass
+        class Event:
+            created: Annotated[datetime, z.codec_async(
+                z.string(), z.datetime(), decode=decode, encode=encode,
+            )]
+
+        event = await Event.parse_async({
+            "created": "2026-10-20T12:30:00",
+        })
+        self.assertEqual(event.created, datetime(2026, 10, 20, 12, 30))
+        self.assertEqual(
+            await Event.encode_async(event),
+            {"created": "2026-10-20T12:30:00"},
+        )
+
     async def test_async_encoding_and_reversibility(self):
         async def decode(value):
             return int(value)

@@ -555,3 +555,45 @@ assert_type(WrappedValidated, type[ExistingValidated])
 assert_type(WrappedValidated(name="Alex"), ExistingValidated)
 if TYPE_CHECKING:
     WrappedValidated(name=1)  # type: ignore[arg-type]
+
+
+@z.dataclass
+class TypedValidatedModel(z.ValidatedModel):
+    name: str
+    age: int = 0
+
+
+if TYPE_CHECKING:
+    assert_type(
+        TypedValidatedModel.parse({"name": "x"}),
+        TypedValidatedModel,
+    )
+    assert_type(
+        TypedValidatedModel.safe_parse({"name": "x"}),
+        Success[TypedValidatedModel] | Failure,
+    )
+    assert_type(
+        TypedValidatedModel.parse_json('{"name": "x"}'),
+        TypedValidatedModel,
+    )
+    assert_type(
+        TypedValidatedModel.encode(TypedValidatedModel("x")),
+        dict[str, Any],
+    )
+    assert_type(TypedValidatedModel.to_json_schema(), dict[str, Any])
+
+    async def _typed_validated_model_async() -> None:
+        assert_type(
+            await TypedValidatedModel.parse_async({"name": "x"}),
+            TypedValidatedModel,
+        )
+        assert_type(
+            await TypedValidatedModel.safe_parse_async({"name": "x"}),
+            Success[TypedValidatedModel] | Failure,
+        )
+        assert_type(
+            await TypedValidatedModel.encode_async(
+                TypedValidatedModel("x"),
+            ),
+            dict[str, Any],
+        )

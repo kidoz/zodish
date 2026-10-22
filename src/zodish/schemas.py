@@ -1368,6 +1368,186 @@ _CONSTRAINT_KINDS = frozenset({
 })
 
 
+def _validated_model_codec(cls: type[Any]) -> Any:
+    from ._validated_dataclasses import codec_for
+
+    return codec_for(cls)
+
+
+class ValidatedModel:
+    """Typed class-level entry points for ``@z.dataclass`` classes.
+
+    Inherit from this mixin to expose the classmethods to type checkers.
+    Decorated classes also receive the same methods at runtime.
+    """
+
+    __slots__ = ()
+
+    @classmethod
+    def parse(
+        cls,
+        value: dict[str, Any] | Missing = MISSING,
+        *,
+        error: ErrorMap | None = None,
+    ) -> Self:
+        return cast(Self, _validated_model_codec(cls).parse(value, error=error))
+
+    @classmethod
+    def safe_parse(
+        cls,
+        value: dict[str, Any] | Missing = MISSING,
+        *,
+        error: ErrorMap | None = None,
+    ) -> Success[Self] | Failure:
+        return cast(
+            Success[Self] | Failure,
+            _validated_model_codec(cls).safe_parse(value, error=error),
+        )
+
+    @classmethod
+    def validate(
+        cls, value: dict[str, Any] | Missing = MISSING,
+    ) -> bool:
+        return cast(bool, _validated_model_codec(cls).validate(value))
+
+    @classmethod
+    def parse_json(
+        cls,
+        data: str | builtins.bytes | bytearray,
+        *,
+        error: ErrorMap | None = None,
+    ) -> Self:
+        return cast(
+            Self, _validated_model_codec(cls).parse_json(data, error=error),
+        )
+
+    @classmethod
+    def safe_parse_json(
+        cls,
+        data: str | builtins.bytes | bytearray,
+        *,
+        error: ErrorMap | None = None,
+    ) -> Success[Self] | Failure:
+        return cast(
+            Success[Self] | Failure,
+            _validated_model_codec(cls).safe_parse_json(data, error=error),
+        )
+
+    @classmethod
+    def validate_json(
+        cls, data: str | builtins.bytes | bytearray,
+    ) -> bool:
+        return cast(bool, _validated_model_codec(cls).validate_json(data))
+
+    @classmethod
+    async def parse_async(
+        cls,
+        value: dict[str, Any] | Missing = MISSING,
+        *,
+        error: ErrorMap | None = None,
+    ) -> Self:
+        return cast(
+            Self,
+            await _validated_model_codec(cls).parse_async(value, error=error),
+        )
+
+    @classmethod
+    async def safe_parse_async(
+        cls,
+        value: dict[str, Any] | Missing = MISSING,
+        *,
+        error: ErrorMap | None = None,
+    ) -> Success[Self] | Failure:
+        return cast(
+            Success[Self] | Failure,
+            await _validated_model_codec(cls).safe_parse_async(
+                value, error=error,
+            ),
+        )
+
+    @classmethod
+    async def validate_async(
+        cls, value: dict[str, Any] | Missing = MISSING,
+    ) -> bool:
+        return cast(
+            bool, await _validated_model_codec(cls).validate_async(value),
+        )
+
+    @classmethod
+    async def parse_json_async(
+        cls,
+        data: str | builtins.bytes | bytearray,
+        *,
+        error: ErrorMap | None = None,
+    ) -> Self:
+        return cast(
+            Self,
+            await _validated_model_codec(cls).parse_json_async(
+                data, error=error,
+            ),
+        )
+
+    @classmethod
+    async def safe_parse_json_async(
+        cls,
+        data: str | builtins.bytes | bytearray,
+        *,
+        error: ErrorMap | None = None,
+    ) -> Success[Self] | Failure:
+        return cast(
+            Success[Self] | Failure,
+            await _validated_model_codec(cls).safe_parse_json_async(
+                data, error=error,
+            ),
+        )
+
+    @classmethod
+    def encode(cls, value: Self) -> dict[str, Any]:
+        return cast(dict[str, Any], _validated_model_codec(cls).encode(value))
+
+    @classmethod
+    def safe_encode(
+        cls, value: Self,
+    ) -> Success[dict[str, Any]] | Failure:
+        return cast(
+            Success[dict[str, Any]] | Failure,
+            _validated_model_codec(cls).safe_encode(value),
+        )
+
+    @classmethod
+    async def encode_async(cls, value: Self) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            await _validated_model_codec(cls).encode_async(value),
+        )
+
+    @classmethod
+    async def safe_encode_async(
+        cls, value: Self,
+    ) -> Success[dict[str, Any]] | Failure:
+        return cast(
+            Success[dict[str, Any]] | Failure,
+            await _validated_model_codec(cls).safe_encode_async(value),
+        )
+
+    @classmethod
+    def to_json_schema(
+        cls,
+        *,
+        target: JSONSchemaTarget = "draft-2020-12",
+        io: JSONSchemaIO = "output",
+        unrepresentable: UnrepresentablePolicy = "throw",
+    ) -> JSONSchema:
+        return cast(
+            JSONSchema,
+            _validated_model_codec(cls).to_json_schema(
+                target=target,
+                io=io,
+                unrepresentable=unrepresentable,
+            ),
+        )
+
+
 @overload
 def dataclass[T](cls: type[T], /) -> type[T]: ...
 
