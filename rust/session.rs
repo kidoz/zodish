@@ -299,7 +299,10 @@ impl AsyncSession {
             .as_ref()
             .ok_or_else(|| PyRuntimeError::new_err("Async session is closed"))?
             .clone_ref(py);
-        let has_async = node.bind(py).try_borrow().map_err(PyErr::from)?.has_async;
+        let has_async = match node.bind(py).try_borrow() {
+            Ok(node) => node.has_async,
+            Err(error) => return self.close_on_error(py, PyErr::from(error)),
+        };
         if !has_async {
             let parsed = node.bind(py).borrow().parse(
                 py,
@@ -339,13 +342,21 @@ impl AsyncSession {
         value: Py<PyAny>,
     ) -> PyResult<Py<PyAny>> {
         self.check_awaiting(token)?;
-        let pending = self
-            .pending
-            .take()
-            .ok_or_else(|| PyRuntimeError::new_err("Async session has no pending callback"))?;
+        let pending = match self.pending.take() {
+            Some(pending) => pending,
+            None => {
+                return self.close_on_error(
+                    py,
+                    PyRuntimeError::new_err("Async session has no pending callback"),
+                );
+            }
+        };
         self.awaitable = None;
         self.state = AsyncSessionState::Running;
-        let next = self.resume_callback(py, pending, value)?;
+        let next = match self.resume_callback(py, pending, value) {
+            Ok(next) => next,
+            Err(error) => return self.close_on_error(py, error),
+        };
         self.continue_run(py, next)
     }
 
@@ -356,19 +367,25 @@ impl AsyncSession {
         error: Py<PyAny>,
     ) -> PyResult<Py<PyAny>> {
         self.check_awaiting(token)?;
-        let pending = self
-            .pending
-            .take()
-            .ok_or_else(|| PyRuntimeError::new_err("Async session has no pending callback"))?;
+        let pending = match self.pending.take() {
+            Some(pending) => pending,
+            None => {
+                return self.close_on_error(
+                    py,
+                    PyRuntimeError::new_err("Async session has no pending callback"),
+                );
+            }
+        };
         self.awaitable = None;
         let exception = error.bind(py);
         if !exception.is_instance_of::<PyException>() {
-            self.state = AsyncSessionState::Closed;
-            self.clear_refs();
-            return Err(PyErr::from_value(exception.clone()));
+            return self.close_on_error(py, PyErr::from_value(exception.clone()));
         }
         self.state = AsyncSessionState::Running;
-        let ctx = self.context(py)?;
+        let ctx = match self.context(py) {
+            Ok(ctx) => ctx,
+            Err(error) => return self.close_on_error(py, error),
+        };
         let outcome = Err(ctx.normalize(
             Error::Python(PyErr::from_value(exception.clone())),
             &pending.path,
@@ -505,10 +522,21 @@ impl AsyncSession {
 
     fn continue_run(&mut self, py: Python<'_>, next: AsyncNext) -> PyResult<Py<PyAny>> {
         let next = match next {
-            AsyncNext::Task(task) => self.run(py, task)?,
+            AsyncNext::Task(task) => match self.run(py, task) {
+                Ok(next) => next,
+                Err(error) => return self.close_on_error(py, error),
+            },
             other => other,
         };
-        self.finish(py, next)
+        match self.finish(py, next) {
+            Ok(value) => Ok(value),
+            Err(error) => self.close_on_error(py, error),
+        }
+    }
+
+    fn close_on_error(&mut self, py: Python<'_>, error: PyErr) -> PyResult<Py<PyAny>> {
+        self.close(py);
+        Err(error)
     }
 
     fn finish(&mut self, py: Python<'_>, next: AsyncNext) -> PyResult<Py<PyAny>> {

@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Issues and object, typed-object, and discriminated-union schemas are now
   hashable. Issue hashing uses code, message, path, and branches; metadata
   remains excluded from schema equality and hashing.
+- Native async sessions close and release references when a resume raises,
+  instead of remaining stuck in a running state.
 
 ### Changed
 

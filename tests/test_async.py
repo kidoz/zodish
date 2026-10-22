@@ -2198,6 +2198,28 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         pending_session.close()
         self.assertIsNone(coroutine.cr_frame)
 
+    async def test_session_closes_when_resume_raises(self):
+        issue = Issue("custom", "boom")
+        object.__setattr__(issue, "branches", ((issue,),))
+
+        async def callback(value):
+            return issue
+
+        reference = weakref.ref(callback)
+        schema = z.unknown().super_refine_async(callback)
+        session = AsyncSession(
+            schema._node, object(), MISSING, Issue, ValidationError,
+        )
+        done, payload = session.start()
+        self.assertFalse(done)
+        token, awaitable = payload
+        value = await awaitable
+        with self.assertRaises(RecursionError):
+            session.resume_value(token, value)
+        del callback, schema
+        gc.collect()
+        self.assertIsNone(reference())
+
     async def test_native_session_rejects_stale_tokens_and_closes(self):
         async def callback(value):
             return True
