@@ -217,6 +217,14 @@ class Issue:
     params: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        builtins.object.__setattr__(self, "path", builtins.tuple(self.path))
+        builtins.object.__setattr__(
+            self,
+            "branches",
+            builtins.tuple(
+                builtins.tuple(branch) for branch in self.branches
+            ),
+        )
         builtins.object.__setattr__(
             self, "params", MappingProxyType(dict(self.params)),
         )

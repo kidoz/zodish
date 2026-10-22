@@ -21,6 +21,7 @@ from typing import (
 from zodish import (
     MISSING,
     Failure,
+    Issue,
     Schema,
     Success,
     UnrepresentableError,
@@ -200,6 +201,14 @@ class SchemaTests(unittest.TestCase):
         self.assertIsInstance(
             beyond_i64.safe_parse(2 * float_divisor + 1), Failure,
         )
+
+    def test_issue_path_and_branches_are_tuples(self):
+        issue = Issue("custom", "x", path=["a", 1])
+        self.assertEqual(issue.path, ("a", 1))
+        self.assertEqual(issue, Issue("custom", "x", path=("a", 1)))
+        nested = Issue("custom", "y")
+        parent = Issue("custom", "x", branches=[[nested]])
+        self.assertEqual(parent.branches, ((nested,),))
 
     def test_structured_issues_and_params(self):
         cases = [
