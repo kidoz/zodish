@@ -99,11 +99,14 @@ cannot have a wire name.
 | `.array()` | Any schema | Shorthand for `z.array(schema)` |
 
 `z.set(item)` validates a Python `set` and returns a new set. Element issues use
-the iteration index in their paths. Sets are not JSON-representable and cannot
-be encoded.
+the iteration index in their paths. Reverse encoding returns a list, JSON Schema
+export uses an array with `uniqueItems: true`, and `.min()`, `.max()`, and
+`.length()` map to array length bounds. `parse_json` still requires Python set
+input; JSON array-to-set conversion is not implemented.
 
 `z.map(key_schema, value_schema)` validates a Python dictionary through the same
-native record evaluator as `z.record(key_schema, value_schema)`.
+native record evaluator as `z.record(key_schema, value_schema)`. It is
+reversibly encodable when both key and value schemas are reversible.
 
 ## Choice and composition methods
 

@@ -34,6 +34,7 @@ schema.to_json_schema(...)
 | `z.literal(value)` | `const` |
 | `z.enum(values)` | `enum` |
 | `z.array(item)` | `type: array` with `items` and length keywords |
+| `z.set(item)` | `type: array`, `items`, `uniqueItems: true`, and length keywords |
 | `z.tuple(*items)` | Draft: `prefixItems`; OpenAPI: not representable |
 | `z.tuple(*items).rest(schema)` | Draft only: `prefixItems` plus `items` |
 | `z.record(value_schema)` | `type: object` with `additionalProperties` |
@@ -120,7 +121,6 @@ These constructs raise `UnrepresentableError` unless `unrepresentable="any"`:
   `async_overwrite`;
 - `default_factory`;
 - `instance_of`;
-- `z.set(item)`;
 - `trim`, `lower`, and `upper`;
 - regexes with non-default flags;
 - Python object schemas: `z.date()`, `z.datetime()`, `z.time()`, `z.timedelta()`,
