@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   field-prefixed paths and leave the previous value unchanged. The option is
   inherited by decorated subclasses, requires a non-frozen dataclass, and
   leaves construction-only behavior unchanged by default.
+- `@z.dataclass(async_fields=True)` permits async construction schemas and adds
+  `await Model.acreate(...)` for decoded-value construction. Direct construction
+  raises when async schemas are present; synchronous defaults, inherited async
+  fields, class-level async parsing, and async annotation guards are supported.
+  Async construction cannot be combined with `validate_assignment=True`.
 - `z.create_model()` creates keyword-only validated dataclasses from runtime
   field-schema mappings or a plain strip `z.object` shape. It supports explicit
   and inferred defaults, mutable-default copying, codecs, classmethods, JSON

@@ -444,8 +444,8 @@ InitVar parameters, and one or more dataclass bases (ordinary or validated)
 plus non-dataclass mixins. Standard dataclass MRO field-order and
 duplicate-field rules apply. Custom `__init__`/`__new__`/`__setattr__`,
 dataclass-level `init=False`, generic dataclass bases, undecorated subclasses,
-`transform`/`coerce`/`stringbool`/`pipe` field schemas, and async construction
-are rejected. InitVar values are validated and passed to `__post_init__` but
+`transform`/`coerce`/`stringbool`/`pipe` field schemas, and async field schemas
+without `async_fields=True` are rejected. InitVar values are validated and passed to `__post_init__` but
 not stored or encoded; defaulted `init=False` fields are validated before
 post-init. Use `.overwrite()` for type-preserving normalization or a codec for
 type-changing conversions.
@@ -463,7 +463,10 @@ methods to type checkers; every decorated class receives them at runtime unless
 a user-defined method or field name already occupies the name. For fields
 discovered at runtime, `z.create_model("User", fields, defaults=...)` creates a
 keyword-only validated dataclass with the same codecs, classmethods, JSON
-Schema, and assignment options; field attributes are statically `Any`. See the
+Schema, and assignment options; field attributes are statically `Any`. Async
+field schemas are opt-in with `@z.dataclass(async_fields=True)` and require
+`await Model.acreate(...)` for decoded-value construction; direct construction
+raises when async construction schemas are present. See the
 [validated construction guide](docs/how-to/use-codecs.md#validate-direct-construction).
 
 Codec combinators preserve both directions:

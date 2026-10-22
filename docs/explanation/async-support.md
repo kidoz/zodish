@@ -131,7 +131,9 @@ Sync codecs and plain reversible schemas also work through the async entry
 points. The codec wrappers, record/array/union/tuple codec combinators, and
 ordinary containers preserve both directions for async codecs. Dataclass codecs
 await async field codecs through `.decode_async()`/`.encode_async()` and preserve
-field issue prefixes and dataclass defaults.
+field issue prefixes and dataclass defaults. Validated dataclasses opt into
+async field schemas with `async_fields=True` and construct decoded values with
+`await Model.acreate(...)`; direct construction remains synchronous.
 
 ## Errors and cancellation
 

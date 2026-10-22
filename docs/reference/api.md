@@ -274,10 +274,12 @@ the same session protocol.
 | `@z.dataclass()` | Decorator form with default options |
 | `@z.dataclass(frozen=True, slots=True, kw_only=True, ...)` | Pass dataclass options through |
 | `@z.dataclass(validate_assignment=True)` | Validate later declared-field assignments |
+| `@z.dataclass(async_fields=True)` | Permit async construction schemas |
 | `z.dataclass(ExistingDataclass)` | Wrap an existing supported dataclass |
 | `z.create_model(name, fields, *, defaults=None, ...)` | Create a validated dataclass from runtime field schemas |
 | `z.ValidatedModel` | Typed mixin for class-level codec methods |
 | `Cls.parse`, `safe_parse`, `validate` | Decode encoded input through the cached codec |
+| `await Cls.acreate(...)` | Construct from decoded values with async validation |
 | `Cls.parse_json`, `safe_parse_json`, `validate_json` | Decode JSON input |
 | `Cls.parse_async`, `safe_parse_async`, `validate_async` | Async encoded decode |
 | `Cls.parse_json_async`, `safe_parse_json_async` | Async JSON decode |
@@ -297,8 +299,9 @@ schemas receive a native output guard that raises `TypeError` on mismatch.
 Inferred schemas are trusted. An optional field schema without a dataclass
 default, a `MISSING` default, `preprocess` schemas, `transform`, `coerce`,
 `stringbool`, and `pipe` schemas, lazy schemas whose async capability is not
-statically known, async construction, custom `__init__`, `__new__`, and
-`__setattr__`, and dataclass-level `init=False` are rejected at decoration. Use
+statically known, async field schemas without `async_fields=True`, custom
+`__init__`, `__new__`, and `__setattr__`, and dataclass-level `init=False` are
+rejected at decoration. Use
 `.overwrite()` for type-preserving normalization or a codec for type-changing
 conversions.
 
@@ -358,8 +361,8 @@ decorated class unless a user-defined method, inherited method, or field name
 already occupies the name. Inherit `z.ValidatedModel` for statically typed
 classmethods; otherwise use `z.codecs.dataclass(Cls)` when typing is required.
 Calling a `ValidatedModel` method on a class without `@z.dataclass` raises
-`TypeError`. Async classmethods do not make direct construction asynchronous or
-permit async field schemas.
+`TypeError`. Async classmethods do not change direct construction; async field
+schemas require `async_fields=True` and `acreate`.
 
 `z.create_model(name, fields, *, defaults=None, validate_assignment=None,
 **options)` creates a keyword-only validated dataclass from a mapping of field
@@ -371,7 +374,20 @@ instance. Optional field schemas without a default and object schemas with
 non-strip policies or catchalls are rejected. Frozen, slots, assignment
 validation, class-level methods, codecs, and JSON Schema use the normal
 validated-dataclass behavior. Dynamic field attributes are statically `Any`; use
-a normal `@z.dataclass` when static field types are required. See
+a normal `@z.dataclass` when static field types are required. Pass
+`async_fields=True` to use `await Model.acreate(...)` with async field schemas.
+
+Async field schemas are rejected by default. Pass `async_fields=True` to permit
+them and construct decoded values with `await Cls.acreate(*args, **kwargs)`.
+`acreate` binds the dataclass signature, resolves synchronous defaults, runs
+one native async parse, rejects `MISSING` outputs, and calls `__post_init__`.
+When any construction schema is async, direct `Cls(...)` and
+`dataclasses.replace()` raise `TypeError`; `parse_async` remains the
+encoded-input codec entry point. If no field is async, direct construction
+remains available. `validate_assignment=True` cannot combine with async
+construction schemas, async transforms/preprocessors remain rejected, and async
+schema-level default factories are not resolved by the default machinery. The
+option is inherited by decorated subclasses. See
 [Validate direct construction](../how-to/use-codecs.md#validate-direct-construction).
 
 ## JSON Schema export
