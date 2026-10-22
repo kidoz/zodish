@@ -934,6 +934,8 @@ class Schema[Out, In = Out]:
         )
 
     def pipe[U](self, other: Schema[U, Any]) -> Schema[U, In]:
+        if not isinstance(other, Schema):
+            raise TypeError("Pipe operand must be a schema")
         return Schema[U, In](
             NativeSchema("pipe", (self._node, other._node), ()),
             _inner=self,
@@ -1022,6 +1024,8 @@ class Schema[Out, In = Out]:
     def or_[U, OtherIn](
         self, other: Schema[U, OtherIn],
     ) -> UnionSchema[Out | U, In | OtherIn]:
+        if not isinstance(other, Schema):
+            raise TypeError("Union options must be schemas")
         return UnionSchema[Out | U, In | OtherIn](
             NativeSchema("union", (self._node, other._node), ()),
             (self, other),
@@ -1813,6 +1817,8 @@ def instance_of[T](cls: type[T]) -> Schema[T, T]:
 
 
 def array[Out, In](item: Schema[Out, In]) -> ArraySchema[Out, In]:
+    if not isinstance(item, Schema):
+        raise TypeError("Array item must be a schema")
     return ArraySchema[Out, In](
         NativeSchema("array", (item._node,), ()),
         item,
@@ -2211,6 +2217,8 @@ def union(*options: Schema[Any, Any]) -> UnionSchema[Any, Any]: ...
 def union(*options: Schema[Any, Any]) -> UnionSchema[Any, Any]:
     if not options:
         raise ValueError("Union requires at least one schema")
+    if not all(isinstance(option, Schema) for option in options):
+        raise TypeError("Union options must be schemas")
 
     return UnionSchema[Any, Any](
         NativeSchema("union", builtins.tuple(option._node for option in options), ()),
@@ -2365,6 +2373,8 @@ def tuple(
     builtins.tuple[Any, ...],
     list[Any] | builtins.tuple[Any, ...],
 ]:
+    if not all(isinstance(item, Schema) for item in items):
+        raise TypeError("Tuple items must be schemas")
     return TupleSchema[
         builtins.tuple[Any, ...],
         list[Any] | builtins.tuple[Any, ...],
@@ -2385,6 +2395,8 @@ def lazy[Out, In](factory: Callable[[], Schema[Out, In]]) -> Schema[Out, In]:
 
 
 def preprocess[Out, In](fn: Callable[[Any], Any], schema: Schema[Out, In]) -> Schema[Out, Any]:
+    if not isinstance(schema, Schema):
+        raise TypeError("Preprocess input must be a schema")
     fn = _sync_callback(fn, "preprocess callback")
     return Schema[Out, Any](
         NativeSchema("preprocess", (schema._node,), (fn,)),
@@ -2397,6 +2409,8 @@ def preprocess_async[Out, In](
     fn: Callable[[Any], Awaitable[Any]], schema: Schema[Out, In],
 ) -> Schema[Out, Any]:
     """Await input conversion before validating through ``schema``."""
+    if not isinstance(schema, Schema):
+        raise TypeError("Preprocess input must be a schema")
     fn = _async_callback(fn, "preprocess_async callback")
     return Schema[Out, Any](
         NativeSchema("async_preprocess", (schema._node,), (fn,)),

@@ -210,6 +210,23 @@ class SchemaTests(unittest.TestCase):
         parent = Issue("custom", "x", branches=[[nested]])
         self.assertEqual(parent.branches, ((nested,),))
 
+    def test_builders_reject_non_schema_arguments(self):
+        async def passthrough(value):
+            return value
+
+        cases = (
+            ("union", lambda: z.union(z.string(), 1)),
+            ("or_", lambda: z.string().or_(1)),
+            ("pipe", lambda: z.string().pipe(1)),
+            ("array", lambda: z.array(1)),
+            ("tuple", lambda: z.tuple(z.string(), 1)),
+            ("preprocess", lambda: z.preprocess(str, 1)),
+            ("preprocess_async", lambda: z.preprocess_async(passthrough, 1)),
+        )
+        for name, build in cases:
+            with self.subTest(builder=name), self.assertRaises(TypeError):
+                build()
+
     def test_structured_issues_and_params(self):
         cases = [
             (z.string().min(3), "ab", "too_small",
