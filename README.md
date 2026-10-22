@@ -449,7 +449,12 @@ not stored or encoded; defaulted `init=False` fields are validated before
 post-init. Use `.overwrite()` for type-preserving normalization or a codec for
 type-changing conversions.
 `dataclasses.replace()` revalidates; assignment, `copy`, and `pickle` bypass
-validation. See the
+validation. Decorated classes also expose class-level boundary methods:
+`User.parse(...)`, `parse_json`, `safe_parse`, `validate`, their async variants,
+`encode`, `safe_encode`, async encode, and `to_json_schema`. They delegate to a
+cached `z.codecs.dataclass(User)`. Inherit `z.ValidatedModel` to expose these
+methods to type checkers; every decorated class receives them at runtime unless
+a user-defined method or field name already occupies the name. See the
 [validated construction guide](docs/how-to/use-codecs.md#validate-direct-construction).
 
 Codec combinators preserve both directions:

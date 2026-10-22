@@ -231,7 +231,7 @@ Error behavior:
 | Optional field schema without a dataclass default | `ValueError` |
 | Async field schema in construction | `TypeError` |
 
-The first slice supports ordinary dataclasses with `init=True`, defaults and
+The implementation supports ordinary dataclasses with `init=True`, defaults and
 default factories, `frozen`, `slots`, `weakref_slot=True` with slots,
 `kw_only`, and a `__post_init__` whose parameters match the `InitVar` fields.
 Custom `__init__`, `__new__`, and `__setattr__`; dataclass-level `init=False`;
@@ -271,6 +271,51 @@ initializer, but reverse stacking and option combinations remain unsupported.
 `dataclasses.replace()` revalidates because it calls the initializer.
 Assignment, `copy`, `pickle`, and direct `object.__new__` bypass validation.
 Fields mutated by `__post_init__` are not revalidated.
+
+### Class-level boundary methods
+
+Every decorated class exposes classmethods backed by a cached
+`z.codecs.dataclass(Cls)`:
+
+| Methods | Purpose |
+| --- | --- |
+| `parse`, `safe_parse`, `validate` | Decode encoded input |
+| `parse_json`, `safe_parse_json`, `validate_json` | Decode JSON input |
+| `parse_async`, `safe_parse_async`, `validate_async` | Async encoded decode |
+| `parse_json_async`, `safe_parse_json_async` | Async JSON decode |
+| `encode`, `safe_encode` | Encode an instance |
+| `encode_async`, `safe_encode_async` | Async encode |
+| `to_json_schema` | Export the codec's JSON Schema |
+
+Inherit `z.ValidatedModel` to expose these methods to type checkers:
+
+```python
+from zodish import z
+
+
+@z.dataclass
+class User(z.ValidatedModel):
+    name: str
+    age: int
+
+
+user = User.parse({"name": "Alex", "age": 30})  # encoded input
+payload = User.encode(user)                     # {"name": "Alex", "age": 30}
+schema = User.to_json_schema(io="input")
+```
+
+The runtime methods are installed on every decorated class even without the
+mixin, but type checkers only see the typed versions through `ValidatedModel`.
+For a class that cannot inherit the mixin, `z.codecs.dataclass(Cls)` remains
+fully typed. A method defined on the class or a base, or a dataclass field with
+the same name, takes precedence and is not replaced.
+
+These are codec entry points: `parse` accepts encoded values, and `encode`
+returns encoded output. They do not change the synchronous rules for direct
+construction. Async field schemas remain rejected by the constructor, while
+async codecs whose decode/output schema is synchronous work through the codec.
+Calling a `ValidatedModel` method on a class without `@z.dataclass` raises
+`TypeError`.
 
 ## Compose codecs
 

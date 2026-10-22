@@ -274,6 +274,13 @@ the same session protocol.
 | `@z.dataclass()` | Decorator form with default options |
 | `@z.dataclass(frozen=True, slots=True, kw_only=True, ...)` | Pass dataclass options through |
 | `z.dataclass(ExistingDataclass)` | Wrap an existing supported dataclass |
+| `z.ValidatedModel` | Typed mixin for class-level codec methods |
+| `Cls.parse`, `safe_parse`, `validate` | Decode encoded input through the cached codec |
+| `Cls.parse_json`, `safe_parse_json`, `validate_json` | Decode JSON input |
+| `Cls.parse_async`, `safe_parse_async`, `validate_async` | Async encoded decode |
+| `Cls.parse_json_async`, `safe_parse_json_async` | Async JSON decode |
+| `Cls.encode`, `safe_encode`, `encode_async`, `safe_encode_async` | Encode an instance |
+| `Cls.to_json_schema` | Export the codec's JSON Schema |
 
 Constructor arguments are decoded values typed by the field annotations.
 Encoded input and reverse encoding use `z.codecs.dataclass(Cls)`. Defaults and
@@ -327,7 +334,18 @@ behavior.
 
 For a decorated class in `z.codecs.dataclass(Cls, fields=...)`, the class
 annotation and guard still apply to override outputs, while `fields=` controls
-the encoded/decoded conversion. See
+the encoded/decoded conversion.
+
+Class-level methods delegate to a cached `z.codecs.dataclass(Cls)`: `parse` and
+the JSON/async variants accept encoded input, the `encode` family returns
+encoded output, and `to_json_schema` accepts the same `target`, `io`, and
+`unrepresentable` options as a schema. Methods are installed at runtime on every
+decorated class unless a user-defined method, inherited method, or field name
+already occupies the name. Inherit `z.ValidatedModel` for statically typed
+classmethods; otherwise use `z.codecs.dataclass(Cls)` when typing is required.
+Calling a `ValidatedModel` method on a class without `@z.dataclass` raises
+`TypeError`. Async classmethods do not make direct construction asynchronous or
+permit async field schemas. See
 [Validate direct construction](../how-to/use-codecs.md#validate-direct-construction).
 
 ## JSON Schema export

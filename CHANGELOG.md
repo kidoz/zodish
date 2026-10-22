@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stored or encoded; defaulted `init=False` fields are validated and assigned
   before post-init. Codec decode accepts InitVar input and applies `init=False`
   defaults; encode omits both. Inherited InitVar/`init=False` fields work.
+- Validated dataclasses expose class-level `parse`, safe/async, JSON, `encode`,
+  and `to_json_schema` methods backed by a cached `z.codecs.dataclass` schema.
+  `z.ValidatedModel` provides typed classmethods; decorated classes also receive
+  them at runtime unless a user-defined method or field name wins.
 - Validated dataclasses support one dataclass base chain (ordinary or
   validated) plus non-dataclass mixins, including field overrides/additions,
   inherited defaults/factories, `__post_init__`, frozen/slots, and codec
