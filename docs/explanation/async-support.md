@@ -98,6 +98,12 @@ Callbacks run in the caller's task. Zodish does not schedule independent fields
 or array elements concurrently. If independent I/O can be batched, do so inside
 one object-level async callback using application-owned concurrency.
 
+Native work also runs on the caller's thread. On GIL builds the evaluator holds
+the GIL for the duration of a synchronous subtree, so a long parse inside
+`parse_async` blocks the event loop for that time. Zodish does not release the
+GIL or offload evaluation to a worker thread; see
+[Architecture](architecture.md#performance) for the synchronous trade-off.
+
 ## Async codecs and encoding
 
 `z.codec_async(input_schema, output_schema, *, decode=fn, encode=fn)` builds a
