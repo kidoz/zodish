@@ -165,9 +165,95 @@ Recursive or unresolved aliases and variadic parameters (`TypeVarTuple` and
 `ParamSpec`) raise `TypeError`; use `fields=` for an explicit schema in those
 cases. Finite nesting such as `Items[Items[Age]]` is supported. This resolves
 aliases; parameterized dataclass classes such as `Box[int]` remain unsupported.
-An alias remains a Python type annotation. Validation happens through the
-dataclass codec; calling `User(...)` directly uses the ordinary dataclass
-constructor and does not validate its arguments.
+An alias remains a Python type annotation. For an ordinary dataclass,
+validation happens through the dataclass codec; calling `User(...)` directly
+uses the ordinary constructor and does not validate its arguments. Use
+[`@z.dataclass`](#validate-direct-construction) when construction itself should
+validate.
+
+## Validate direct construction
+
+`z.codecs.dataclass()` validates encoded input and returns an instance, but for
+an ordinary dataclass, `User(...)` remains the standard constructor. Decorate
+the class with `@z.dataclass` when construction should validate and normalize
+decoded field values:
+
+```python
+from typing import Annotated
+from zodish import z
+
+
+@z.dataclass
+class User:
+    name: Annotated[str, z.string().trim().min(1)]
+    age: Annotated[int, z.integer().min(0)]
+    nickname: str | None = None
+
+
+user = User(name=" Alex ", age=30)   # name is "Alex"
+```
+
+Constructor arguments are **decoded values**, typed by the annotations. Encoded
+input remains a boundary concern: use `z.codecs.dataclass(User).parse(...)` for
+wire data, including codec fields whose encoded and decoded types differ. For
+example, a field annotated `Annotated[datetime, z.codecs.iso_datetime()]`
+accepts a `datetime` in the constructor and an ISO string through the codec.
+
+Defaults and default factories are validated as constructor inputs. An invalid
+default raises `ValidationError`; a factory runs once when its field is omitted
+and is not called for supplied fields. Schema-level `.default()` and
+`.optional()` wrappers do not make a constructor parameter optional; the
+dataclass signature controls requiredness.
+
+Explicit `Annotated[T, schema]` schemas must produce `T`. Clearly incompatible
+pairs such as `Annotated[int, z.string()]` fail at decoration with `TypeError`.
+Other explicit schemas receive a native output guard; a value that does not
+match the declared annotation raises `TypeError` during construction. Inferred
+schemas are trusted. Explicit overrides may use additional guard-supported
+annotations, including sets, `TypedDict` classes, arbitrary classes, keyed
+records with non-string keys, and homogeneous tuples.
+
+`z.codecs.dataclass(User)` remains the parse, encode, and JSON Schema entry
+point for a decorated class. Its decode path validates supplied fields once,
+validates omitted defaults, checks explicit overrides against the class
+annotations, and assembles the instance without calling the validating
+initializer. This avoids duplicate transforms and `__post_init__` calls. An
+ordinary stdlib dataclass keeps the existing codec behavior, including its
+default and override semantics.
+
+Error behavior:
+
+| Situation | Exception |
+| --- | --- |
+| Missing required, extra, or bad constructor arguments | `TypeError` |
+| Field or default validation failure | `ValidationError` with aggregated paths |
+| Output/annotation mismatch | `TypeError` |
+| Optional field schema without a dataclass default | `ValueError` |
+| Async field schema in construction | `TypeError` |
+
+The first slice supports ordinary dataclasses with `init=True`, defaults and
+default factories, `frozen`, `slots`, `weakref_slot=True` with slots,
+`kw_only`, and a zero-argument `__post_init__`. Custom `__init__`, `__new__`,
+and `__setattr__`; `InitVar`; `init=False` fields; inherited dataclass fields;
+`preprocess`; `transform`, `coerce`, `stringbool`, and `pipe` field schemas; and
+async construction are rejected at decoration. Use `.overwrite()` for
+type-preserving normalization or a codec for type-changing conversions. Lazy field schemas are also rejected because
+their async capability is not statically known. Subclasses of validated classes
+are not supported; the codec rejects them rather than inheriting the decode
+path, and applying stdlib `@dataclasses.dataclass` to a subclass does not restore
+validation for inherited fields.
+
+`@z.dataclass` uses `dataclass_transform`, so type checkers see typed
+constructor arguments and attributes. Literal `frozen=True` and `kw_only=True`
+options are reflected statically; options computed at runtime are not. Apply
+`@z.dataclass` as the outermost decorator. A bare `@z.dataclass` can wrap an
+existing supported dataclass; applying options to an existing dataclass is
+rejected. A plain outer `@dataclasses.dataclass` preserves the validating
+initializer, but reverse stacking and option combinations remain unsupported.
+
+`dataclasses.replace()` revalidates because it calls the initializer.
+Assignment, `copy`, `pickle`, and direct `object.__new__` bypass validation.
+Fields mutated by `__post_init__` are not revalidated.
 
 ## Compose codecs
 

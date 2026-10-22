@@ -421,6 +421,33 @@ default. A field schema that permits missing input without a dataclass default
 is rejected. Input-mode JSON Schema describes the encoded object; output mode
 describes the decoded object, so Python-only field values remain unrepresentable.
 
+For direct construction, decorate the class with `@z.dataclass`:
+
+```python
+from typing import Annotated
+from zodish import z
+
+@z.dataclass
+class User:
+    name: Annotated[str, z.string().trim().min(1)]
+    age: Annotated[int, z.integer().min(0)]
+    nickname: str | None = None
+
+User(name=" Alex ", age=30)  # normalized and validated
+```
+
+Constructor arguments are decoded values; encoded input still uses
+`z.codecs.dataclass(User)`. Defaults and factories are validated once. The
+decorator supports ordinary dataclasses with `init=True`, frozen/slots/keyword-only
+options, and a zero-argument `__post_init__`; `InitVar`, `init=False`, custom
+`__init__`/`__new__`/`__setattr__`, inherited dataclass fields, `transform`/
+`coerce`/`stringbool`/`pipe` field schemas, and async construction are rejected.
+Use `.overwrite()` for type-preserving normalization or a codec for
+type-changing conversions.
+`dataclasses.replace()` revalidates; assignment, `copy`, and `pickle` bypass
+validation. See the
+[validated construction guide](docs/how-to/use-codecs.md#validate-direct-construction).
+
 Codec combinators preserve both directions:
 
 ```python
@@ -504,7 +531,7 @@ credentials = z.object({
 
 `Schema[Out, In]` tracks parsed output and accepted input types for primitives, homogeneous collections (including sets and maps), transforms, preprocessors, and wrappers. `In` defaults to `Out`, so `Schema[T]` remains valid when input and output types match. `default()` and `default_factory()` accept input-typed values; after a transform, pass the pre-transform type or apply the default before the transform.
 
-Python type checkers cannot generally derive a new `TypedDict` from a dictionary of schema instances as TypeScript does with `z.infer`. Use `z.typed_object(TypedDictClass, shape)` when a statically typed dictionary result is needed; plain objects return `dict[str, Any]`. `z.tuple()` infers fixed-length tuple types for up to four items, while larger tuples and tuples with a rest schema return `tuple[Any, ...]`. Use `z.codecs.dataclass(Cls, fields=...)` or a transform to produce a statically typed dataclass result. Unions infer up to four alternatives; larger unions fall back to `Any`.
+Python type checkers cannot generally derive a new `TypedDict` from a dictionary of schema instances as TypeScript does with `z.infer`. Use `z.typed_object(TypedDictClass, shape)` when a statically typed dictionary result is needed; plain objects return `dict[str, Any]`. `z.tuple()` infers fixed-length tuple types for up to four items, while larger tuples and tuples with a rest schema return `tuple[Any, ...]`. Use `z.codecs.dataclass(Cls, fields=...)` or a transform to produce a statically typed dataclass result; `@z.dataclass` adds typed constructor arguments and attributes through `dataclass_transform`. Unions infer up to four alternatives; larger unions fall back to `Any`.
 
 A `.brand(NewType)` marker changes only the static output type and is a runtime no-op. There is no type-checker plugin or generated model API.
 

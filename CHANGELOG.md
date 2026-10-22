@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `@z.dataclass` validates direct dataclass construction, including defaults
+  and default factories, and exposes typed constructors through
+  `dataclass_transform`. Decoration-time checks reject unsupported dataclass
+  features and incompatible explicit field schemas; explicit outputs receive a
+  native type guard.
+- `z.codecs.dataclass` recognizes validated classes and decodes them without
+  re-entering the validating constructor, validating omitted defaults once and
+  applying annotation guards to explicit `fields=` outputs. Ordinary dataclass
+  codecs keep their existing behavior.
+
 ### Fixed
 
 - Native validation rejects cyclic `Issue.branches` graphs with

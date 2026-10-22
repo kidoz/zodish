@@ -253,8 +253,8 @@ parameters, including defaults that refer to earlier parameters. Missing
 arguments without defaults and excess arguments raise `TypeError`. Bounds and
 constraints are checked statically. Recursive and unresolved aliases and
 variadic parameters require explicit field definitions. Parameterized dataclass
-classes such as `Box[int]` remain unsupported. Dataclass construction itself does
-not validate. See
+classes such as `Box[int]` remain unsupported. Ordinary dataclass construction
+does not validate; use `@z.dataclass` for validated construction. See
 [Use codecs](../how-to/use-codecs.md).
 
 Encoding is available only for reversible schema trees. Primitives, constraints,
@@ -265,6 +265,54 @@ are one-way, so `.encode()` and `.encode_async()` raise `TypeError` when they
 occur. Async codec callbacks participate in the reverse graph; plain schemas and
 codecs can use `.encode_async()`, and synchronous reverse graphs complete through
 the same session protocol.
+
+## Validated dataclasses
+
+| Call | Purpose |
+| --- | --- |
+| `@z.dataclass` | Validate and normalize ordinary construction |
+| `@z.dataclass()` | Decorator form with default options |
+| `@z.dataclass(frozen=True, slots=True, kw_only=True, ...)` | Pass dataclass options through |
+| `z.dataclass(ExistingDataclass)` | Wrap an existing supported dataclass |
+
+Constructor arguments are decoded values typed by the field annotations.
+Encoded input and reverse encoding use `z.codecs.dataclass(Cls)`. Defaults and
+default factories are validated; a factory runs once for an omitted field and
+not for supplied fields. Missing required, extra, and incorrectly bound
+arguments raise `TypeError`; field and default failures raise `ValidationError`
+with aggregated field paths.
+
+Explicit `Annotated[T, schema]` field schemas must produce `T`. Clearly
+incompatible output kinds fail at decoration with `TypeError`; other explicit
+schemas receive a native output guard that raises `TypeError` on mismatch.
+Inferred schemas are trusted. An optional field schema without a dataclass
+default, a `MISSING` default, `preprocess` schemas, `transform`, `coerce`,
+`stringbool`, and `pipe` schemas, lazy schemas whose async capability is not
+statically known, async construction, custom `__init__`, `__new__`, and
+`__setattr__`, `InitVar`, `init=False` fields, and inherited dataclass fields
+are rejected at decoration. Use `.overwrite()` for type-preserving
+normalization or a codec for type-changing conversions.
+Subclasses of validated classes are rejected by the codec; applying stdlib
+`@dataclasses.dataclass` to a subclass does not restore validation.
+
+Supported options include `frozen`, `slots`, `weakref_slot=True` with slots,
+`kw_only`, `repr`, `eq`, `order`, `unsafe_hash`, and `match_args`. A
+zero-argument `__post_init__` runs after validation; fields it mutates are not
+revalidated. `dataclasses.replace()` revalidates; assignment, `copy`, `pickle`,
+and direct `object.__new__` bypass validation.
+
+`@z.dataclass` uses `dataclass_transform`, so constructor arguments and
+attributes are statically typed. Literal `frozen=True` and `kw_only=True` are
+honored by type checkers; options computed at runtime are not. Decorated classes
+use a dedicated codec decode path that validates supplied fields and omitted
+defaults once, guards explicit override outputs, and assembles without calling
+the validating initializer. Ordinary stdlib dataclass codecs keep their existing
+behavior.
+
+For a decorated class in `z.codecs.dataclass(Cls, fields=...)`, the class
+annotation and guard still apply to override outputs, while `fields=` controls
+the encoded/decoded conversion. See
+[Validate direct construction](../how-to/use-codecs.md#validate-direct-construction).
 
 ## JSON Schema export
 
@@ -311,7 +359,9 @@ schema instances. Plain objects return `dict[str, Any]`; use
 result. `z.tuple()` infers a fixed-length tuple type for up to four items; larger
 tuples and tuples with a rest schema return `tuple[Any, ...]`. Use
 `z.codecs.dataclass(Cls, fields=...)` or a transform to produce a statically
-typed dataclass result. Unions infer up to four alternatives; larger unions fall
+typed dataclass result. `@z.dataclass` additionally gives the constructor
+`dataclass_transform` typing, so constructor arguments and attributes follow the
+declared annotations. Unions infer up to four alternatives; larger unions fall
 back to `Any`. `.brand(NewType)` changes only the static output type and is a
 runtime no-op. There is no type-checker plugin or generated model API.
 
