@@ -44,7 +44,9 @@ Paths, issue/error types, and the GC-aware native issue bundle live in
 `rust/runtime.rs` holds the per-parse `Context`, callback-error normalization,
 and lazy caches: local storage for sync parsing and session-owned shared storage
 for async parsing. Session GC traversal and cleanup in `rust/session.rs` visit
-and release the same cached references.
+and release the same cached references. `rust/stack.rs` checks the thread's
+remaining stack before each native evaluation so deep or re-entrant recursion
+raises `RecursionError` instead of overflowing the stack.
 `rust/values.rs` shares Python value predicates, numeric multiple checks,
 coercion, error-value formatting, JSON-value compatibility checks, dictionary
 merging, and copying across validation paths. `rust/schema/evaluate.rs` owns
@@ -150,10 +152,12 @@ is materialized.
 ## Recursion and container snapshots
 
 Inputs must be acyclic. The native evaluator raises `RecursionError` at 256 nested
-schema-node evaluations, including wrappers, to bound Rust stack use. Each lazy
-node resolves its factory once per parse and reuses the result for the rest of
-that parse; later parses resolve it again. Python callbacks may additionally hit
-Python's recursion limit.
+schema-node evaluations, including wrappers, to bound Rust stack use. It also
+raises `RecursionError` when the remaining thread stack is too small, so a
+callback that re-enters `parse` on a small-stack thread fails cleanly instead of
+exhausting the native stack. Each lazy node resolves its factory once per parse
+and reuses the result for the rest of that parse; later parses resolve it again.
+Python callbacks may additionally hit Python's recursion limit.
 
 Containers are shallow-snapshotted before traversal, so a callback can mutate the
 original list or dictionary without invalidating the iteration.

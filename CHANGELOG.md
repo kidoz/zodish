@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Native validation rejects cyclic `Issue.branches` graphs with
   `RecursionError` instead of overflowing the Rust stack.
+- Native validation checks the remaining thread stack during evaluation, so
+  recursive schemas and callbacks that re-enter `parse` raise `RecursionError`
+  on small-stack threads instead of crashing the interpreter.
 
 ## [0.10.0] - 2026-10-22
 

@@ -4,6 +4,7 @@ import gc
 import importlib.machinery
 import json
 import math
+import subprocess
 import sys
 import unittest
 import weakref
@@ -455,6 +456,77 @@ class NativeTests(unittest.TestCase):
 
         with self.assertRaises(RecursionError):
             z.string().refine(raise_validation_error, "unused").parse("x")
+
+    def test_small_thread_stack_raises_instead_of_crashing(self):
+        # The native depth guard is per-parse, so a callback can re-enter with
+        # a fresh budget while outer Rust frames remain. Run each case in a
+        # child process: a regression must fail this test, not the test runner.
+        script = """
+import threading
+from zodish import z
+
+try:
+    threading.stack_size(512 * 1024)
+except (ValueError, RuntimeError):
+    print("skip: stack size unsupported")
+    raise SystemExit(0)
+
+def run_case(name, schema, value):
+    print(f"case: {name}", flush=True)
+    try:
+        schema.parse(value)
+    except RecursionError:
+        return
+    raise SystemExit(f"{name} did not raise RecursionError")
+
+def plain_lazy():
+    holder = {}
+    holder["schema"] = z.lazy(lambda: holder["schema"])
+    run_case("plain lazy", holder["schema"], 1)
+
+def lazy_with_refine():
+    holder = {}
+    holder["schema"] = z.lazy(lambda: holder["schema"]).refine(
+        lambda _: True, "no",
+    )
+    run_case("lazy with refine", holder["schema"], 1)
+
+def reentrant_parse():
+    holder = {}
+    holder["schema"] = z.string().refine(
+        lambda value: holder["schema"].parse(value), "no",
+    )
+    run_case("re-entrant parse", holder["schema"], "x")
+
+errors = []
+def target():
+    try:
+        plain_lazy()
+        lazy_with_refine()
+        reentrant_parse()
+    except BaseException as error:
+        errors.append(error)
+
+thread = threading.Thread(target=target)
+thread.start()
+thread.join()
+if errors:
+    raise errors[0]
+print("all cases ok")
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if "skip:" in result.stdout:
+            self.skipTest(result.stdout.strip())
+        self.assertEqual(
+            result.returncode, 0,
+            msg=f"child process failed\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+        )
+        self.assertIn("all cases ok", result.stdout)
 
     def test_intersection_merge_depth_is_bounded(self):
         schema = z.intersection(z.unknown(), z.unknown())

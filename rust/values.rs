@@ -6,6 +6,7 @@ use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 
 use crate::MAX_DEPTH;
 use crate::schema::Kind;
+use crate::stack::ensure_stack;
 
 pub(crate) fn literal_description(value: &Bound<'_, PyAny>) -> PyResult<String> {
     match value.repr() {
@@ -253,6 +254,7 @@ pub(crate) fn is_json_value(value: &Bound<'_, PyAny>, depth: usize) -> PyResult<
             "JSON value depth exceeds 256 nodes",
         ));
     }
+    ensure_stack()?;
     if value.is_none()
         || value.is_instance_of::<PyBool>()
         || value.is_instance_of::<PyString>()
@@ -292,6 +294,7 @@ pub(crate) fn merge_dicts<'py>(
             "Intersection merge depth exceeds 256 levels",
         ));
     }
+    ensure_stack()?;
     let result = left.copy()?;
     for (key, right_value) in right.iter() {
         let merged = match result.get_item(&key)? {

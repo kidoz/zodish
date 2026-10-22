@@ -10,6 +10,7 @@ use super::{Kind, NativeSchema};
 use crate::MAX_DEPTH;
 use crate::errors::{Error, Issue, Path, PathPart, Result};
 use crate::runtime::{Context, LazyStore};
+use crate::stack::ensure_stack;
 use crate::values::{
     coerce_value, deepcopy, enum_message, is_json_value, literal_description, merge_dicts,
     safe_param,
@@ -26,6 +27,7 @@ impl NativeSchema {
         if depth >= MAX_DEPTH {
             return Err(PyRecursionError::new_err("Native schema depth exceeds 256 nodes").into());
         }
+        ensure_stack()?;
         self.evaluate(ctx, value, path, depth)
             .map_err(|error| ctx.normalize(error, path))
     }

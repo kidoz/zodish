@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use super::{Kind, NativeSchema, UnknownKeys};
 use crate::MAX_DEPTH;
+use crate::stack::ensure_stack;
 
 impl NativeSchema {
     pub(super) fn validate_json_fast(
@@ -18,6 +19,7 @@ impl NativeSchema {
         if depth >= MAX_DEPTH {
             return Ok(None);
         }
+        ensure_stack()?;
         match self.kind {
             Kind::String => match value {
                 Value::String(text) => Ok(Some(PyString::new(py, text).into_any().unbind())),

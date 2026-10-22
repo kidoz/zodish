@@ -5,6 +5,7 @@ mod errors;
 mod runtime;
 mod schema;
 mod session;
+mod stack;
 mod values;
 
 use pyo3::prelude::*;
