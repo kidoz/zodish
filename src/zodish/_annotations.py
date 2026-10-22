@@ -204,6 +204,8 @@ def infer_dataclass_field(
     context: _DataclassAnnotation | None = None,
     type_only: bool = False,
     decoded_dataclasses: bool = False,
+    self_codec: _codecs.CodecSchema[Any, Any] | None = None,
+    self_type: type[Any] | None = None,
 ) -> _schemas.Schema[Any, Any]:
     """Build a field schema while retaining alias bindings and dataclass ancestry.
 
@@ -226,8 +228,14 @@ def infer_dataclass_field(
             context=context,
             type_only=type_only,
             decoded_dataclasses=decoded_dataclasses,
+            self_codec=self_codec,
+            self_type=self_type,
         )
 
+    if self_codec is not None and self_type is not None:
+        origin = typing.get_origin(annotation)
+        if annotation is self_type or origin is self_type:
+            return self_codec
     if annotation is Any or annotation is builtins.object:
         return _schemas.unknown()
     if annotation is None or annotation is type(None):

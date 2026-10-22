@@ -85,11 +85,6 @@ def codec_for(cls: type[Any]) -> CodecSchema[Any, Any]:
     marker = marker_for(cls)
     if marker is None:
         raise TypeError("ValidatedModel methods require @z.dataclass")
-    if marker.recursive:
-        raise TypeError(
-            "Recursive validated dataclasses do not support codec "
-            "decoding or encoding; construct nested instances directly",
-        )
     cached = cls.__dict__.get("__zodish_codec_cache__")
     if isinstance(cached, CodecSchema):
         return cached

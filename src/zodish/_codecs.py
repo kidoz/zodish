@@ -899,11 +899,6 @@ class _Codecs:
         )
 
         marker = marker_for(cls)
-        if marker is not None and marker.recursive:
-            raise TypeError(
-                "Recursive validated dataclasses do not support codec "
-                "decoding or encoding; construct nested instances directly",
-            )
         fields_by_name: Mapping[str, dataclasses.Field[Any]]
         has_default: Mapping[str, bool]
         if marker is None:
@@ -969,6 +964,22 @@ class _Codecs:
         missing = expected - provided
         hints = dataclass_type_hints(cls) if missing else {}
 
+        recursion_holder: dict[str, Any] = {}
+        recursive_codec: CodecSchema[Any, Any] | None = None
+        if marker is not None and marker.recursive:
+            def decode_recursive(value: Any) -> Any:
+                return recursion_holder["codec"].decode(value)
+
+            def encode_recursive(value: Any) -> Any:
+                return recursion_holder["codec"].encode(value)
+
+            recursive_codec = codec(
+                unknown(),
+                instance_of(cls),
+                decode=decode_recursive,
+                encode=encode_recursive,
+            )
+
         schemas_by_name: dict[str, Schema[Any, Any]] = {}
         for name in names:
             if name in overrides:
@@ -989,7 +1000,12 @@ class _Codecs:
                     else None
                 )
                 schema = infer_dataclass_field(
-                    annotation, name, stack=stack, context=context,
+                    annotation,
+                    name,
+                    stack=stack,
+                    context=context,
+                    self_codec=recursive_codec,
+                    self_type=cls if recursive_codec is not None else None,
                 )
             if not isinstance(schema, Schema):
                 raise TypeError(f"Field {name!r} must be a schema")
@@ -1248,6 +1264,12 @@ class _Codecs:
             )
             for schema in (schemas_by_name[name] for name in stored_names)
         )
+        if recursive_codec is not None and (
+            decode_async_needed or encode_async_needed
+        ):
+            raise TypeError(
+                "Recursive validated dataclasses do not support async codecs",
+            )
 
         decode_transform = NativeSchema(
             "async_transform" if decode_async_needed else "transform",
@@ -1265,7 +1287,7 @@ class _Codecs:
             (encode_value_async if encode_async_needed else encode_value,),
         )
 
-        return _CompoundCodecSchema[DataclassT, dict[str, Any]](
+        result = _CompoundCodecSchema[DataclassT, dict[str, Any]](
             decode_node,
             _encode_node=encode_transform,
             _input_schema=input_schema,
@@ -1273,6 +1295,9 @@ class _Codecs:
             _json_output_schema=output_json_schema,
             _inner=output_schema,
         )
+        if recursive_codec is not None:
+            recursion_holder["codec"] = result
+        return result
 
 
 
