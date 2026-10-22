@@ -7,6 +7,7 @@ module-load cycle.
 
 from __future__ import annotations
 
+import annotationlib
 import builtins
 import dataclasses
 import datetime as _datetime
@@ -1082,9 +1083,16 @@ class _Codecs:
             fields_by_name = marker.fields
             has_default = marker.has_default
         expected = builtins.set(names)
+        try:
+            init_signature = inspect.signature(cls.__init__)
+        except (NameError, TypeError):
+            init_signature = inspect.signature(
+                cls.__init__,
+                annotation_format=annotationlib.Format.FORWARDREF,
+            )
         parameters = {
             name
-            for name, parameter in inspect.signature(cls.__init__).parameters.items()
+            for name, parameter in init_signature.parameters.items()
             if parameter.kind in (
                 inspect.Parameter.POSITIONAL_ONLY,
                 inspect.Parameter.POSITIONAL_OR_KEYWORD,
@@ -1114,21 +1122,98 @@ class _Codecs:
                 + ", ".join(sorted(builtins.map(repr, unknown_fields)))
             )
         missing = expected - provided
-        hints = dataclass_type_hints(cls) if missing else {}
+        hints = (
+            (
+                dict(marker.hints)
+                if marker is not None
+                else dataclass_type_hints(cls)
+            )
+            if missing
+            else {}
+        )
 
         recursion_holder: dict[str, Any] = {}
         json_holder: dict[str, Any] = {}
         lazy_output: Schema[Any, Any] | None = None
         recursive_codec: CodecSchema[Any, Any] | None = None
-        if marker is not None and marker.recursive:
-            json_id = f"{cls.__module__}.{cls.__qualname__}"
-            lazy_input = lazy(
-                lambda: json_holder["input_schema"],
-            ).meta({"id": json_id})
-            lazy_output = lazy(
-                lambda: json_holder["output_json_schema"],
-            ).meta({"id": json_id})
+
+        def infer_schemas(
+            recursive_schema: CodecSchema[Any, Any] | None,
+        ) -> dict[str, Schema[Any, Any]]:
+            result: dict[str, Schema[Any, Any]] = {}
+            for name in names:
+                if name in overrides:
+                    schema = overrides[name]
+                else:
+                    annotation = hints.get(name, _UNSET)
+                    if annotation is _UNSET:
+                        raise TypeError(
+                            f"Cannot infer a schema for field {name!r}",
+                        )
+                    if _is_initvar_field(fields_by_name[name]):
+                        annotation = _initvar_annotation(annotation, name)
+                    context = (
+                        _DataclassAnnotation(
+                            annotation, bindings=marker.type_bindings,
+                        )
+                        if marker is not None
+                        else None
+                    )
+                    schema = infer_dataclass_field(
+                        annotation,
+                        name,
+                        stack=stack,
+                        context=context,
+                        self_codec=recursive_schema,
+                        self_type=cls if recursive_schema is not None else None,
+                    )
+                if not isinstance(schema, Schema):
+                    raise TypeError(f"Field {name!r} must be a schema")
+                result[name] = schema
+            return result
+
+        def make_recursive_codec(
+            asynchronous: bool,
+        ) -> CodecSchema[Any, Any]:
+            assert lazy_output is not None
             output_placeholder = instance_of(cls)
+            if asynchronous:
+                async def decode_recursive_async(value: Any) -> Any:
+                    return await recursion_holder["codec"].decode_async(value)
+
+                async def encode_recursive_async(value: Any) -> Any:
+                    return await recursion_holder["codec"].encode_async(value)
+
+                return AsyncCodecSchema[Any, Any](
+                    NativeSchema(
+                        "pipe",
+                        (
+                            NativeSchema(
+                                "async_transform",
+                                (lazy_input._node,),
+                                (decode_recursive_async,),
+                            ),
+                            output_placeholder._node,
+                        ),
+                        (),
+                    ),
+                    _encode_node=NativeSchema(
+                        "pipe",
+                        (
+                            NativeSchema(
+                                "async_transform",
+                                (output_placeholder._node,),
+                                (encode_recursive_async,),
+                            ),
+                            lazy_input._node,
+                        ),
+                        (),
+                    ),
+                    _input_schema=lazy_input,
+                    _output_schema=output_placeholder,
+                    _json_output_schema=lazy_output,
+                    _inner=output_placeholder,
+                )
 
             def decode_recursive(value: Any) -> Any:
                 return recursion_holder["codec"].decode(value)
@@ -1136,7 +1221,7 @@ class _Codecs:
             def encode_recursive(value: Any) -> Any:
                 return recursion_holder["codec"].encode(value)
 
-            recursive_codec = _CompoundCodecSchema[Any, Any](
+            return _CompoundCodecSchema[Any, Any](
                 NativeSchema(
                     "pipe",
                     (
@@ -1167,36 +1252,37 @@ class _Codecs:
                 _inner=output_placeholder,
             )
 
-        schemas_by_name: dict[str, Schema[Any, Any]] = {}
-        for name in names:
-            if name in overrides:
-                schema = overrides[name]
-            else:
-                annotation = hints.get(name, _UNSET)
-                if annotation is _UNSET:
-                    raise TypeError(
-                        f"Cannot infer a schema for field {name!r}",
-                    )
-                if _is_initvar_field(fields_by_name[name]):
-                    annotation = _initvar_annotation(annotation, name)
-                context = (
-                    _DataclassAnnotation(
-                        annotation, bindings=marker.type_bindings,
-                    )
-                    if marker is not None
-                    else None
+        if marker is not None and marker.recursive:
+            json_id = f"{cls.__module__}.{cls.__qualname__}"
+            lazy_input = lazy(
+                lambda: json_holder["input_schema"],
+            ).meta({"id": json_id})
+            lazy_output = lazy(
+                lambda: json_holder["output_json_schema"],
+            ).meta({"id": json_id})
+            recursive_codec = make_recursive_codec(False)
+            schemas_by_name = infer_schemas(recursive_codec)
+            recursive_async_needed = (
+                builtins.any(
+                    _node_has_async_without_lazy(schema._node)
+                    for schema in schemas_by_name.values()
                 )
-                schema = infer_dataclass_field(
-                    annotation,
-                    name,
-                    stack=stack,
-                    context=context,
-                    self_codec=recursive_codec,
-                    self_type=cls if recursive_codec is not None else None,
+                or builtins.any(
+                    _node_has_async_without_lazy(
+                        schema._encode_node
+                        if isinstance(schema, CodecSchema)
+                        else schema._node,
+                    )
+                    for schema in (
+                        schemas_by_name[name] for name in stored_names
+                    )
                 )
-            if not isinstance(schema, Schema):
-                raise TypeError(f"Field {name!r} must be a schema")
-            schemas_by_name[name] = schema
+            )
+            if recursive_async_needed:
+                recursive_codec = make_recursive_codec(True)
+                schemas_by_name = infer_schemas(recursive_codec)
+        else:
+            schemas_by_name = infer_schemas(None)
 
         def input_field_schema(name: str) -> Schema[Any, Any]:
             schema = schemas_by_name[name]
@@ -1473,13 +1559,6 @@ class _Codecs:
                     schemas_by_name[name] for name in stored_names
                 )
             )
-        if recursive_codec is not None and (
-            decode_async_needed or encode_async_needed
-        ):
-            raise TypeError(
-                "Recursive validated dataclasses do not support async codecs",
-            )
-
         decode_transform = NativeSchema(
             "async_transform" if decode_async_needed else "transform",
             (decode_input_schema._node,),

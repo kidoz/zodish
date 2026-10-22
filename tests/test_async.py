@@ -938,6 +938,64 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
             class InvalidTransform:
                 value: Annotated[int, z.integer().transform_async(bump)]
 
+    async def test_validated_dataclass_recursive_async_codec(self):
+        async def decode(value: str) -> int:
+            return int(value)
+
+        async def encode(value: int) -> str:
+            return str(value)
+
+        @z.dataclass
+        class Node:
+            value: Annotated[int, z.codec_async(
+                z.string().regex(r"^\d+$"),
+                z.integer(),
+                decode=decode,
+                encode=encode,
+            )]
+            child: Node | None = None
+
+        node = await Node.parse_async({
+            "value": "1",
+            "child": {"value": "2", "child": None},
+        })
+        self.assertEqual(node.value, 1)
+        self.assertEqual(node.child.value, 2)
+        self.assertEqual(
+            await Node.encode_async(node),
+            {"value": "1", "child": {"value": "2", "child": None}},
+        )
+        self.assertIsInstance(await Node.safe_parse_async({}), Failure)
+        with self.assertRaises(TypeError):
+            Node.parse({"value": "1"})
+        with self.assertRaises(ValidationError) as caught:
+            await Node.parse_async({
+                "value": "1",
+                "child": {"value": "not-an-integer"},
+            })
+        self.assertEqual(caught.exception.issues[0].path, ("child", "value"))
+
+        codec = z.codecs.dataclass(Node)
+        decoded = await codec.decode_async({"value": "3"})
+        self.assertEqual(decoded.value, 3)
+        self.assertEqual(
+            await codec.encode_async(decoded), {"value": "3", "child": None},
+        )
+
+        output_schema = Node.to_json_schema()
+        self.assertEqual(
+            output_schema["properties"]["value"]["type"], "integer",
+        )
+        self.assertTrue(
+            output_schema["properties"]["child"]["anyOf"][0]["$ref"].startswith(
+                "#/$defs/",
+            ),
+        )
+        input_schema = Node.to_json_schema(io="input")
+        self.assertEqual(
+            input_schema["properties"]["value"]["type"], "string",
+        )
+
     async def test_validated_dataclass_async_codec_decode(self):
         calls: list[str] = []
 

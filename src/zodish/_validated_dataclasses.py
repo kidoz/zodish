@@ -66,6 +66,7 @@ class _ValidatedDataclass:
     guards: Mapping[str, Schema[Any, Any] | None]
     annotation_guards: Mapping[str, Schema[Any, Any] | None]
     fields: Mapping[str, dataclasses.Field[Any]]
+    hints: Mapping[str, Any]
     has_default: Mapping[str, bool]
     assignment_schemas: Mapping[str, Schema[Any, Any]]
     validate_assignment: bool
@@ -822,6 +823,7 @@ def _decorate(
         guards=guards,
         annotation_guards=annotation_guards,
         fields={name: field for name, field in all_fields.items()},
+        hints=hints,
         has_default=has_default,
         assignment_schemas=assignment_schemas,
         validate_assignment=effective_validate_assignment,
