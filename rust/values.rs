@@ -50,19 +50,13 @@ pub(crate) fn is_multiple_of(
     if value.is_exact_instance_of::<PyInt>() && divisor.is_exact_instance_of::<PyInt>() {
         return Ok(!value.rem(divisor)?.is_truthy()?);
     }
-    if value.is_exact_instance_of::<PyInt>() && divisor.is_exact_instance_of::<PyFloat>() {
-        let divisor_float: f64 = divisor.extract()?;
-        if divisor_float.is_finite() && divisor_float > 0.0 && divisor_float.fract() == 0.0 {
-            // `i64::MAX as f64` rounds up to 2**63, so values at or above it
-            // must use an exact Python integer conversion instead of `as i64`.
-            if divisor_float < i64::MAX as f64 {
-                let divisor_int = (divisor_float as i64).into_pyobject(value.py())?.into_any();
-                return Ok(!value.rem(&divisor_int)?.is_truthy()?);
-            }
-            let ratio = divisor.call_method0("as_integer_ratio")?;
-            let divisor_int = ratio.get_item(0)?;
-            return Ok(!value.rem(&divisor_int)?.is_truthy()?);
+    if let (Some(value_int), Some(divisor_int)) =
+        (integral_number(value)?, integral_number(divisor)?)
+    {
+        if divisor_int.le(0)? {
+            return Ok(false);
         }
+        return Ok(!value_int.rem(&divisor_int)?.is_truthy()?);
     }
 
     let value_float: f64 = match value.extract() {
@@ -80,7 +74,29 @@ pub(crate) fn is_multiple_of(
     if !quotient.is_finite() {
         return Ok(false);
     }
-    Ok((quotient - quotient.round()).abs() <= 8.0 * f64::EPSILON * quotient.abs().max(1.0))
+    if quotient.abs() < 0.5 {
+        return Ok(value_float == 0.0);
+    }
+    // Remainders retain information that division can round away at large
+    // magnitudes. Allow ordinary decimal float roundoff, but never let a
+    // growing relative tolerance accept a substantial fraction of a step.
+    let remainder = (value_float % divisor_float).abs();
+    let distance = remainder.min(divisor_float - remainder) / divisor_float;
+    let tolerance = (8.0 * f64::EPSILON * quotient.abs().max(1.0)).min(1e-8);
+    Ok(distance <= tolerance)
+}
+
+fn integral_number<'py>(value: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if value.is_exact_instance_of::<PyInt>() {
+        return Ok(Some(value.clone()));
+    }
+    if value.is_exact_instance_of::<PyFloat>() {
+        let number: f64 = value.extract()?;
+        if number.is_finite() && number.fract() == 0.0 {
+            return Ok(Some(value.call_method0("as_integer_ratio")?.get_item(0)?));
+        }
+    }
+    Ok(None)
 }
 
 pub(crate) fn safe_param<'py>(
