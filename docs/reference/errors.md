@@ -77,7 +77,7 @@ call the mapper. There is no locale catalog or global configuration.
 | `too_big` | Value is above an inclusive/exclusive upper bound | `maximum`, `inclusive`, `origin` |
 | `not_multiple_of` | Value is not a multiple of the divisor | `divisor` |
 | `invalid_type` | Wrong Python type, or a failed coercion | `expected` |
-| `invalid_value` | Value does not match a literal, enum, or discriminator | `values` |
+| `invalid_value` | Value does not match a literal, a `z.enum` choice, or a discriminator | `values` |
 | `invalid_format` | String predicate or format check failed | `format`; JSON text adds `position`; predicates add `prefix`, `suffix`, or `substring` |
 | `invalid_key` | An object or record key is not a string | `expected` |
 | `unrecognized_key` | Strict object received an unknown key | `keys` |
