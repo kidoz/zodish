@@ -3677,6 +3677,60 @@ class SchemaTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             z.codecs.dataclass(ValidatedChild)
 
+    def test_validated_dataclass_undecorated_subclass_not_validated(self):
+        @z.dataclass
+        class Base:
+            value: int
+
+        class Plain(Base):
+            pass
+
+        # An undecorated subclass constructs like a plain stdlib dataclass.
+        plain = Plain("bad")
+        self.assertEqual(plain.value, "bad")
+        self.assertTrue(repr(plain).endswith("Plain(value='bad')"))
+        self.assertEqual(plain, Plain("bad"))
+        self.assertNotEqual(plain, Plain(1))
+        self.assertEqual(dataclasses.replace(Plain(1), value="bad"), plain)
+
+        with self.assertRaises(ValidationError):
+            Base("bad")
+        with self.assertRaises(TypeError):
+            z.codecs.dataclass(Plain)
+
+        # A stdlib-decorated subclass with new fields stays unvalidated.
+        @dataclasses.dataclass
+        class Sub(Base):
+            extra: int = 0
+
+        self.assertEqual(Sub("bad", 1), Sub("bad", 1))
+
+        # Assignment validation does not leak to undecorated subclasses.
+        @z.dataclass(validate_assignment=True)
+        class StrictBase:
+            value: int
+
+        class PlainStrict(StrictBase):
+            pass
+
+        plain_strict = PlainStrict("bad")
+        plain_strict.value = "still bad"
+        self.assertEqual(plain_strict.value, "still bad")
+        with self.assertRaises(ValidationError):
+            StrictBase("bad")
+        strict = StrictBase(1)
+        with self.assertRaises(ValidationError):
+            strict.value = "bad"
+
+        # A decorated subclass keeps its own validating initializer.
+        @z.dataclass
+        class Decorated(Base):
+            extra: int = 0
+
+        with self.assertRaises(ValidationError):
+            Decorated("bad")
+        self.assertEqual(Decorated(1, 2).extra, 2)
+
     def test_validated_dataclass_frozen_slots_and_kw_only(self):
         @z.dataclass(frozen=True, slots=True, weakref_slot=True)
         class Frozen:

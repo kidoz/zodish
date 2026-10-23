@@ -839,6 +839,11 @@ def _decorate(
 
     @functools.wraps(original_init)
     def __init__(self: Any, *args: Any, **kwargs: Any) -> None:
+        # An undecorated subclass is not validated: the installed replacement
+        # is inherited, but construction follows the stdlib dataclass path.
+        if type(self) is not cls and marker_for(type(self)) is None:
+            original_init(self, *args, **kwargs)
+            return
         if has_async:
             raise TypeError(
                 "This validated dataclass has asynchronous field schemas; "
