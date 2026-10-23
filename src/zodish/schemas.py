@@ -70,12 +70,14 @@ from ._errors import (
 from ._native import NativeSchema
 
 
-_URL_PATTERN = r"^[a-zA-Z][a-zA-Z0-9+.-]*://[^\s]+$"
-_HTTP_URL_PATTERN = r"^[Hh][Tt][Tt][Pp][Ss]?://[^\s]+$"
-_HEX_PATTERN = r"^[0-9a-fA-F]+$"
+# Unlike $, this end assertion rejects a final newline in Python and JSON
+# Schema's regex dialect alike. Custom .regex() retains re.search semantics.
+_URL_PATTERN = r"^[a-zA-Z][a-zA-Z0-9+.-]*://[^\s]+(?![\s\S])"
+_HTTP_URL_PATTERN = r"^[Hh][Tt][Tt][Pp][Ss]?://[^\s]+(?![\s\S])"
+_HEX_PATTERN = r"^[0-9a-fA-F]+(?![\s\S])"
 _DURATION_PATTERN = (
     r"^[+-]?P(?:\d+W|(?=\d|T)(?:\d+D)?"
-    r"(?:T(?=\d)(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?)?)$"
+    r"(?:T(?=\d)(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?)?)(?![\s\S])"
 )
 _DURATION_PARTS = re.compile(
     r"^[+-]?P(?:(\d+)W|(?:(\d+)D)?"
@@ -83,46 +85,46 @@ _DURATION_PARTS = re.compile(
 )
 _UUID_PATTERN = (
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"
-    r"-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    r"-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?![\s\S])"
 )
 _DATE_PATTERN = (
-    r"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$"
+    r"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])(?![\s\S])"
 )
 _TIME_PATTERN = (
     r"^(?:[01][0-9]|2[0-3]):[0-5][0-9](?::[0-5][0-9](?:\.[0-9]+)?)?"
-    r"(?:[Zz]|[+-](?:0[0-9]|1[0-9]|2[0-3]):[0-5][0-9])?$"
+    r"(?:[Zz]|[+-](?:0[0-9]|1[0-9]|2[0-3]):[0-5][0-9])?(?![\s\S])"
 )
 _DATETIME_PATTERN = (
     r"^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])"
     r"[Tt ](?:[01][0-9]|2[0-3]):[0-5][0-9]"
     r"(?::[0-5][0-9](?:\.[0-9]+)?)?"
-    r"(?:[Zz]|[+-](?:0[0-9]|1[0-9]|2[0-3]):[0-5][0-9])?$"
+    r"(?:[Zz]|[+-](?:0[0-9]|1[0-9]|2[0-3]):[0-5][0-9])?(?![\s\S])"
 )
 _IPV4_PATTERN = (
     r"^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}"
-    r"(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+    r"(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(?![\s\S])"
 )
 _DECIMAL_PATTERN = (
-    r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
+    r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?(?![\s\S])"
 )
 _BASE64_PATTERN = (
-    r"^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    r"^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?(?![\s\S])"
 )
 _BASE64URL_PATTERN = (
     r"^(?:[A-Za-z0-9_-]{4})*"
-    r"(?:[A-Za-z0-9_-]{2}==|[A-Za-z0-9_-]{3}=|[A-Za-z0-9_-]{2,3})?$"
+    r"(?:[A-Za-z0-9_-]{2}==|[A-Za-z0-9_-]{3}=|[A-Za-z0-9_-]{2,3})?(?![\s\S])"
 )
 _HOSTNAME_PATTERN = (
     r"^(?=.{1,253}$)"
     r"(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)"
-    r"(?:\.(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))*$"
+    r"(?:\.(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))*(?![\s\S])"
 )
-_ULID_PATTERN = r"(?i)^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
-_CUID_PATTERN = r"(?i)^c[^\s-]{8,}$"
-_CUID2_PATTERN = r"^[a-z][a-z0-9]{1,31}$"
-_NANOID_PATTERN = r"^[A-Za-z0-9_-]{21}$"
-_JWT_PATTERN = r"^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$"
-_E164_PATTERN = r"^\+[1-9][0-9]{1,14}$"
+_ULID_PATTERN = r"(?i)^[0-7][0-9A-HJKMNP-TV-Z]{25}(?![\s\S])"
+_CUID_PATTERN = r"(?i)^c[^\s-]{8,}(?![\s\S])"
+_CUID2_PATTERN = r"^[a-z][a-z0-9]{1,31}(?![\s\S])"
+_NANOID_PATTERN = r"^[A-Za-z0-9_-]{21}(?![\s\S])"
+_JWT_PATTERN = r"^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?![\s\S])"
+_E164_PATTERN = r"^\+[1-9][0-9]{1,14}(?![\s\S])"
 _KNOWN_FORMATS = frozenset({
     "email", "uri", "uuid", "date", "time", "date-time", "ipv4", "ipv6",
     "hostname", "ulid", "cuid", "cuid2", "nanoid", "jwt", "e164",
@@ -223,7 +225,7 @@ def _parse_base64(
 ) -> builtins.bytes:
     try:
         if urlsafe:
-            return base64.urlsafe_b64decode(value)
+            return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
         return base64.b64decode(value, validate=True)
     except (binascii.Error, ValueError):
         raise _invalid_format(message, "base64") from None
