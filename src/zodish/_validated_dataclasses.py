@@ -418,10 +418,13 @@ def _class_type_bindings(
                     "Validated dataclasses do not support variadic generic "
                     "bases",
                 )
-            bindings[parameter] = _annotations._DataclassAnnotation(
-                argument,
-                bindings=bindings,
-            )
+            if argument is not parameter:
+                # Capture the caller's scope before replacing a binding. In
+                # Base[T], T retains its existing (possibly Any) meaning.
+                bindings[parameter] = _annotations._DataclassAnnotation(
+                    argument,
+                    bindings=dict(bindings),
+                )
     return bindings
 
 
@@ -686,13 +689,14 @@ def _decorate(
     regular_init_fields = [
         field for field in dataclasses.fields(cls) if field.init
     ]
+    regular_init_names = {field.name for field in regular_init_fields}
     initvar_fields = [
         field for field in all_fields.values() if _is_initvar_field(field)
     ]
     constructor_fields = {
         name: field
         for name, field in all_fields.items()
-        if _is_initvar_field(field) or field.init
+        if _is_initvar_field(field) or name in regular_init_names
     }
     non_init_default_fields = {
         field.name: field

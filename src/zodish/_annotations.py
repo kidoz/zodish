@@ -116,8 +116,13 @@ def _resolve_annotation(
     aliases = context.aliases
     bindings = context.bindings
     metadata: list[_schemas.Schema[Any, Any]] = []
+    seen_bindings: set[tuple[typing.TypeVar, int]] = set()
     while True:
         if isinstance(annotation, typing.TypeVar):
+            key = (annotation, id(bindings))
+            if key in seen_bindings:
+                raise TypeError(f"Cyclic type parameter binding for field {name!r}")
+            seen_bindings.add(key)
             bound = bindings.get(annotation)
             if bound is None:
                 raise TypeError(
