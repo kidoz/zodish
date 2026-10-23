@@ -62,6 +62,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Numeric multiple checks preserve integral float precision and bound fractional
+  roundoff tolerance, rejecting large nonmultiples and nonzero values near zero.
+- Generic validated dataclass inheritance no longer creates cyclic type-parameter
+  bindings, and `ClassVar` declarations are excluded from constructor fields.
+- Built-in string formats reject trailing newlines while custom `.regex()`
+  retains Python `re.search` semantics. Base64url codecs accept valid unpadded
+  input, matching their input schemas.
+- Typed objects and branded containers retain their reversible encoders. Wired
+  dataclass codec fields round-trip through their encoded names in both sync and
+  async modes, while direct construction uses Python attribute names.
+- JSON fast paths fall back to Python decoding for lone surrogates in input or
+  schema literals instead of raising `UnicodeEncodeError`.
+- Pinned `psm` to preserve Rust 1.85 source builds and added an MSRV CI check.
 - Native validation rejects cyclic `Issue.branches` graphs with
   `RecursionError` instead of overflowing the Rust stack.
 - Native validation checks the remaining thread stack during evaluation, so
