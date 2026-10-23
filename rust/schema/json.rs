@@ -279,7 +279,10 @@ fn json_literal_matches(value: &Value, expected: &Bound<'_, PyAny>) -> PyResult<
         return Ok(Some(value.is_null()));
     }
     if expected.is_exact_instance_of::<PyString>() {
-        let expected = expected.cast::<PyString>().map_err(PyErr::from)?.to_str()?;
+        let expected = expected.cast::<PyString>().map_err(PyErr::from)?;
+        let Ok(expected) = expected.to_str() else {
+            return Ok(None);
+        };
         return Ok(Some(
             matches!(value, Value::String(text) if text == expected),
         ));
@@ -289,7 +292,12 @@ fn json_literal_matches(value: &Value, expected: &Bound<'_, PyAny>) -> PyResult<
 
 pub(super) fn parse_json_value(data: &Bound<'_, PyAny>) -> PyResult<Option<Value>> {
     if data.is_instance_of::<PyString>() {
-        let text = data.cast::<PyString>().map_err(PyErr::from)?.to_str()?;
+        let text = data.cast::<PyString>().map_err(PyErr::from)?;
+        // Python's JSON decoder accepts lone surrogates, which Rust UTF-8
+        // strings cannot represent. Let that decoder handle these inputs.
+        let Ok(text) = text.to_str() else {
+            return Ok(None);
+        };
         Ok(serde_json::from_str(text).ok())
     } else if data.is_instance_of::<PyBytes>() {
         let bytes = data.cast::<PyBytes>().map_err(PyErr::from)?.as_bytes();
