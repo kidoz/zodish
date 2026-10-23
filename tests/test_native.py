@@ -21,6 +21,74 @@ from zodish._errors import _issue_from_raw
 
 
 class NativeTests(unittest.TestCase):
+    def test_multiple_of_preserves_large_float_remainders(self):
+        valid = (
+            (1000000000000000.0, 2),
+            (1000000000000000.0, 2.0),
+            (1e300, 2),
+            (2.5, 0.5),
+            (0.3, 0.1),
+            (-0.3, 0.1),
+            (100000.1, 0.1),
+            (0.0, 0.1),
+        )
+        for value, divisor in valid:
+            with self.subTest(value=value, divisor=divisor):
+                self.assertEqual(z.number().multiple_of(divisor).parse(value), value)
+        invalid = (
+            (1000000000000001.0, 2),
+            (1000000000000001.0, 2.0),
+            (-1000000000000001.0, 2),
+            (1000000000000001.0, 1.5),
+            (0.35, 0.1),
+            (1e-20, 1),
+        )
+        for value, divisor in invalid:
+            with self.subTest(value=value, divisor=divisor):
+                result = z.number().multiple_of(divisor).safe_parse(value)
+                self.assertIsInstance(result, Failure)
+                self.assertEqual(result.error.issues[0].code, "not_multiple_of")
+
+    def test_json_surrogates_use_python_decoding(self):
+        surrogate = "\ud800"
+        for schema, value in (
+            (z.string(), surrogate),
+            (z.literal(surrogate), surrogate),
+            (z.string().array(), [surrogate]),
+            (z.object({"value": z.string()}), {"value": surrogate}),
+            (z.object({surrogate: z.string()}), {surrogate: "value"}),
+        ):
+            for ensure_ascii in (False, True):
+                with self.subTest(value=repr(value), ensure_ascii=ensure_ascii):
+                    data = json.dumps(value, ensure_ascii=ensure_ascii)
+                    self.assertEqual(schema.parse_json(data), schema.parse(json.loads(data)))
+        self.assertIsInstance(z.literal(surrogate).safe_parse_json('"other"'), Failure)
+        self.assertIsInstance(z.string().safe_parse_json('"' + surrogate), Failure)
+
+    def test_legacy_generic_inheritance_does_not_loop(self):
+        script = """
+from typing import Generic, TypeVar
+from zodish import Failure, z
+T = TypeVar("T")
+@z.dataclass
+class Base(Generic[T]):
+    value: T
+@z.dataclass
+class Child(Base[T], Generic[T]):
+    pass
+assert Child(value="text").value == "text"
+assert Child.parse({"value": 1}).value == 1
+@z.dataclass
+class Concrete(Child[int]):
+    pass
+assert Concrete(value=1).value == 1
+assert isinstance(Concrete.safe_parse({"value": "text"}), Failure)
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", script], capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_required_output_native_guard(self):
         def omit(_):
             calls.append("omit")
@@ -746,6 +814,7 @@ print("all cases ok")
         codec = z.codecs.dataclass(Point)
         self.assertEqual(codec._node.kind, "dataclass_decode")
         self.assertEqual(codec._encode_node.kind, "dataclass_encode")
+        self.assertEqual(codec._encode_node.args[2], ("x", "y"))
         self.assertFalse(codec._node.has_async)
         for children, args in (
             ((), ()),
@@ -763,8 +832,13 @@ print("all cases ok")
                 _native.NativeSchema("dataclass_decode", children, args)
         with self.assertRaises(ValueError):
             _native.NativeSchema(
-                "dataclass_encode", (z.integer()._node,), (Point, ("x", "y")),
+                "dataclass_encode", (z.integer()._node,), (Point, ("x", "y"), ("x", "y")),
             )
+        for output_names in ((), (1,), "x"):
+            with self.subTest(output_names=output_names), self.assertRaises(ValueError):
+                _native.NativeSchema(
+                    "dataclass_encode", (z.integer()._node,), (Point, ("x",), output_names),
+                )
 
     def test_validated_dataclass_codec_gc_cycle(self):
         @z.dataclass

@@ -3,6 +3,7 @@
 import asyncio
 import dataclasses
 import gc
+import json
 import threading
 import unittest
 import weakref
@@ -15,6 +16,71 @@ from zodish._native import AsyncSession
 
 
 class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_review_numeric_and_json_boundaries(self):
+        schema = z.number().multiple_of(2)
+        self.assertIsInstance(await schema.safe_parse_async(1000000000000001.0), Failure)
+        self.assertEqual(await schema.parse_async(1000000000000000.0), 1000000000000000.0)
+        raw = json.dumps("\ud800", ensure_ascii=False)
+        self.assertEqual(await z.string().parse_json_async(raw), "\ud800")
+        result = await z.string().http_url().safe_parse_async("https://example.com\n")
+        self.assertIsInstance(result, Failure)
+
+    async def test_wired_dataclass_and_typed_encoders(self):
+        async def decode(value):
+            return int(value)
+
+        async def encode(value):
+            await asyncio.sleep(0)
+            gc.collect()
+            return str(value)
+
+        field = z.codec_async(z.string(), z.integer(), decode=decode, encode=encode)
+
+        @z.dataclass
+        class Item:
+            value: Annotated[int, field.wire("wireValue")]
+            count: Annotated[int, z.integer().wire("")] = 1
+
+        item = Item(value=3)
+        expected = {"wireValue": "3", "": 1}
+        self.assertEqual(await Item.encode_async(item), expected)
+        self.assertEqual(await Item.parse_async(expected), item)
+        with self.assertRaises(TypeError):
+            Item.encode(item)
+
+        class Fields(TypedDict):
+            value: int
+
+        typed = z.typed_object(Fields, {"value": field.wire("wireValue")})
+        brand = NewType("Payload", dict)
+        for schema in (typed, typed.brand(brand)):
+            self.assertEqual(await schema.encode_async({"value": 3}), {"wireValue": "3"})
+            self.assertEqual(await schema.parse_async({"wireValue": "3"}), {"value": 3})
+            self.assertIsInstance(await schema.safe_encode_async({}), Failure)
+
+    async def test_async_dataclass_omitted_defaults_remain_validated(self):
+        calls = []
+
+        async def positive(value):
+            calls.append(value)
+            return value > 0
+
+        @z.dataclass(async_fields=True)
+        class Item:
+            value: Annotated[int, z.integer().refine_async(positive)] = 1
+            derived: Annotated[int, z.integer().refine_async(positive)] = dataclasses.field(
+                init=False, default=2,
+            )
+
+        item = await Item.parse_async({})
+        self.assertEqual((item.value, item.derived), (1, 2))
+        self.assertEqual(calls, [1, 2])
+        calls.clear()
+        result = await Item.safe_parse_async({"value": -1})
+        self.assertIsInstance(result, Failure)
+        self.assertEqual([issue.path for issue in result.error.issues], [("value",)])
+        self.assertEqual(calls, [-1, 2])
+
     async def test_typed_object_required_output(self):
         class Fields(TypedDict):
             first: int

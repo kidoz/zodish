@@ -14,6 +14,7 @@ import weakref
 from typing import (
     Annotated,
     Any,
+    ClassVar,
     Generic,
     Literal,
     NewType,
@@ -45,6 +46,106 @@ class _RecursiveNode:
 
 
 class SchemaTests(unittest.TestCase):
+    def test_builtin_formats_reject_trailing_newlines(self):
+        cases = (
+            (z.string().email(), "a@example.com"),
+            (z.string().url(), "https://example.com"),
+            (z.string().http_url(), "https://example.com"),
+            (z.string().uuid(), "123e4567-e89b-12d3-a456-426614174000"),
+            (z.string().date(), "2026-10-23"),
+            (z.string().time(), "12:30:00Z"),
+            (z.string().datetime(), "2026-10-23T12:30:00Z"),
+            (z.string().ipv4(), "127.0.0.1"),
+            (z.string().hostname(), "example.com"),
+            (z.string().hex(), "abcd"),
+            (z.string().duration(), "PT1H"),
+            (z.string().ulid(), "01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+            (z.string().cuid(), "cjld2cjxh0000qzrmn831i7rn"),
+            (z.string().cuid2(), "tz4a98xxat96iws9zmbrgj3a"),
+            (z.string().nanoid(), "V1StGXR8_Z5jdHi6B-myT"),
+            (z.string().jwt(), "header.payload.signature"),
+            (z.string().e164(), "+14155552671"),
+            (z.string().base64(), "aGVsbG8="),
+            (z.string().base64url(), "aGVsbG8"),
+        )
+        for schema, value in cases:
+            with self.subTest(value=value):
+                self.assertEqual(schema.parse(value), value)
+                for ending in ("\n", "\r\n"):
+                    result = schema.safe_parse(value + ending)
+                    self.assertIsInstance(result, Failure)
+                    self.assertEqual(result.error.issues[0].code, "invalid_format")
+        # User-supplied patterns continue to use Python's re.search contract.
+        self.assertEqual(z.string().regex("^abc$").parse("abc\n"), "abc\n")
+
+    def test_unpadded_base64url_codec(self):
+        codec = z.codecs.bytes_base64(urlsafe=True)
+        for encoded, decoded in (
+            ("", b""), ("Zg", b"f"), ("Zg==", b"f"),
+            ("Zm8", b"fo"), ("Zm8=", b"fo"), ("Zm9v", b"foo"),
+            ("aGVsbG8", b"hello"), ("-_8", b"\xfb\xff"),
+        ):
+            with self.subTest(encoded=encoded):
+                self.assertEqual(codec.decode(encoded), decoded)
+                self.assertEqual(codec.decode(codec.encode(decoded)), decoded)
+        for value in ("Z", "Zg=", "Zg===", "Zg\n", "+/8="):
+            with self.subTest(value=value):
+                result = codec.safe_decode(value)
+                self.assertIsInstance(result, Failure)
+                self.assertEqual(result.error.issues[0].params["format"], "base64url")
+
+    def test_typed_and_branded_structures_encode(self):
+        class Fields(TypedDict):
+            count: int
+            label: NotRequired[str]
+
+        codec = z.codec(z.string(), z.integer(), decode=int, encode=str)
+        typed = z.typed_object(Fields, {
+            "count": codec.wire("countValue"),
+            "label": z.string().optional(),
+        }).strict()
+        self.assertEqual(typed.encode({"count": 3}), {"countValue": "3"})
+        self.assertEqual(typed.parse(typed.encode({"count": 3})), {"count": 3})
+        self.assertIsInstance(typed.safe_encode({}), Failure)
+        self.assertIsInstance(typed.safe_encode({"count": "bad"}), Failure)
+        brand = NewType("Payload", dict)
+        array_brand = NewType("Items", list)
+        for base, marker, value in (
+            (z.object({"count": codec}), brand, {"count": 3}),
+            (typed, brand, {"count": 3}),
+            (codec.array().min(1), array_brand, [1, 2]),
+        ):
+            with self.subTest(schema=type(base).__name__):
+                branded = base.brand(marker).describe("Branded")
+                self.assertEqual(branded.encode(value), base.encode(value))
+                self.assertEqual(branded.parse(branded.encode(value)), value)
+                self.assertEqual(
+                    branded.to_json_schema(io="input"),
+                    {**base.to_json_schema(io="input"), "description": "Branded"},
+                )
+        self.assertIsInstance(codec.array().min(1).brand(array_brand).safe_encode([]), Failure)
+
+    def test_validated_dataclass_classvars_are_not_fields(self):
+        @z.dataclass
+        class Base:
+            version: ClassVar[int] = 1
+            value: int
+
+        @z.dataclass
+        class Child(Base):
+            label: ClassVar[str] = "model"
+
+        for cls in (Base, Child):
+            with self.subTest(cls=cls):
+                value = cls(value=2)
+                self.assertEqual(value.version, 1)
+                self.assertEqual(cls.encode(value), {"value": 2})
+                self.assertEqual(cls.parse({"value": 3}).value, 3)
+                self.assertEqual(set(inspect.signature(cls).parameters), {"value"})
+                self.assertEqual(set(cls.to_json_schema()["properties"]), {"value"})
+                with self.assertRaises(ValidationError):
+                    cls(value="bad")
+
     def test_container_schemas_are_hashable(self):
         schema = z.object({"name": z.string()})
         self.assertIsInstance(hash(schema), int)
@@ -3796,6 +3897,32 @@ class SchemaTests(unittest.TestCase):
             "createdAt": "2026-01-01T12:30:00",
         })
         self.assertEqual(decoded.created, dt.datetime(2026, 1, 1, 12, 30))
+        self.assertEqual(Wired.encode(decoded), {
+            "createdAt": "2026-01-01T12:30:00",
+        })
+        self.assertEqual(Wired.parse(Wired.encode(decoded)), decoded)
+
+        for decorator in (z.dataclass, dataclasses.dataclass):
+            with self.subTest(decorator=decorator):
+                @decorator
+                class WithNames:
+                    created: Annotated[
+                        dt.datetime, z.codecs.iso_datetime().wire("createdAt")
+                    ]
+                    count: Annotated[int, z.integer().wire("")] = 1
+
+                codec = z.codecs.dataclass(WithNames)
+                instance = WithNames(created=dt.datetime(2026, 1, 1))
+                encoded = {"createdAt": "2026-01-01T00:00:00", "": 1}
+                self.assertEqual(codec.encode(instance), encoded)
+                self.assertEqual(codec.decode(encoded), instance)
+                self.assertEqual(
+                    set(codec.to_json_schema(io="input")["properties"]), {"createdAt", ""},
+                )
+                for bad, path in (({"createdAt": "invalid"}, "createdAt"), ({"": "bad"}, "")):
+                    invalid = codec.safe_parse({**encoded, **bad})
+                    self.assertIsInstance(invalid, Failure)
+                    self.assertEqual([issue.path for issue in invalid.error.issues], [(path,)])
 
     def test_validated_dataclass_rejects_custom_hooks(self):
         @dataclasses.dataclass
