@@ -202,12 +202,19 @@ impl NativeSchema {
         }
         if matches!(kind, Kind::DataclassEncode) {
             let valid = args[0].bind(py).is_instance_of::<PyType>()
-                && match args[1].bind(py).cast::<PyTuple>() {
-                    Ok(names) => {
+                && match (
+                    args[1].bind(py).cast::<PyTuple>(),
+                    args[2].bind(py).cast::<PyTuple>(),
+                ) {
+                    (Ok(names), Ok(output_names)) => {
                         names.len() == children.len()
-                            && names.iter().all(|name| name.is_instance_of::<PyString>())
+                            && names.len() == output_names.len()
+                            && names
+                                .iter()
+                                .chain(output_names.iter())
+                                .all(|name| name.is_instance_of::<PyString>())
                     }
-                    Err(_) => false,
+                    _ => false,
                 };
             if !valid {
                 return Err(PyValueError::new_err(

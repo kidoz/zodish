@@ -114,6 +114,10 @@ Built-in constraints accept a keyword-only `message=`. `.refine()` accepts a rel
 
 Object fields can declare an input-only wire name: `z.object({"user_name": z.string().wire("userName")})` accepts `userName`, returns `user_name`, and encodes back to `userName`. Missing and `None` behavior comes from the field schema. Wire names must be unique; `.keyof()` and shape methods use canonical keys, and the discriminated-union key cannot be aliased.
 
+Dataclass codec fields also support `.wire(name)`, applied after the field's codec
+and wrappers. Direct construction uses Python attribute names and decoded
+values; codec decoding accepts wire names and encoding emits them.
+
 Schemas are immutable: fluent methods return a new schema. Operations execute in declaration order: `.trim().min(1)` validates the trimmed string. Structural object methods operate on the shape. Apply `.refine()` or `.super_refine()` after structural edits; they return a general `Schema[T]`, as do transforms, pipes, and optional/default wrappers. Type-specific methods should therefore precede these wrappers.
 
 ## Missing, None, and Defaults
@@ -270,7 +274,7 @@ z.number().multiple_of(0.25)
 z.string().starts_with("v").ends_with(".json").includes("config")
 ```
 
-Exclusive bound failures use `too_small`/`too_big` with `inclusive=False`; multiple-of failures use `not_multiple_of` with the `divisor` in `params`; and string predicate failures use `invalid_format`. Integer multiple checks are exact. Float checks compare the quotient to the nearest integer with a small relative tolerance, so `0.3` counts as a multiple of `0.1` despite binary floating-point representation. Divisors must be positive finite numbers.
+Exclusive bound failures use `too_small`/`too_big` with `inclusive=False`; multiple-of failures use `not_multiple_of` with the `divisor` in `params`; and string predicate failures use `invalid_format`. Multiple checks between integral values are exact, including integral floats. Other float checks use remainders with a bounded roundoff tolerance, so `0.3` counts as a multiple of `0.1` despite binary floating-point representation. Divisors must be positive finite numbers.
 
 ## Formats and Python Scalars
 

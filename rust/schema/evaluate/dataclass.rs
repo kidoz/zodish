@@ -294,6 +294,10 @@ impl NativeSchema {
             .bind(py)
             .cast::<PyTuple>()
             .map_err(PyErr::from)?;
+        let output_names = self.args[2]
+            .bind(py)
+            .cast::<PyTuple>()
+            .map_err(PyErr::from)?;
         let result = PyDict::new(py);
         let mut issues = Vec::new();
         for (index, name) in names.iter().enumerate() {
@@ -302,7 +306,7 @@ impl NativeSchema {
             let parsed = self.child(index, ctx, &raw, path, depth);
             path.pop();
             match parsed {
-                Ok(value) => result.set_item(&name, value)?,
+                Ok(value) => result.set_item(output_names.get_item(index)?, value)?,
                 Err(Error::Invalid(mut errors)) => issues.append(&mut errors),
                 Err(error) => return Err(error),
             }

@@ -419,6 +419,10 @@ def _export_node(
     unrepresentable: UnrepresentablePolicy,
     relax_strip: bool,
 ) -> JSONSchema:
+    if schema._inner is not None and schema._node is schema._inner._node:
+        return _export_node(
+            schema._inner, path, target, io, unrepresentable, relax_strip,
+        )
     if isinstance(schema, _JsonTextSchema):
         return {"type": "string"}
     if isinstance(schema, AsyncCodecSchema):

@@ -53,6 +53,7 @@ from .schemas import (
     RecordSchema,
     SetSchema,
     TupleSchema,
+    TypedObjectSchema,
     UnionSchema,
     _encode_base64,
     _format_iso_duration,
@@ -1169,6 +1170,19 @@ class _Codecs:
                     )
                 if not isinstance(schema, Schema):
                     raise TypeError(f"Field {name!r} must be a schema")
+                if (
+                    schema._node.kind == "wire"
+                    and isinstance(schema._inner, CodecSchema)
+                ):
+                    # Retain conversion capabilities as well as the input
+                    # name when the terminal field marker wraps a codec.
+                    inner = schema._inner
+                    schema = replace(
+                        inner,
+                        _node=schema._node,
+                        _input_schema=inner.input_schema.wire(schema._node.args[0]),
+                        _inner=inner,
+                    )
                 result[name] = schema
             return result
 
@@ -1304,14 +1318,20 @@ class _Codecs:
             name: input_field_schema(name) for name in names
         }
         input_schema = object(input_schemas)
+        encoded_names = dict(zip(names, input_schema._node.args[3], strict=True))
         # Codec fields are validated and converted by the codec itself, so
         # their shape entries only enforce presence. Plain fields are validated
         # by their normal schemas.
         decode_shape: dict[str, Schema[Any, Any]] = {}
         for name in names:
             if isinstance(schemas_by_name[name], CodecSchema):
-                decode_shape[name] = (
+                field_placeholder = (
                     unknown().optional() if has_default[name] else unknown()
+                )
+                decode_shape[name] = (
+                    field_placeholder.wire(encoded_names[name])
+                    if encoded_names[name] != name
+                    else field_placeholder
                 )
             else:
                 decode_shape[name] = input_schemas[name]
@@ -1367,7 +1387,7 @@ class _Codecs:
                         value = schema.decode(value)
                     except ValidationError as error:
                         issues.extend(
-                            _prefix_issue(item, name) for item in error.issues
+                            _prefix_issue(item, encoded_names[name]) for item in error.issues
                         )
                         continue
                 if marker is not None:
@@ -1444,7 +1464,7 @@ class _Codecs:
                         value = await schema.decode_async(value)
                     except ValidationError as error:
                         issues.extend(
-                            _prefix_issue(item, name) for item in error.issues
+                            _prefix_issue(item, encoded_names[name]) for item in error.issues
                         )
                         continue
                 if marker is not None:
@@ -1501,7 +1521,7 @@ class _Codecs:
                         _prefix_issue(item, name) for item in error.issues
                     )
                     continue
-                encoded[name] = field_value
+                encoded[encoded_names[name]] = field_value
             if issues:
                 raise ValidationError(issues)
             return encoded
@@ -1524,7 +1544,7 @@ class _Codecs:
                         _prefix_issue(item, name) for item in error.issues
                     )
                     continue
-                encoded[name] = field_value
+                encoded[encoded_names[name]] = field_value
             if issues:
                 raise ValidationError(issues)
             return encoded
@@ -1573,11 +1593,7 @@ class _Codecs:
                     if isinstance(schema, CodecSchema)
                     else input_schemas[name]._node
                 )
-                input_names.append(
-                    name
-                    if isinstance(schema, CodecSchema)
-                    else _field_wire(input_schemas[name]._node) or name
-                )
+                input_names.append(encoded_names[name])
                 guard = marker.annotation_guards[name]
                 if guard is not None and (
                     name in overrides or marker.guards[name] is not None
@@ -1662,7 +1678,10 @@ class _Codecs:
             encode_node = NativeSchema(
                 "dataclass_encode",
                 builtins.tuple(encode_children),
-                (cls, builtins.tuple(stored_names)),
+                (
+                    cls, builtins.tuple(stored_names),
+                    builtins.tuple(encoded_names[name] for name in stored_names),
+                ),
             )
         else:
             encode_node = NativeSchema(
@@ -1725,6 +1744,9 @@ def _set_encode_node(
 
 
 def _encode_node_for(schema: Schema[Any, Any]) -> NativeSchema | None:
+    if schema._inner is not None and schema._node is schema._inner._node:
+        # A typing-only brand retains the exact node and its structural schema.
+        return _encode_node_for(schema._inner)
     if isinstance(schema, CodecSchema):
         return schema._encode_node
     if isinstance(schema, ArraySchema):
@@ -1737,7 +1759,7 @@ def _encode_node_for(schema: Schema[Any, Any]) -> NativeSchema | None:
         if item_node is None:
             return None
         return _set_encode_node(schema, item_node)
-    if isinstance(schema, ObjectSchema):
+    if isinstance(schema, (ObjectSchema, TypedObjectSchema)):
         property_nodes: list[NativeSchema] = []
         for prop in schema.shape.values():
             prop_node = _encode_node_for(prop)

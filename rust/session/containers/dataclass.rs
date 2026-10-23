@@ -477,8 +477,9 @@ impl AsyncSession {
     ) -> PyResult<AsyncNext> {
         match outcome {
             Ok(value) => {
-                let name = frame.names[frame.cursor].clone_ref(py);
-                if let Err(error) = frame.result.bind(py).set_item(name.bind(py), value) {
+                let node = frame.node.bind(py).try_borrow().map_err(PyErr::from)?;
+                let name = node.args[2].bind(py).get_item(frame.cursor)?;
+                if let Err(error) = frame.result.bind(py).set_item(name, value) {
                     return Ok(deliver_at(Err(Error::Python(error)), frame.path));
                 }
             }

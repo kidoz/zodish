@@ -81,9 +81,10 @@ them exactly.
 | `.keyof()` | Enum schema of the shape keys |
 | `.wire(name)` | Field marker: accept `name` on input, emit the shape key |
 
-`.wire(name)` applies to a field schema inside `z.object()` or
-`z.typed_object()`. The shape key is the output name; the wire name is the
-input name. Wire names must be unique and must not collide with another field's
+`.wire(name)` applies to a field schema inside `z.object()`,
+`z.typed_object()`, or a dataclass codec. The shape key or dataclass attribute
+is the output name; the wire name is the input name. Wire names must be unique
+and must not collide with another field's
 input name. Input validation issue paths use the wire name; typed-object
 required-output issues use the shape key. `.keyof()`, `.pick()`, `.omit()`,
 `.extend()`, and typed-object keys use shape keys. Encoding and `io="input"`
@@ -91,6 +92,10 @@ JSON Schema use wire names; `io="output"` uses shape keys. With
 `.passthrough()` or `.catchall()`, an unknown input key that equals a shape key
 does not overwrite the validated field. A discriminated-union discriminator
 cannot have a wire name.
+
+Dataclass construction uses Python attribute names and decoded values;
+codec decoding accepts wire names and encoding emits them. Apply `.wire()`
+after a field's codec and its wrappers.
 
 ## Collection methods
 
@@ -327,6 +332,9 @@ cannot see the runtime type argument. Variadic generic parameters are rejected,
 as are bases with the `init=False` option or a custom `__init__`. An undecorated subclass is not validated; the codec rejects
 it, and stdlib `@dataclasses.dataclass` on the subclass does not restore
 validation. Decorate the subclass with `@z.dataclass`.
+
+`ClassVar` declarations remain class attributes and are excluded from
+constructor validation, codec fields, and JSON Schema properties.
 
 Self-referential fields such as `Node | None` or `list[Node]` support direct
 construction with already-validated instances, synchronous and async codec

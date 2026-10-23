@@ -199,14 +199,14 @@ def _check_static_output(
     )
 
 
-def _codec_output_schema(schema: Schema[Any, Any]) -> Schema[Any, Any] | None:
-    """Return a codec's decoded schema, looking through a wire wrapper."""
+def _construction_field_schema(schema: Schema[Any, Any]) -> Schema[Any, Any]:
+    """Use decoded schemas and Python field names during construction."""
     current = schema
     while current._node.kind == "wire" and current._inner is not None:
         current = current._inner
     if isinstance(current, CodecSchema):
         return current.output_schema
-    return None
+    return current
 
 
 def _guarded_schema(
@@ -263,7 +263,7 @@ def _compile_field_schema(
     )
     if not isinstance(schema, Schema):
         raise TypeError(f"Field {name!r} must be a schema")
-    base = _codec_output_schema(schema) or schema
+    base = _construction_field_schema(schema)
     if base._node.has_async and not allow_async:
         raise TypeError(
             f"Field {name!r} uses asynchronous validation; "
