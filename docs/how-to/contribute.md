@@ -7,6 +7,10 @@ running the test and quality gates, and benchmarking.
 
 Building from source requires Rust 1.85+ and CPython 3.14+.
 
+`psm` is pinned to retain the Rust 1.85 minimum for `stacker`. CI checks that
+minimum separately from the current stable toolchain; dependency updates must
+pass both builds.
+
 ```bash
 python3.14 -m venv .venv
 source .venv/bin/activate
