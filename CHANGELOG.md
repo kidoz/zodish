@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-23
+
+### Fixed
+
+- Constructing an undecorated subclass of a validated dataclass now follows the
+  standard dataclass constructor without field validation. Previously the
+  inherited validating `__init__` validated undecorated subclasses, contrary to
+  the documented behavior.
+
+### Changed
+
+- Clarified that `validate()` does not accept `error=` and that `z.enum`
+  mismatches report `invalid_value`.
+
 ## [0.11.0] - 2026-10-23
 
 ### Added
