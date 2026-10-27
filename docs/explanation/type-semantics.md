@@ -153,6 +153,28 @@ schemas are preserved. `.strict()`, `.passthrough()`, `.strip()`, and
 shape-changing methods such as `.pick()`, `.omit()`, and `.partial()` return
 the ordinary `ObjectSchema` type.
 
+A type checker does not build that `TypedDict` from the shape. mypy 2.4 types
+a dict whose schema classes differ as `dict[str, object]`: the keys are `str`,
+and each field's output type is gone. `z.object(...).parse` is therefore
+`dict[str, Any]`. No overload recovers the shape, and Zodish does not ship a
+type-checker plugin.
+
+`z.typed_object` reports the class you wrote. A dict literal with those keys
+is accepted. A value annotated `dict[str, Any]` is rejected, so untyped JSON
+objects need `parse_json` or a cast. The checker does not compare a field
+schema with the annotation: `age: int` paired with `z.string()` still
+type-checks. `parse` and `encode` are both annotated as the `TypedDict`.
+`.wire()` accepts and emits the wire name at runtime, so those calls disagree
+with the keys the checker expects. For a boundary whose keys differ, use
+`@z.dataclass` and `ValidatedModel.parse`: the constructor and `parse` result
+are the class, and both the encoded input and the encoded output are
+`dict[str, Any]`.
+
+`.transform(fn)` is typed as the function's return type.
+`z.create_model(name, object_schema)` builds a validated class from a plain
+strip `z.object` and is `type[Any]` to the checker. The runnable forms are in
+[examples/typed_objects.py](../../examples/typed_objects.py).
+
 ### Brands
 
 A `NewType` brand changes only the static output type:
@@ -235,3 +257,4 @@ callbacks to report validation issues explicitly. See
 - [API reference](../reference/api.md)
 - [JSON Schema reference](../reference/json-schema.md)
 - [Transform and refine values](../how-to/transform-and-refine.md)
+- [Typed objects example](../../examples/typed_objects.py)
