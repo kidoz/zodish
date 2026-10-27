@@ -42,6 +42,38 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(async_result, Failure)
                 self.assertEqual(sync_result.error.issues, async_result.error.issues)
 
+    async def test_compound_union_messages_match_sync_results(self):
+        async def decode(value):
+            try:
+                return int(value)
+            except ValueError:
+                raise ValidationError([
+                    Issue("custom", "not an integer", ()),
+                ]) from None
+
+        async def encode(value):
+            return str(value)
+
+        codec = z.codec_async(
+            z.string(), z.integer(), decode=decode, encode=encode,
+        )
+        sync_union = z.codecs.union(z.codecs.iso_date(), z.codecs.iso_time())
+        async_union = z.codecs.union(sync_union, codec)
+        sync_decode = sync_union.safe_decode("not-a-date")
+        async_decode = await async_union.safe_decode_async("not-a-date")
+        sync_encode = sync_union.safe_encode("not-a-date")
+        async_encode = await async_union.safe_encode_async("not-a-date")
+        for sync_result, async_result in (
+            (sync_decode, async_decode),
+            (sync_encode, async_encode),
+        ):
+            self.assertIsInstance(sync_result, Failure)
+            self.assertIsInstance(async_result, Failure)
+            self.assertEqual(
+                sync_result.error.issues[0].message,
+                async_result.error.issues[0].message,
+            )
+
     async def test_wired_dataclass_and_typed_encoders(self):
         async def decode(value):
             return int(value)

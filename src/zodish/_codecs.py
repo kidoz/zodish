@@ -798,7 +798,7 @@ def _union_codec(options: Sequence[Schema[Any, Any]]) -> CodecSchema[Any, Any]:
         raise ValidationError([
             Issue(
                 "invalid_union",
-                "Invalid input",
+                "No union branch matched",
                 branches=builtins.tuple(branch_issues),
             ),
         ])
@@ -813,7 +813,7 @@ def _union_codec(options: Sequence[Schema[Any, Any]]) -> CodecSchema[Any, Any]:
         raise ValidationError([
             Issue(
                 "invalid_union",
-                "Invalid input",
+                "No union branch matched",
                 branches=builtins.tuple(branch_issues),
             ),
         ])
