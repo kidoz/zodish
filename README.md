@@ -17,6 +17,7 @@ Detailed documentation follows the [Diátaxis](https://diataxis.fr/) framework a
 - [How-to guides](docs/how-to/validate-data.md) — solve a specific validation task.
 - [Reference](docs/reference/api.md) — APIs, error codes, and JSON Schema support.
 - [Explanation](docs/explanation/architecture.md) — design decisions and semantics.
+- [Examples](examples/README.md) — runnable API, settings, event, model, and async programs.
 
 ## Installation
 

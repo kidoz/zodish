@@ -16,6 +16,8 @@ straight to the kind of help you need.
 | Task | Read |
 | --- | --- |
 | Build and validate my first schema | [Tutorial: Get started](tutorials/get-started.md) |
+| See a complete program for an API, settings, events, or async checks | [Examples](../examples/README.md) |
+| Give a parsed object a static type | [Typed objects example](../examples/typed_objects.py) |
 | Validate objects, arrays, tuples, records, or unions | [Validate structured data](how-to/validate-data.md) |
 | Return errors to an API client or a form | [Handle errors](how-to/handle-errors.md) |
 | Distinguish missing input, `None`, and defaults | [Handle missing values](how-to/handle-missing-values.md) |

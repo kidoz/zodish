@@ -178,6 +178,8 @@ wire, or pass `unrepresentable="any"` to replace unrepresentable nodes with
 
 ## Where to go next
 
+- [Examples](../../examples/README.md) — runnable programs for a JSON API,
+  settings, webhooks, validated models, and async checks.
 - [Validate structured data](../how-to/validate-data.md) — objects, collections,
   unions, and intersections.
 - [Handle missing values](../how-to/handle-missing-values.md) — `optional`,

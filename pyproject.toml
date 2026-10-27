@@ -43,6 +43,7 @@ python-source = "src"
 module-name = "zodish._native"
 include = [
   { path = "examples/*.py", format = "sdist" },
+  { path = "examples/README.md", format = "sdist" },
   { path = "tests/*.py", format = "sdist" },
   { path = "benchmarks/*.py", format = "sdist" },
   { path = "benchmarks/README.md", format = "sdist" },
@@ -69,7 +70,6 @@ files = [
   "src",
   "benchmarks",
   "scripts",
-  "examples/typing_checks.py",
-  "examples/verify_native.py",
+  "examples",
 ]
 mypy_path = "src"

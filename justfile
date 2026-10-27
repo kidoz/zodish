@@ -17,6 +17,14 @@ test:
 # Run the example scripts.
 examples:
     {{ python }} examples/quickstart.py
+    {{ python }} examples/api_boundary.py
+    {{ python }} examples/string_inputs.py
+    {{ python }} examples/domain_events.py
+    {{ python }} examples/account.py
+    {{ python }} examples/registration.py
+    {{ python }} examples/category_tree.py
+    {{ python }} examples/async_signup.py
+    {{ python }} examples/typed_objects.py
     {{ python }} examples/typing_checks.py
 
 # Lint Python code with ruff.
