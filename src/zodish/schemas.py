@@ -30,6 +30,7 @@ from ._core import (
     UnrepresentablePolicy,
     _async_callback,
     _field_wire,
+    _field_wire_names,
     _message,
     _string_argument,
     _sync_callback,
@@ -1057,7 +1058,14 @@ def object(
         key if (wire := _field_wire(child._node)) is None else wire
         for key, child in frozen.items()
     )
-    if len(builtins.set(input_keys)) != len(input_keys):
+    input_aliases = builtins.tuple(
+        (input_key,) if (aliases := _field_wire_names(child._node)) is None else aliases
+        for input_key, child in zip(input_keys, frozen.values(), strict=True)
+    )
+    flattened_aliases = builtins.tuple(
+        alias for aliases in input_aliases for alias in aliases
+    )
+    if len(builtins.set(flattened_aliases)) != len(flattened_aliases):
         raise ValueError("Object wire names must be unique")
 
     node = NativeSchema(
@@ -1067,6 +1075,7 @@ def object(
             policy,
             catchall._node if catchall is not None else None,
             input_keys,
+            input_aliases,
         ),
     )
     return ObjectSchema(node, frozen, policy, catchall)

@@ -96,6 +96,40 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         parsed = await ContextModel.parse_async({"value": "x"}, context="x")
         self.assertEqual(parsed.value, "x")
 
+    async def test_wire_name_aliases_async(self):
+        async def accept(value):
+            await asyncio.sleep(0)
+            return True
+
+        schema = z.object({
+            "name": z.string().refine_async(accept).wire_names(
+                ("displayName", "name"),
+            ),
+        }).strict()
+        for data in ({"displayName": "Alex"}, {"name": "Alex"}):
+            with self.subTest(data=data):
+                self.assertEqual(await schema.parse_async(data), {"name": "Alex"})
+        duplicate = await schema.safe_parse_async({
+            "displayName": "Alex", "name": "Other",
+        })
+        self.assertIsInstance(duplicate, Failure)
+        self.assertEqual(duplicate.error.issues[0].code, "duplicate_key")
+
+        @z.dataclass(async_fields=True)
+        class AliasUser:
+            name: Annotated[
+                str,
+                z.string().refine_async(accept).wire_names(("displayName", "name")),
+            ]
+
+        parsed = await AliasUser.parse_async({"name": "Alex"})
+        self.assertEqual(parsed.name, "Alex")
+        duplicate = await AliasUser.safe_parse_async({
+            "displayName": "Alex", "name": "Other",
+        })
+        self.assertIsInstance(duplicate, Failure)
+        self.assertEqual(duplicate.error.issues[0].code, "duplicate_key")
+
     async def test_calendar_dates_match_sync_results(self):
         async def passthrough(value):
             return value

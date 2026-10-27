@@ -130,17 +130,32 @@ impl NativeSchema {
             .bind(py)
             .cast::<PyTuple>()
             .map_err(PyErr::from)?;
+        let input_aliases = self.args[10]
+            .bind(py)
+            .cast::<PyTuple>()
+            .map_err(PyErr::from)?;
         let field_count = names.len();
         // Read every field value before evaluating: a field callback can
         // mutate the input dict, so reads and the snapshot follow the object
-        // node's fetch-then-copy order. Lookups use the wire (input) key, like
-        // the object node's input_keys.
+        // node's fetch-then-copy order.
         let mut raws = Vec::with_capacity(field_count);
+        let mut duplicates: Vec<Option<Py<PyAny>>> = (0..field_count).map(|_| None).collect();
         let mut present = 0;
-        for index in 0..field_count {
-            let raw = dict.get_item(input_names.get_item(index)?)?;
-            if raw.is_some() {
-                present += 1;
+        for (index, aliases) in input_aliases.iter().enumerate() {
+            let aliases = aliases.cast::<PyTuple>().map_err(PyErr::from)?;
+            let mut raw = None;
+            let mut supplied = Vec::new();
+            for alias in aliases.iter() {
+                if let Some(found) = dict.get_item(&alias)? {
+                    present += 1;
+                    supplied.push(alias.clone());
+                    if raw.is_none() {
+                        raw = Some(found);
+                    }
+                }
+            }
+            if supplied.len() > 1 {
+                duplicates[index] = Some(PyTuple::new(py, supplied)?.into_any().unbind());
             }
             raws.push(raw);
         }
@@ -155,6 +170,12 @@ impl NativeSchema {
         for (index, raw) in raws.iter().enumerate() {
             let name = names.get_item(index)?;
             let input_name = input_names.get_item(index)?;
+            if let Some(keys) = &duplicates[index] {
+                path.push(PathPart::Value(input_name.clone().unbind()));
+                issues.push(Issue::duplicate_key(py, path, keys.bind(py))?);
+                path.pop();
+                continue;
+            }
             let flag = flags.get_item(index)?.extract::<u8>()?;
             let mut supplied = None;
             if let Some(raw) = raw {

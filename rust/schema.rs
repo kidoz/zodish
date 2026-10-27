@@ -63,10 +63,18 @@ impl NativeSchema {
         if matches!(kind, Kind::Object) {
             let keys = args[0].bind(py).cast::<PyTuple>()?;
             let input_keys = args[3].bind(py).cast::<PyTuple>()?;
+            let input_aliases = args[4].bind(py).cast::<PyTuple>()?;
+            let aliases_valid = input_aliases.iter().all(|names| {
+                names.cast::<PyTuple>().is_ok_and(|names| {
+                    !names.is_empty() && names.iter().all(|name| name.is_instance_of::<PyString>())
+                })
+            });
             let policy: String = args[1].bind(py).extract()?;
             let catchall = args[2].bind(py);
             if keys.len() != children.len()
                 || input_keys.len() != children.len()
+                || input_aliases.len() != children.len()
+                || !aliases_valid
                 || keys.iter().any(|key| !key.is_instance_of::<PyString>())
                 || input_keys
                     .iter()
@@ -165,6 +173,7 @@ impl NativeSchema {
                     args[7].bind(py).cast::<PyTuple>(),
                     args[8].bind(py).cast::<PyTuple>(),
                     args[9].bind(py).cast::<PyTuple>(),
+                    args[10].bind(py).cast::<PyTuple>(),
                 ];
                 let [
                     Ok(names),
@@ -175,6 +184,7 @@ impl NativeSchema {
                     Ok(non_init_default_values),
                     Ok(non_init_default_factories),
                     Ok(input_names),
+                    Ok(input_aliases),
                 ] = tuples
                 else {
                     return false;
@@ -183,6 +193,13 @@ impl NativeSchema {
                     && names.len() == default_values.len()
                     && names.len() == default_factories.len()
                     && names.len() == input_names.len()
+                    && names.len() == input_aliases.len()
+                    && input_aliases.iter().all(|names| {
+                        names.cast::<PyTuple>().is_ok_and(|names| {
+                            !names.is_empty()
+                                && names.iter().all(|name| name.is_instance_of::<PyString>())
+                        })
+                    })
                     && non_init_names.len() == non_init_default_values.len()
                     && non_init_names.len() == non_init_default_factories.len()
                     && children.len() == 2 * names.len() + non_init_names.len()
@@ -238,7 +255,16 @@ impl NativeSchema {
                         break;
                     }
                 }
-                matches!(unknown_keys, UnknownKeys::Strip | UnknownKeys::Strict) && all_fast
+                let aliases_fast = matches!(kind, Kind::Object)
+                    && args[4]
+                        .bind(py)
+                        .cast::<PyTuple>()
+                        .map_err(PyErr::from)?
+                        .iter()
+                        .all(|names| names.cast::<PyTuple>().is_ok_and(|names| names.len() == 1));
+                matches!(unknown_keys, UnknownKeys::Strip | UnknownKeys::Strict)
+                    && all_fast
+                    && aliases_fast
             }
             JsonFast::Never => false,
         };

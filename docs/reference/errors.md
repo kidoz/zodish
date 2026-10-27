@@ -81,6 +81,7 @@ call the mapper. There is no locale catalog or global configuration.
 | `invalid_format` | String predicate or format check failed | `format`; JSON text adds `position`; predicates add `prefix`, `suffix`, or `substring` |
 | `invalid_key` | An object or record key is not a string | `expected` |
 | `unrecognized_key` | Strict object received an unknown key | `keys` |
+| `duplicate_key` | More than one input alias for a field was supplied | `keys` |
 | `invalid_length` | Tuple input has the wrong number of items | `expected` |
 | `invalid_union` | No union branch matched | `branches` on the issue |
 | `invalid_intersection_types` | An intersection branch did not produce a dictionary | None |

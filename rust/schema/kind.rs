@@ -111,7 +111,7 @@ define_kinds! {
     Array => ("array", ChildArity::Exact(1), 0, false, false, JsonFast::InheritFirstChild),
     Set => ("set", ChildArity::Exact(1), 0, false, false, JsonFast::Never),
     SetEncode => ("set_encode", ChildArity::Exact(1), 0, false, false, JsonFast::Never),
-    Object => ("object", ChildArity::Any, 4, false, false, JsonFast::ObjectFields),
+    Object => ("object", ChildArity::Any, 5, false, false, JsonFast::ObjectFields),
     Union => ("union", ChildArity::AtLeastOne, 0, false, false, JsonFast::Never),
     DiscriminatedUnion => ("discriminated_union", ChildArity::AtLeastOne, 2, false, false, JsonFast::Never),
     Intersection => ("intersection", ChildArity::Exact(2), 0, false, false, JsonFast::Never),
@@ -167,7 +167,7 @@ define_kinds! {
     Trim => ("trim", ChildArity::Exact(1), 0, false, false, JsonFast::Never),
     Lower => ("lower", ChildArity::Exact(1), 0, false, false, JsonFast::Never),
     Upper => ("upper", ChildArity::Exact(1), 0, false, false, JsonFast::Never),
-    DataclassDecode => ("dataclass_decode", ChildArity::Any, 10, false, false, JsonFast::Never),
+    DataclassDecode => ("dataclass_decode", ChildArity::Any, 11, false, false, JsonFast::Never),
     DataclassEncode => ("dataclass_encode", ChildArity::Any, 3, false, false, JsonFast::Never),
     Cleared => ("cleared", ChildArity::Any, 0, false, false, JsonFast::Never),
 }

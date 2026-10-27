@@ -44,6 +44,25 @@ optional behavior come from the field schema. Wire names must be unique;
 uses wire names for `io="input"` and shape keys for `io="output"`. The
 discriminator key of a discriminated union cannot be aliased.
 
+Use `.wire_names()` when an older and a newer input key must both be accepted:
+
+```python
+compatible_user = z.object({
+    "name": z.string().wire_names(("displayName", "name")),
+})
+compatible_user.parse({"name": "Alex"})          # {"name": "Alex"}
+compatible_user.parse({"displayName": "Alex"})  # {"name": "Alex"}
+compatible_user.encode({"name": "Alex"})         # {"displayName": "Alex"}
+```
+
+The first name is canonical for encoding and output-mode JSON Schema. Every
+alias counts as known under strict/strip/passthrough/catchall policies. Supplying
+more than one alias for a field produces a `duplicate_key` issue whose `keys`
+param lists the supplied aliases and whose path uses the canonical name; the
+field callback is not run. Multi-alias input is unrepresentable in JSON Schema:
+input export raises under `unrepresentable="throw"` and yields `{}` under
+`"any"` for the affected object.
+
 ## Validate JSON text
 
 `parse_json`, `safe_parse_json`, and `validate_json` accept `str`, `bytes`, or

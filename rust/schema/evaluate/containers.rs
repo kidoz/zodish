@@ -184,6 +184,10 @@ impl NativeSchema {
                 .bind(py)
                 .cast::<PyTuple>()
                 .map_err(PyErr::from)?;
+            let input_aliases = self.args[4]
+                .bind(py)
+                .cast::<PyTuple>()
+                .map_err(PyErr::from)?;
             const INLINE_VALUES: usize = 4;
             let policy = self.unknown_keys;
             let output_names = if matches!(policy, UnknownKeys::Passthrough | UnknownKeys::Catchall,)
@@ -195,11 +199,23 @@ impl NativeSchema {
             let mut inline_values: [Option<Bound<'_, PyAny>>; INLINE_VALUES] =
                 std::array::from_fn(|_| None);
             let mut heap_values = Vec::with_capacity(keys.len().saturating_sub(INLINE_VALUES));
+            let mut duplicates: Vec<Option<Py<PyAny>>> = (0..keys.len()).map(|_| None).collect();
             let mut present = 0;
-            for (index, input_key) in input_keys.iter().enumerate() {
-                let value = dict.get_item(&input_key)?;
-                if value.is_some() {
-                    present += 1;
+            for (index, aliases) in input_aliases.iter().enumerate() {
+                let aliases = aliases.cast::<PyTuple>().map_err(PyErr::from)?;
+                let mut value = None;
+                let mut supplied = Vec::new();
+                for alias in aliases.iter() {
+                    if let Some(found) = dict.get_item(&alias)? {
+                        present += 1;
+                        supplied.push(alias.clone());
+                        if value.is_none() {
+                            value = Some(found);
+                        }
+                    }
+                }
+                if supplied.len() > 1 {
+                    duplicates[index] = Some(PyTuple::new(py, supplied)?.into_any().unbind());
                 }
                 if index < INLINE_VALUES {
                     inline_values[index] = value;
@@ -222,6 +238,12 @@ impl NativeSchema {
                 let is_present = value.is_some();
                 let raw = value.unwrap_or_else(|| ctx.missing.clone());
                 let child = self.children[index].try_borrow(py).map_err(PyErr::from)?;
+                if let Some(keys) = &duplicates[index] {
+                    path.push(PathPart::Value(input_key.clone().unbind()));
+                    issues.push(Issue::duplicate_key(py, path, keys.bind(py))?);
+                    path.pop();
+                    continue;
+                }
                 if is_present
                     && depth + 1 < MAX_DEPTH
                     && is_primitive_kind(child.kind)
@@ -249,8 +271,10 @@ impl NativeSchema {
             }
             if let Some(snapshot) = snapshot {
                 let known = PyDict::new(py);
-                for input_key in input_keys.iter() {
-                    known.set_item(&input_key, true)?;
+                for aliases in input_aliases.iter() {
+                    for alias in aliases.cast::<PyTuple>().map_err(PyErr::from)?.iter() {
+                        known.set_item(&alias, true)?;
+                    }
                 }
                 for (key, raw) in snapshot.iter() {
                     if !key.is_instance_of::<PyString>() {

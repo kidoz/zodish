@@ -153,6 +153,7 @@ struct ObjectFrame {
     path_keys: Vec<Py<PyAny>>,
     output_names: Option<Py<PySet>>,
     values: Vec<Option<Py<PyAny>>>,
+    duplicates: Vec<Option<Py<PyAny>>>,
     fast: Vec<bool>,
     cursor: usize,
     result: Py<PyDict>,
@@ -180,6 +181,7 @@ struct DataclassDecodeFrame {
     input_names: Vec<Py<PyAny>>,
     flags: Vec<u8>,
     raws: Vec<Option<Py<PyAny>>>,
+    duplicates: Vec<Option<Py<PyAny>>>,
     non_init_names: Vec<Py<PyAny>>,
     // Snapshot keys retained for the post-field invalid_key scan; unknown
     // string keys are stripped, so values are never needed.

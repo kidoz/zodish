@@ -137,13 +137,19 @@ _WIRE_WRAPPER_KINDS = frozenset({
 })
 
 
-def _field_wire(node: NativeSchema) -> str | None:
-    """Return the wire name carried by a field schema, if one is set."""
+def _field_wire_names(node: NativeSchema) -> builtins.tuple[str, ...] | None:
+    """Return the canonical and alternative input names carried by a field."""
     while True:
         kind = node.kind
         if kind == "wire":
-            name = node.args[0]
-            return name if isinstance(name, str) else None
+            names = node.args[0]
+            if isinstance(names, str):
+                return (names,)
+            if isinstance(names, builtins.tuple) and all(
+                isinstance(name, str) for name in names
+            ):
+                return names
+            return None
         if kind == "pipe":
             node = node.children[0]
             continue
@@ -151,6 +157,12 @@ def _field_wire(node: NativeSchema) -> str | None:
             node = node.children[0]
             continue
         return None
+
+
+def _field_wire(node: NativeSchema) -> str | None:
+    """Return the canonical wire name carried by a field schema, if one is set."""
+    names = _field_wire_names(node)
+    return None if names is None else names[0]
 
 
 @dataclass(frozen=True)
@@ -206,8 +218,31 @@ class Schema[Out, In = Out]:
             _meta=self._meta,
         )
 
+    def wire_names(self, names: Sequence[str]) -> Schema[Out, In]:
+        """Accept a field from any named input key; encode with the first name."""
+        if isinstance(names, (str, builtins.bytes)):
+            raise TypeError("Wire names must be a sequence of strings")
+        names = builtins.tuple(names)
+        if not names:
+            raise ValueError("Wire names must not be empty")
+        if not all(isinstance(name, str) for name in names):
+            raise TypeError("Wire names must be strings")
+        if len(builtins.set(names)) != len(names):
+            raise ValueError("Wire names must be unique")
+        if _field_wire(self._node) is not None:
+            raise ValueError("Schema already has a wire name")
+        return Schema[Out, In](
+            NativeSchema("wire", (self._node,), (names,)),
+            _inner=self,
+            _meta=self._meta,
+        )
+
     def parse(
-        self, value: In | Missing = MISSING, *, error: ErrorMap | None = None,
+        self,
+        value: In | Missing = MISSING,
+        *,
+        error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Out:
         """Validate a value; raise ``ValidationError`` on failure.
 

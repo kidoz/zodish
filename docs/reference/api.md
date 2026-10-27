@@ -81,22 +81,25 @@ them exactly.
 | `.required()` | Make every field reject missing input |
 | `.keyof()` | Enum schema of the shape keys |
 | `.wire(name)` | Field marker: accept `name` on input, emit the shape key |
+| `.wire_names(names)` | Accept several input names and emit the first on encode |
 
 `.wire(name)` applies to a field schema inside `z.object()`,
 `z.typed_object()`, or a dataclass codec. The shape key or dataclass attribute
-is the output name; the wire name is the input name. Wire names must be unique
-and must not collide with another field's
-input name. Input validation issue paths use the wire name; typed-object
-required-output issues use the shape key. `.keyof()`, `.pick()`, `.omit()`,
-`.extend()`, and typed-object keys use shape keys. Encoding and `io="input"`
-JSON Schema use wire names; `io="output"` uses shape keys. With
-`.passthrough()` or `.catchall()`, an unknown input key that equals a shape key
-does not overwrite the validated field. A discriminated-union discriminator
-cannot have a wire name.
+is the output name; the wire name is the input name. `.wire_names()` accepts a
+nonempty sequence of unique names, using the first as canonical for encoding.
+All aliases must be unique across the object. Input validation issue paths use
+the canonical wire name; typed-object required-output issues use the shape key.
+Supplying multiple aliases for one field reports `duplicate_key` and skips that
+field's callback. `.keyof()`, `.pick()`, `.omit()`, `.extend()`, and
+typed-object keys use shape keys. Encoding and `io="input"` JSON Schema use
+wire names; `io="output"` uses shape keys. Multi-alias input is unrepresentable
+in JSON Schema. With `.passthrough()` or `.catchall()`, an unknown input key
+that equals a shape key does not overwrite the validated field. A
+discriminated-union discriminator cannot have a wire name.
 
 Dataclass construction uses Python attribute names and decoded values;
-codec decoding accepts wire names and encoding emits them. Apply `.wire()`
-after a field's codec and its wrappers.
+codec decoding accepts aliases and encoding emits the canonical name. Apply
+`.wire()` or `.wire_names()` after a field's codec and its wrappers.
 
 ## Collection methods
 
@@ -163,6 +166,8 @@ literal discriminator.
 | `.catch_async(factory)` | Await a fallback factory on validation failure |
 | `.unwrap()` | Return the tracked inner schema |
 | `.brand(NewType)` | Apply a typing-only brand to parsed output |
+| `.wire(name)` | Use one input alias and encode with that name |
+| `.wire_names(names)` | Accept multiple input aliases and encode with the first |
 | `.refine(predicate, message, *, path=())` | Add a custom synchronous check |
 | `.refine_async(predicate, message, *, path=())` | Add a check awaiting an awaitable result |
 | `.refine_with_context(predicate, ...)` | Check using `(value, context)` |

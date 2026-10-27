@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `@z.validate_call` validates sync/async function arguments and return values.
 - Parse APIs accept per-call `context` with six context-aware sync/async
   refinement, super-refinement, and transform builders.
+- `wire_names()` accepts multiple unique input aliases, emits the canonical name
+  on encode, and reports `duplicate_key` when aliases are supplied together.
 
 ## [0.11.1] - 2026-10-23
 

@@ -44,6 +44,7 @@ impl AsyncSession {
         let build = (|| -> PyResult<ObjectFrame> {
             let keys = node.args[0].bind(py).cast::<PyTuple>()?;
             let input_keys = node.args[3].bind(py).cast::<PyTuple>()?;
+            let input_aliases = node.args[4].bind(py).cast::<PyTuple>()?;
             let output_names = if matches!(
                 node.unknown_keys,
                 UnknownKeys::Passthrough | UnknownKeys::Catchall,
@@ -54,28 +55,48 @@ impl AsyncSession {
             };
             let result = PyDict::new(py);
             let mut values = Vec::with_capacity(keys.len());
+            let mut duplicates = Vec::with_capacity(keys.len());
             let mut fast = Vec::with_capacity(keys.len());
             let mut path_keys = Vec::with_capacity(keys.len());
+            let mut known_keys = Vec::new();
             let mut present = 0;
-            for (index, input_key) in input_keys.iter().enumerate() {
-                let found = dict.get_item(&input_key)?;
+            for (index, aliases) in input_aliases.iter().enumerate() {
+                let aliases = aliases.cast::<PyTuple>()?;
+                let input_key = input_keys.get_item(index)?;
                 let child = node.children[index].try_borrow(py)?;
                 path_keys.push(if matches!(child.kind, Kind::RequiredOutput) {
                     keys.get_item(index)?.unbind()
                 } else {
-                    input_key.clone().unbind()
+                    input_key.unbind()
                 });
-                if let Some(raw) = found {
-                    present += 1;
-                    let is_fast = depth + 1 < MAX_DEPTH
-                        && is_primitive_kind(child.kind)
-                        && primitive_matches(&raw, child.kind)?;
-                    values.push(Some(raw.unbind()));
-                    fast.push(is_fast);
-                } else {
-                    values.push(Some(ctx.missing.clone().unbind()));
-                    fast.push(false);
+                let mut raw = None;
+                let mut supplied = Vec::new();
+                for alias in aliases.iter() {
+                    known_keys.push(alias.clone().unbind());
+                    if let Some(found) = dict.get_item(&alias)? {
+                        present += 1;
+                        supplied.push(alias.clone());
+                        if raw.is_none() {
+                            raw = Some(found);
+                        }
+                    }
                 }
+                let duplicate = if supplied.len() > 1 {
+                    Some(PyTuple::new(py, supplied)?.into_any().unbind())
+                } else {
+                    None
+                };
+                let is_fast = duplicate.is_none()
+                    && raw.is_some()
+                    && depth + 1 < MAX_DEPTH
+                    && is_primitive_kind(child.kind)
+                    && primitive_matches(raw.as_ref().expect("present value"), child.kind)?;
+                values.push(Some(match raw {
+                    Some(raw) => raw.unbind(),
+                    None => ctx.missing.clone().unbind(),
+                }));
+                duplicates.push(duplicate);
+                fast.push(is_fast);
             }
             let extras = if present == dict.len() {
                 Vec::new()
@@ -90,10 +111,11 @@ impl AsyncSession {
                 node: node_py,
                 depth,
                 keys: keys.iter().map(Bound::unbind).collect(),
-                input_keys: input_keys.iter().map(Bound::unbind).collect(),
+                input_keys: known_keys,
                 path_keys,
                 output_names,
                 values,
+                duplicates,
                 fast,
                 cursor: 0,
                 result: result.unbind(),
@@ -142,8 +164,16 @@ impl AsyncSession {
                 if frame.cursor < frame.values.len() {
                     let index = frame.cursor;
                     let path_key = frame.path_keys[index].clone_ref(py);
-                    let raw = frame.values[index].take().expect("non-fast object field");
                     frame.cursor += 1;
+                    if let Some(keys) = &frame.duplicates[index] {
+                        frame.values[index].take();
+                        let issue_path = child_path(py, &frame.path, PathPart::Value(path_key));
+                        frame
+                            .issues
+                            .push(Issue::duplicate_key(py, &issue_path, keys.bind(py))?);
+                        continue;
+                    }
+                    let raw = frame.values[index].take().expect("non-fast object field");
                     let child = frame
                         .node
                         .bind(py)

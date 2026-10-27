@@ -921,6 +921,7 @@ print("all cases ok")
                 (),
                 (),
                 ("value",),
+                (("value",),),
             ),
         )
         with self.assertRaises(TypeError) as default_caught:

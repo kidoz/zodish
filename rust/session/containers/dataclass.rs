@@ -111,16 +111,31 @@ impl AsyncSession {
             let flags = node.args[2].bind(py).cast::<PyTuple>()?;
             let non_init_names = node.args[5].bind(py).cast::<PyTuple>()?;
             let input_names = node.args[9].bind(py).cast::<PyTuple>()?;
+            let input_aliases = node.args[10].bind(py).cast::<PyTuple>()?;
             // Fetch every field value before evaluating: a field callback can
             // mutate the input dict, so reads and the snapshot follow the
             // object node's fetch-then-copy order.
             let mut raws = Vec::with_capacity(names.len());
+            let mut duplicates = Vec::with_capacity(names.len());
             let mut present = 0;
-            for input_name in input_names.iter() {
-                let raw = dict.get_item(input_name)?;
-                if raw.is_some() {
-                    present += 1;
+            for aliases in input_aliases.iter() {
+                let aliases = aliases.cast::<PyTuple>()?;
+                let mut raw = None;
+                let mut supplied = Vec::new();
+                for alias in aliases.iter() {
+                    if let Some(found) = dict.get_item(&alias)? {
+                        present += 1;
+                        supplied.push(alias.clone());
+                        if raw.is_none() {
+                            raw = Some(found);
+                        }
+                    }
                 }
+                duplicates.push(if supplied.len() > 1 {
+                    Some(PyTuple::new(py, supplied)?.into_any().unbind())
+                } else {
+                    None
+                });
                 raws.push(raw.map(Bound::unbind));
             }
             let extra_keys = if present == dict.len() {
@@ -139,6 +154,7 @@ impl AsyncSession {
                     .map(|flag| flag.extract::<u8>())
                     .collect::<PyResult<Vec<_>>>()?,
                 raws,
+                duplicates,
                 non_init_names: non_init_names.iter().map(Bound::unbind).collect(),
                 extra_keys,
                 stored: PyDict::new(py).unbind(),
@@ -242,6 +258,19 @@ impl AsyncSession {
                         continue;
                     }
                     let index = frame.cursor;
+                    if let Some(keys) = &frame.duplicates[index] {
+                        frame.raws[index].take();
+                        let path = child_path(
+                            py,
+                            &frame.path,
+                            PathPart::Value(frame.input_names[index].clone_ref(py)),
+                        );
+                        frame
+                            .issues
+                            .push(Issue::duplicate_key(py, &path, keys.bind(py))?);
+                        frame.cursor += 1;
+                        continue;
+                    }
                     if let Some(raw) = frame.raws[index].take() {
                         let key = frame.input_names[index].clone_ref(py);
                         return self.eval_decode_child(py, frame, 2 * index, raw, key);

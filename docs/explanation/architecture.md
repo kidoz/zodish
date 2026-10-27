@@ -120,8 +120,9 @@ native boundary, not implementation details:
 - `ValidationError` exposes `issues` and the `_from_bundle(bundle)` classmethod;
 - `NativeIssueBundle.to_raw()` returns `(code, message, path, branches, params)`
   tuples in that positional order;
-- `NativeSchema("object", ...)` expects `(keys, policy, catchall, input_keys)`
-  as its four positional arguments.
+- `NativeSchema("object", ...)` expects `(keys, policy, catchall, input_keys,
+  input_aliases)` as its five positional arguments. Each alias entry contains
+  the canonical input key followed by any accepted alternatives.
 
 `zodish/_boundary.py` encodes these shapes as protocols and checks the concrete
 classes against them. Change the Python definitions and the Rust accessors

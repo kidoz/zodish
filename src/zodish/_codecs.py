@@ -27,6 +27,7 @@ from ._core import (
     _async_callback,
     _brand_argument,
     _field_wire,
+    _field_wire_names,
     _message,
     _sync_callback,
 )
@@ -1177,10 +1178,13 @@ class _Codecs:
                     # Retain conversion capabilities as well as the input
                     # name when the terminal field marker wraps a codec.
                     inner = schema._inner
+                    input_names = _field_wire_names(schema._node)
+                    if input_names is None:
+                        raise TypeError("Invalid wire names on codec field")
                     schema = replace(
                         inner,
                         _node=schema._node,
-                        _input_schema=inner.input_schema.wire(schema._node.args[0]),
+                        _input_schema=inner.input_schema.wire_names(input_names),
                         _inner=inner,
                     )
                 result[name] = schema
@@ -1319,6 +1323,7 @@ class _Codecs:
         }
         input_schema = object(input_schemas)
         encoded_names = dict(zip(names, input_schema._node.args[3], strict=True))
+        encoded_aliases = dict(zip(names, input_schema._node.args[4], strict=True))
         # Codec fields are validated and converted by the codec itself, so
         # their shape entries only enforce presence. Plain fields are validated
         # by their normal schemas.
@@ -1329,8 +1334,8 @@ class _Codecs:
                     unknown().optional() if has_default[name] else unknown()
                 )
                 decode_shape[name] = (
-                    field_placeholder.wire(encoded_names[name])
-                    if encoded_names[name] != name
+                    field_placeholder.wire_names(encoded_aliases[name])
+                    if encoded_aliases[name] != (name,)
                     else field_placeholder
                 )
             else:
@@ -1586,6 +1591,7 @@ class _Codecs:
             field_default_values: list[Any] = []
             field_default_factories: list[Any] = []
             input_names: list[str] = []
+            input_aliases: list[builtins.tuple[str, ...]] = []
             for name in names:
                 schema = schemas_by_name[name]
                 supplied = (
@@ -1594,6 +1600,7 @@ class _Codecs:
                     else input_schemas[name]._node
                 )
                 input_names.append(encoded_names[name])
+                input_aliases.append(encoded_aliases[name])
                 guard = marker.annotation_guards[name]
                 if guard is not None and (
                     name in overrides or marker.guards[name] is not None
@@ -1653,6 +1660,7 @@ class _Codecs:
                     builtins.tuple(non_init_default_values),
                     builtins.tuple(non_init_default_factories),
                     builtins.tuple(input_names),
+                    builtins.tuple(input_aliases),
                 ),
             )
         else:
@@ -1783,6 +1791,7 @@ def _encode_node_for(schema: Schema[Any, Any]) -> NativeSchema | None:
                 schema.unknown_keys,
                 catchall_node,
                 builtins.tuple(schema.shape),
+                builtins.tuple((key,) for key in schema.shape),
             ),
         )
     if isinstance(schema, (KeyedRecordSchema, MapSchema)):

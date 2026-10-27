@@ -102,6 +102,22 @@ impl Issue {
         Self::new(py, code, message, path, PyDict::new(py).into_any())
     }
 
+    pub(crate) fn duplicate_key(
+        py: Python<'_>,
+        path: &Path,
+        keys: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        let params = PyDict::new(py);
+        params.set_item("keys", keys)?;
+        Ok(Self::new(
+            py,
+            "duplicate_key",
+            "Multiple input aliases supplied",
+            path,
+            params.into_any(),
+        ))
+    }
+
     fn to_raw(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         self.to_raw_at(py, 0)
     }

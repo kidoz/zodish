@@ -99,6 +99,9 @@ pub(super) fn visit_async_frame(
             for value in frame.values.iter().flatten() {
                 visit.call(value)?;
             }
+            for keys in frame.duplicates.iter().flatten() {
+                visit.call(keys)?;
+            }
             visit.call(&frame.result)?;
             for issue in &frame.issues {
                 visit_issue(issue, visit)?;
@@ -141,6 +144,9 @@ pub(super) fn visit_async_frame(
             }
             for raw in frame.raws.iter().flatten() {
                 visit.call(raw)?;
+            }
+            for keys in frame.duplicates.iter().flatten() {
+                visit.call(keys)?;
             }
             for name in &frame.non_init_names {
                 visit.call(name)?;

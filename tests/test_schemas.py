@@ -5284,6 +5284,91 @@ class SchemaTests(unittest.TestCase):
             z.string().refine_with_context(raise_context_error).safe_parse("x")
         self.assertIs(caught.exception, failure)
 
+    def test_wire_name_aliases(self):
+        schema = z.object({
+            "name": z.string().wire_names(("displayName", "name")),
+            "age": z.integer().optional(),
+        }).strict()
+        for data in ({"displayName": "Alex"}, {"name": "Alex"}):
+            with self.subTest(data=data):
+                self.assertEqual(schema.parse(data), {"name": "Alex"})
+        self.assertEqual(schema.encode({"name": "Alex"}), {"displayName": "Alex"})
+        self.assertEqual(schema.parse_json('{"name": "Alex"}'), {"name": "Alex"})
+        self.assertEqual(
+            schema.to_json_schema()["properties"],
+            {"name": {"type": "string"}, "age": {"type": "integer"}},
+        )
+        with self.assertRaises(UnrepresentableError):
+            schema.to_json_schema(io="input")
+        self.assertEqual(schema.to_json_schema(io="input", unrepresentable="any"), {})
+
+        calls = 0
+        def increment(value):
+            nonlocal calls
+            calls += 1
+            return value
+
+        duplicate_schema = z.object({
+            "name": z.string().transform(increment).wire_names(
+                ("displayName", "name"),
+            ),
+            "age": z.integer(),
+        })
+        result = duplicate_schema.safe_parse({
+            "displayName": "Alex", "name": "Other", "age": "bad",
+        })
+        self.assertIsInstance(result, Failure)
+        self.assertEqual(calls, 0)
+        self.assertEqual(
+            [(issue.code, issue.path) for issue in result.error.issues],
+            [("duplicate_key", ("displayName",)), ("invalid_type", ("age",))],
+        )
+        self.assertEqual(
+            result.error.issues[0].params["keys"],
+            ("displayName", "name"),
+        )
+
+        defaulted = z.object({
+            "name": z.string().default("unknown").wire_names(
+                ("displayName", "name"),
+            ),
+        })
+        self.assertEqual(defaulted.parse({}), {"name": "unknown"})
+        for names in ((), "name", b"name", ("a", "a"), ("a", 1)):
+            with self.subTest(names=names), self.assertRaises((TypeError, ValueError)):
+                z.string().wire_names(names)
+        with self.assertRaises(ValueError):
+            z.object({
+                "a": z.string().wire("shared"),
+                "b": z.string().wire_names(("other", "shared")),
+            })
+
+        @z.dataclass
+        class AliasUser:
+            name: Annotated[str, z.string().wire_names(("displayName", "name"))]
+
+        for data in ({"displayName": "Alex"}, {"name": "Alex"}):
+            with self.subTest(data=data):
+                self.assertEqual(AliasUser.parse(data), AliasUser("Alex"))
+        self.assertEqual(AliasUser.encode(AliasUser("Alex")), {"displayName": "Alex"})
+        duplicate = AliasUser.safe_parse({"displayName": "Alex", "name": "Other"})
+        self.assertIsInstance(duplicate, Failure)
+        self.assertEqual(duplicate.error.issues[0].code, "duplicate_key")
+
+        @dataclasses.dataclass
+        class PlainUser:
+            name: str
+
+        plain_codec = z.codecs.dataclass(
+            PlainUser,
+            fields={"name": z.string().wire_names(("displayName", "name"))},
+        )
+        self.assertEqual(plain_codec.decode({"name": "Alex"}), PlainUser("Alex"))
+        self.assertEqual(plain_codec.encode(PlainUser("Alex")), {"displayName": "Alex"})
+        duplicate = plain_codec.safe_decode({"displayName": "Alex", "name": "Other"})
+        self.assertIsInstance(duplicate, Failure)
+        self.assertEqual(duplicate.error.issues[0].code, "duplicate_key")
+
     def test_public_annotations_resolve(self):
         self.assertIn("params", get_type_hints(z.Issue))
         self.assertIn("path", get_type_hints(z.Issue))

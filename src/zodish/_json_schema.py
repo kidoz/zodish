@@ -752,6 +752,10 @@ def _export_object(
         catchall = (
             None if node.args[2] is None else Schema[Any, Any](node.args[2])
         )
+    if io == "input" and any(len(names) > 1 for names in node.args[4]):
+        return _unsupported(
+            path, "multiple input aliases are not representable", unrepresentable,
+        )
     properties: JSONSchema = {}
     required: list[str] = []
     for key, prop in shape.items():
