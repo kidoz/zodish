@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   webhook events, validated dataclasses, cross-field checks, recursive trees,
   and async checks. `examples/typed_objects.py` covers which of those object
   forms a type checker can see. See `examples/README.md`.
+- `z.adapter()` builds ordinary schemas from supported runtime annotations;
+  `@z.validate_call` validates sync/async function arguments and return values.
 
 ## [0.11.1] - 2026-10-23
 

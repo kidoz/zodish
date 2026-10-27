@@ -13,6 +13,7 @@ python examples/registration.py
 python examples/category_tree.py
 python examples/async_signup.py
 python examples/typed_objects.py
+python examples/annotation_validation.py
 ```
 
 `just examples` runs these together with `quickstart.py` and `typing_checks.py`.
@@ -28,6 +29,7 @@ python examples/typed_objects.py
 | [category_tree.py](category_tree.py) | A recursive lazy schema, copied default lists, and `$ref` export. |
 | [async_signup.py](async_signup.py) | `refine_async` beside a normal field check, awaited with `parse_async`. |
 | [typed_objects.py](typed_objects.py) | Which object forms mypy can see: plain `z.object`, `z.typed_object`, transform, `@z.dataclass`, and `z.create_model`. |
+| [annotation_validation.py](annotation_validation.py) | `z.adapter` for annotation-driven schemas and `@z.validate_call` for typed function boundaries. |
 
 `typing_checks.py` is a mypy fixture. `verify_native.py` confirms that an
 installed build loaded the Rust extension.

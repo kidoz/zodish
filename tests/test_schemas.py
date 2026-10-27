@@ -5182,6 +5182,62 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(parsed.seen, "t")
         self.assertEqual(WithInitVar.encode(parsed), {"name": "Alex"})
 
+    def test_annotation_adapter(self):
+        self.assertEqual(z.adapter(list[int]).parse([1, 2]), [1, 2])
+        self.assertEqual(z.adapter(dict[str, int]).parse({"a": 1}), {"a": 1})
+        self.assertEqual(z.adapter(set[int]).parse({1, 2}), {1, 2})
+        self.assertIsNone(z.adapter(int | None).parse(None))
+        self.assertIsInstance(z.adapter(list[int]).safe_parse([1, "bad"]), Failure)
+        self.assertEqual(
+            z.adapter(list[int]).to_json_schema(),
+            {"type": "array", "items": {"type": "integer"}},
+        )
+
+        date_adapter = z.adapter(Annotated[dt.date, z.codecs.iso_date()])
+        self.assertEqual(date_adapter.parse("2024-02-29"), dt.date(2024, 2, 29))
+        self.assertEqual(date_adapter.encode(dt.date(2024, 2, 29)), "2024-02-29")
+
+        @z.dataclass
+        class AdapterUser:
+            name: str
+
+        parsed = z.adapter(list[AdapterUser]).parse([{"name": "Alex"}])
+        self.assertEqual(parsed, [AdapterUser("Alex")])
+        with self.assertRaises(TypeError):
+            z.adapter(tuple[int, ...])
+
+    def test_validate_call(self):
+        @z.validate_call
+        def total(
+            value: int,
+            *values: int,
+            scale: int = 1,
+            **extra: int,
+        ) -> int:
+            return (value + sum(values) + sum(extra.values())) * scale
+
+        self.assertEqual(total(1, 2, 3, scale=2, other=4), 20)
+        self.assertEqual(total.__name__, "total")
+        self.assertEqual(list(inspect.signature(total).parameters), [
+            "value", "values", "scale", "extra",
+        ])
+        with self.assertRaises(ValidationError) as caught:
+            total("bad", 1, "also bad", scale=2, other="bad")
+        self.assertEqual(
+            [issue.path for issue in caught.exception.issues],
+            [("value",), ("values", 1), ("extra", "other")],
+        )
+        with self.assertRaises(TypeError):
+            total()
+
+        @z.validate_call
+        def invalid_return() -> int:
+            return "bad"
+
+        with self.assertRaises(ValidationError) as caught:
+            invalid_return()
+        self.assertEqual(caught.exception.issues[0].path, ())
+
     def test_public_annotations_resolve(self):
         self.assertIn("params", get_type_hints(z.Issue))
         self.assertIn("path", get_type_hints(z.Issue))

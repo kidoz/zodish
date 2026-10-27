@@ -1745,6 +1745,17 @@ def create_model(
     )
 
 
+
+def adapter[T](annotation: type[T]) -> Schema[T, Any]:
+    """Build a schema from a runtime type annotation."""
+    from ._annotations import infer_dataclass_field
+
+    return cast(
+        Schema[T, Any],
+        infer_dataclass_field(annotation, "$root", stack=(), allow_sets=True),
+    )
+
+
 def to_json_schema(
     schema: Schema[Any, Any],
     *,
@@ -1770,6 +1781,7 @@ def to_json_schema(
 
 
 from . import _codecs as _codecs  # noqa: E402
+from . import _validate_call as _validate_call  # noqa: E402
 
 
 AsyncCodecSchema = _codecs.AsyncCodecSchema
@@ -1777,4 +1789,5 @@ CodecSchema = _codecs.CodecSchema
 codec = _codecs.codec
 codec_async = _codecs.codec_async
 codecs = _codecs._Codecs()
+validate_call = _validate_call.validate_call
 _encode_node_for = _codecs._encode_node_for

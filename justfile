@@ -25,6 +25,7 @@ examples:
     {{ python }} examples/category_tree.py
     {{ python }} examples/async_signup.py
     {{ python }} examples/typed_objects.py
+    {{ python }} examples/annotation_validation.py
     {{ python }} examples/typing_checks.py
 
 # Lint Python code with ruff.

@@ -25,6 +25,30 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         result = await z.string().http_url().safe_parse_async("https://example.com\n")
         self.assertIsInstance(result, Failure)
 
+    async def test_validate_call_async(self):
+        @z.validate_call
+        async def render(value: int, suffix: str = "!") -> str:
+            return f"{value}{suffix}"
+
+        self.assertEqual(await render(2), "2!")
+        result = await self._safe_async_call(render, "bad")
+        self.assertIsInstance(result, Failure)
+        self.assertEqual(result.error.issues[0].path, ("value",))
+
+        @z.validate_call
+        async def invalid_return() -> int:
+            return "bad"
+
+        with self.assertRaises(ValidationError) as caught:
+            await invalid_return()
+        self.assertEqual(caught.exception.issues[0].path, ())
+
+    async def _safe_async_call(self, fn, *args, **kwargs):
+        try:
+            return Success(await fn(*args, **kwargs))
+        except ValidationError as error:
+            return Failure(error)
+
     async def test_calendar_dates_match_sync_results(self):
         async def passthrough(value):
             return value

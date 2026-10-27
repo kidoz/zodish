@@ -211,6 +211,7 @@ def infer_dataclass_field(
     decoded_dataclasses: bool = False,
     self_codec: _codecs.CodecSchema[Any, Any] | None = None,
     self_type: type[Any] | None = None,
+    allow_sets: bool = False,
 ) -> _schemas.Schema[Any, Any]:
     """Build a field schema while retaining alias bindings and dataclass ancestry.
 
@@ -235,6 +236,7 @@ def infer_dataclass_field(
             decoded_dataclasses=decoded_dataclasses,
             self_codec=self_codec,
             self_type=self_type,
+            allow_sets=allow_sets,
         )
 
     if self_codec is not None and self_type is not None:
@@ -298,8 +300,11 @@ def infer_dataclass_field(
             if isinstance(value, _codecs.CodecSchema)
             else _schemas.record(value)
         )
-    if type_only and origin is builtins.set:
-        return _schemas.set(child(args[0]) if args else _schemas.unknown())
+    if origin is builtins.set and (type_only or allow_sets):
+        item = child(args[0]) if args else _schemas.unknown()
+        if isinstance(item, _codecs.CodecSchema):
+            raise TypeError(f"Field {name!r} does not support set codecs")
+        return _schemas.set(item)
     if type_only and origin is builtins.frozenset:
         return _schemas.instance_of(builtins.frozenset)
     if origin is builtins.tuple:

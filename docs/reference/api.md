@@ -22,6 +22,7 @@ in declaration order, and the order affects results.
 | Collections | `z.array(item)`, `z.set(item)`, `z.map(key_schema, value_schema)`, `z.tuple(*items)`, `z.record(value_schema)`, `z.record(key_schema, value_schema)` |
 | Composition | `z.intersection(left, right)`, `z.preprocess(fn, schema)`, `z.preprocess_async(fn, schema)`, `z.lazy(factory)` |
 | Codecs | `z.codec(input_schema, output_schema, *, decode=fn, encode=fn)`, `z.codec_async(...)` |
+| Annotation workflows | `z.adapter(annotation)`, `@z.validate_call` |
 
 `z.date()`, `z.datetime()`, `z.time()`, `z.timedelta()`, `z.decimal()`,
 `z.bytes()`, and `z.path()` validate Python objects. They are not string format
@@ -270,6 +271,23 @@ are one-way, so `.encode()` and `.encode_async()` raise `TypeError` when they
 occur. Async codec callbacks participate in the reverse graph; plain schemas and
 codecs can use `.encode_async()`, and synchronous reverse graphs complete through
 the same session protocol.
+
+## Annotation adapters and call validation
+
+`z.adapter(annotation)` returns an ordinary `Schema[Out, Any]` for supported
+runtime annotations: primitives and Python scalar classes, literals, unions and
+`None`, lists/sequences, sets, string-keyed dictionaries/mappings, fixed tuples,
+enums, `Annotated` schemas/codecs, and plain or validated dataclasses. Unsupported
+or ambiguous annotations raise `TypeError` at construction. The returned schema
+supports the usual parse, async, encode, and JSON Schema methods; variable-length
+tuple annotations and set codecs are not currently inferred.
+
+`@z.validate_call` resolves a function's annotations once at decoration. It
+validates bound arguments in one native object evaluation and validates an
+annotated return value. Python argument binding and defaults retain their normal
+behavior. Unannotated parameters accept anything, `*args` validates each item,
+`**kwargs` validates each value, and issue paths include the parameter name.
+Sync and async functions are supported, and metadata/signature are preserved.
 
 ## Validated dataclasses
 

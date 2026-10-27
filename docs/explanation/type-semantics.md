@@ -110,6 +110,20 @@ of schema instances the way TypeScript infers types from Zod. As a result:
 - unions infer up to four alternatives, then fall back to `Any`;
 - there is no type-checker plugin or generated model API.
 
+### Annotation-driven schemas
+
+`z.adapter(T)` exposes the same runtime annotation inference used by dataclass
+fields and returns `Schema[T, Any]`. This is useful for roots such as
+`list[User]`, `dict[str, int]`, `User | None`, or an `Annotated` codec without
+manually composing the container. The accepted annotation matrix is documented
+in the API reference; unsupported typing constructs fail eagerly rather than
+silently becoming `Any`.
+
+`@z.validate_call` preserves the decorated callable's static signature while
+validating its runtime arguments and annotated return value. It complements,
+rather than replaces, static type checking: mypy checks call sites, and Zodish
+checks values arriving from untyped or dynamic code.
+
 ### Typed object results
 
 Pass an explicit `TypedDict` to `z.typed_object` when the output dictionary should

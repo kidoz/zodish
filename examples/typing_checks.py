@@ -41,6 +41,15 @@ assert_type(required_key_user.strict(), z.TypedObjectSchema[RequiredKeyUser])
 assert_type(required_key_user.safe_parse({"age": 1}), Success[RequiredKeyUser] | Failure)
 
 
+assert_type(z.adapter(list[int]).parse([1]), list[int])
+
+
+@z.validate_call
+def typed_add(left: int, right: int = 0) -> int:
+    return left + right
+
+
+assert_type(typed_add(1), int)
 assert_type(z.string().parse("x"), str)
 assert_type(to_json_schema(z.string()), dict[str, Any])
 assert_type(z.string().to_json_schema(), dict[str, Any])
