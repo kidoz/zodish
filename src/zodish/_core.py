@@ -132,6 +132,8 @@ _WIRE_WRAPPER_KINDS = frozenset({
     "includes", "ipv6", "cidrv4", "cidrv6", "trim", "lower", "upper",
     "async_refine", "async_super_refine", "async_transform", "async_overwrite",
     "async_preprocess", "async_default_factory", "async_catch",
+    "context_refine", "context_super_refine", "context_transform",
+    "async_context_refine", "async_context_super_refine", "async_context_transform",
 })
 
 
@@ -214,29 +216,37 @@ class Schema[Out, In = Out]:
         _check_error_map(error)
         try:
             return cast(
-                Out, self._node.parse(value, MISSING, Issue, ValidationError),
+                Out, self._node.parse(value, MISSING, Issue, ValidationError, context),
             )
         except ValidationError as failure:
             failure._set_error_mapper(error)
             raise
 
     def safe_parse(
-        self, value: In | Missing = MISSING, *, error: ErrorMap | None = None,
+        self,
+        value: In | Missing = MISSING,
+        *,
+        error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Success[Out] | Failure:
         """Catch validation errors only; programming errors remain visible."""
         try:
-            return Success(self.parse(value, error=error))
+            return Success(self.parse(value, error=error, context=context))
         except ValidationError as failure:
             return Failure(failure)
 
     async def parse_async(
-        self, value: In | Missing = MISSING, *, error: ErrorMap | None = None,
+        self,
+        value: In | Missing = MISSING,
+        *,
+        error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Out:
         """Parse, awaiting async callback results when required."""
         _check_error_map(error)
         try:
             session = AsyncSession(
-                self._node, value, MISSING, Issue, ValidationError,
+                self._node, value, MISSING, Issue, ValidationError, context,
             )
             return cast(Out, await drive(session))
         except ValidationError as failure:
@@ -244,24 +254,30 @@ class Schema[Out, In = Out]:
             raise
 
     async def safe_parse_async(
-        self, value: In | Missing = MISSING, *, error: ErrorMap | None = None,
+        self,
+        value: In | Missing = MISSING,
+        *,
+        error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Success[Out] | Failure:
         """Catch validation errors from async parsing only."""
         try:
-            return Success(await self.parse_async(value, error=error))
+            return Success(await self.parse_async(value, error=error, context=context))
         except ValidationError as failure:
             return Failure(failure)
 
-    def validate(self, value: In | Missing = MISSING) -> bool:
+    def validate(self, value: In | Missing = MISSING, *, context: Any = None) -> bool:
         """Return whether validation succeeds; callback errors still propagate."""
-        return self.safe_parse(value).success
+        return self.safe_parse(value, context=context).success
 
-    async def validate_async(self, value: In | Missing = MISSING) -> bool:
+    async def validate_async(
+        self, value: In | Missing = MISSING, *, context: Any = None,
+    ) -> bool:
         """Return whether async validation succeeds.
 
         Programming errors still propagate, matching ``validate``.
         """
-        return (await self.safe_parse_async(value)).success
+        return (await self.safe_parse_async(value, context=context)).success
 
     def _json_input(
         self, data: str | builtins.bytes | bytearray,
@@ -295,6 +311,7 @@ class Schema[Out, In = Out]:
         data: str | builtins.bytes | bytearray,
         *,
         error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Out:
         """Parse JSON text and validate the decoded value."""
         _check_error_map(error)
@@ -303,13 +320,17 @@ class Schema[Out, In = Out]:
         except ValidationError as failure:
             failure._set_error_mapper(error)
             raise
-        return cast(Out, value) if fast else self.parse(value, error=error)
+        return (
+            cast(Out, value) if fast
+            else self.parse(value, error=error, context=context)
+        )
 
     async def parse_json_async(
         self,
         data: str | builtins.bytes | bytearray,
         *,
         error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Out:
         """Parse JSON text and await the normal asynchronous evaluator."""
         _check_error_map(error)
@@ -320,7 +341,7 @@ class Schema[Out, In = Out]:
             raise
         return (
             cast(Out, value) if fast
-            else await self.parse_async(value, error=error)
+            else await self.parse_async(value, error=error, context=context)
         )
 
     async def safe_parse_json_async(
@@ -328,10 +349,11 @@ class Schema[Out, In = Out]:
         data: str | builtins.bytes | bytearray,
         *,
         error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Success[Out] | Failure:
         """Catch validation errors from asynchronous JSON parsing only."""
         try:
-            return Success(await self.parse_json_async(data, error=error))
+            return Success(await self.parse_json_async(data, error=error, context=context))
         except ValidationError as failure:
             return Failure(failure)
 
@@ -340,16 +362,19 @@ class Schema[Out, In = Out]:
         data: str | builtins.bytes | bytearray,
         *,
         error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Success[Out] | Failure:
         """Catch validation errors from JSON parsing only."""
         try:
-            return Success(self.parse_json(data, error=error))
+            return Success(self.parse_json(data, error=error, context=context))
         except ValidationError as failure:
             return Failure(failure)
 
-    def validate_json(self, data: str | builtins.bytes | bytearray) -> bool:
+    def validate_json(
+        self, data: str | builtins.bytes | bytearray, *, context: Any = None,
+    ) -> bool:
         """Return whether JSON text parses and validates."""
-        return self.safe_parse_json(data).success
+        return self.safe_parse_json(data, context=context).success
 
     def encode(self, value: Out) -> In:
         """Encode a decoded value when the schema is reversible.
@@ -506,6 +531,92 @@ class Schema[Out, In = Out]:
             raise TypeError("transform_async callback must not be an async generator")
         return Schema[U, In](
             NativeSchema("async_transform", (self._node,), (fn,)),
+            _inner=self,
+            _meta=self._meta,
+        )
+
+    def refine_with_context(
+        self,
+        predicate: Callable[[Out, Any], bool],
+        message: str = "Invalid value",
+        *,
+        path: Sequence[str | int] = (),
+    ) -> Schema[Out, In]:
+        """Reject a parsed value using the current parse context."""
+        predicate = _sync_callback(predicate, "context refine callback")
+        return Schema[Out, In](
+            NativeSchema(
+                "context_refine",
+                (self._node,),
+                (predicate, _message(message, "Invalid value"), _relative_path(path)),
+            ),
+            _inner=self,
+            _meta=self._meta,
+        )
+
+    def refine_with_context_async(
+        self,
+        predicate: Callable[[Out, Any], Awaitable[bool]],
+        message: str = "Invalid value",
+        *,
+        path: Sequence[str | int] = (),
+    ) -> Schema[Out, In]:
+        """Asynchronously reject a value using the current parse context."""
+        predicate = _async_callback(predicate, "async context refine callback")
+        return Schema[Out, In](
+            NativeSchema(
+                "async_context_refine",
+                (self._node,),
+                (predicate, _message(message, "Invalid value"), _relative_path(path)),
+            ),
+            _inner=self,
+            _meta=self._meta,
+        )
+
+    def super_refine_with_context(
+        self,
+        fn: Callable[[Out, Any], Issue | list[Issue] | builtins.tuple[Issue, ...] | None],
+    ) -> Schema[Out, In]:
+        """Emit issues using the current parse context."""
+        fn = _sync_callback(fn, "context super_refine callback")
+        return Schema[Out, In](
+            NativeSchema("context_super_refine", (self._node,), (fn,)),
+            _inner=self,
+            _meta=self._meta,
+        )
+
+    def super_refine_with_context_async(
+        self,
+        fn: Callable[[Out, Any], Awaitable[
+            Issue | list[Issue] | builtins.tuple[Issue, ...] | None
+        ]],
+    ) -> Schema[Out, In]:
+        """Asynchronously emit issues using the current parse context."""
+        fn = _async_callback(fn, "async context super_refine callback")
+        return Schema[Out, In](
+            NativeSchema("async_context_super_refine", (self._node,), (fn,)),
+            _inner=self,
+            _meta=self._meta,
+        )
+
+    def transform_with_context[U](
+        self, fn: Callable[[Out, Any], U],
+    ) -> Schema[U, In]:
+        """Transform parsed output using the current parse context."""
+        fn = _sync_callback(fn, "context transform callback")
+        return Schema[U, In](
+            NativeSchema("context_transform", (self._node,), (fn,)),
+            _inner=self,
+            _meta=self._meta,
+        )
+
+    def transform_with_context_async[U](
+        self, fn: Callable[[Out, Any], Awaitable[U]],
+    ) -> Schema[U, In]:
+        """Asynchronously transform output using the current parse context."""
+        fn = _async_callback(fn, "async context transform callback")
+        return Schema[U, In](
+            NativeSchema("async_context_transform", (self._node,), (fn,)),
             _inner=self,
             _meta=self._meta,
         )

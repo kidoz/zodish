@@ -165,10 +165,16 @@ literal discriminator.
 | `.brand(NewType)` | Apply a typing-only brand to parsed output |
 | `.refine(predicate, message, *, path=())` | Add a custom synchronous check |
 | `.refine_async(predicate, message, *, path=())` | Add a check awaiting an awaitable result |
+| `.refine_with_context(predicate, ...)` | Check using `(value, context)` |
+| `.refine_with_context_async(predicate, ...)` | Await a check using `(value, context)` |
 | `.super_refine_async(fn)` | Await returned issues, or `None`/empty for success |
 | `.super_refine(fn)` | Return one `Issue`, a list/tuple of issues, or `None` |
+| `.super_refine_with_context(fn)` | Return context-dependent issues |
+| `.super_refine_with_context_async(fn)` | Await context-dependent issues |
 | `.transform(fn)` | Convert parsed output synchronously |
 | `.transform_async(fn)` | Convert parsed output by awaiting an awaitable |
+| `.transform_with_context(fn)` | Convert using `(value, context)` |
+| `.transform_with_context_async(fn)` | Await conversion using `(value, context)` |
 | `.overwrite(fn)` | Change a value without changing its type |
 | `.overwrite_async(fn)` | Await a value change without changing its static type |
 | `.pipe(schema)` | Feed output into another schema |
@@ -187,6 +193,12 @@ variants, and `decode`, `safe_decode`, `decode_async`, and
 The mapper receives each `Issue` when issues are materialized and returns the
 replacement `message`. It does not run during successful validation or
 `validate()`; see [Errors reference](errors.md#per-parse-message-mapping).
+
+Parse, safe-parse, validate, JSON, and async variants also accept keyword-only
+`context=`, defaulting to `None`. Only the `*_with_context` callback builders
+receive that object; existing callback signatures are unchanged. Context is
+per-call and isolated across concurrent async sessions. Encoding does not
+accept context in this API version.
 
 ## Evaluation modes
 

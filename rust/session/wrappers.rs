@@ -82,7 +82,16 @@ impl AsyncSession {
                 let node = frame.node.bind(py).try_borrow().map_err(PyErr::from)?;
                 let result = (|| -> Result<Py<PyAny>> {
                     let parsed_bound = parsed.bind(py);
-                    if node.args[0].bind(py).call1((parsed_bound,))?.is_truthy()? {
+                    let ctx = self.context(py)?;
+                    let accepted = if matches!(node.kind, crate::schema::Kind::ContextRefine) {
+                        node.args[0]
+                            .bind(py)
+                            .call1((parsed_bound, &ctx.callback_context))?
+                            .is_truthy()?
+                    } else {
+                        node.args[0].bind(py).call1((parsed_bound,))?.is_truthy()?
+                    };
+                    if accepted {
                         return Ok(parsed_bound.clone().unbind());
                     }
                     let message: String = node.args[1].bind(py).extract()?;
@@ -113,7 +122,13 @@ impl AsyncSession {
                 let node = frame.node.bind(py).try_borrow().map_err(PyErr::from)?;
                 let result = (|| -> Result<Py<PyAny>> {
                     let ctx = self.context(py)?;
-                    let result = node.args[0].bind(py).call1((parsed.bind(py),))?;
+                    let result = if matches!(node.kind, crate::schema::Kind::ContextSuperRefine) {
+                        node.args[0]
+                            .bind(py)
+                            .call1((parsed.bind(py), &ctx.callback_context))?
+                    } else {
+                        node.args[0].bind(py).call1((parsed.bind(py),))?
+                    };
                     interpret_super_refine(&ctx, parsed, &result, &path, "super_refine")
                 })();
                 drop(node);

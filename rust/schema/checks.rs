@@ -209,6 +209,12 @@ impl NativeSchema {
             Kind::Transform | Kind::Overwrite => {
                 return Ok(self.args[0].bind(py).call1((parsed,))?.unbind());
             }
+            Kind::ContextTransform => {
+                return Ok(self.args[0]
+                    .bind(py)
+                    .call1((parsed, &ctx.callback_context))?
+                    .unbind());
+            }
             Kind::Trim | Kind::Lower | Kind::Upper => {
                 let method = match self.kind {
                     Kind::Trim => "strip",

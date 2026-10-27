@@ -5238,6 +5238,52 @@ class SchemaTests(unittest.TestCase):
             invalid_return()
         self.assertEqual(caught.exception.issues[0].path, ())
 
+    def test_validation_context(self):
+        def matches(value, expected):
+            return value == expected
+
+        schema = z.string().refine_with_context(matches)
+        self.assertEqual(schema.parse("x", context="x"), "x")
+        self.assertIsInstance(schema.safe_parse("x", context="y"), Failure)
+        self.assertTrue(schema.validate("x", context="x"))
+        self.assertEqual(
+            z.string().transform_with_context(
+                lambda value, context: (value, context),
+            ).parse_json('"value"', context={"tenant": 1}),
+            ("value", {"tenant": 1}),
+        )
+        self.assertIsNone(
+            z.string().transform_with_context(lambda _, context: context).parse("x"),
+        )
+
+        def contextual_issue(value, context):
+            if value != context:
+                return Issue("custom", "Context mismatch", ("field",))
+            return None
+
+        result = z.string().super_refine_with_context(
+            contextual_issue,
+        ).safe_parse("x", context="y")
+        self.assertIsInstance(result, Failure)
+        self.assertEqual(result.error.issues[0].path, ("field",))
+
+        @z.dataclass
+        class ContextModel:
+            value: Annotated[str, z.string().refine_with_context(matches)]
+
+        parsed = ContextModel.parse({"value": "x"}, context="x")
+        self.assertEqual(parsed.value, "x")
+        self.assertTrue(ContextModel.validate({"value": "x"}, context="x"))
+        parsed_json = ContextModel.parse_json('{"value": "x"}', context="x")
+        self.assertEqual(parsed_json.value, "x")
+
+        failure = RuntimeError("boom")
+        def raise_context_error(*_):
+            raise failure
+        with self.assertRaises(RuntimeError) as caught:
+            z.string().refine_with_context(raise_context_error).safe_parse("x")
+        self.assertIs(caught.exception, failure)
+
     def test_public_annotations_resolve(self):
         self.assertIn("params", get_type_hints(z.Issue))
         self.assertIn("path", get_type_hints(z.Issue))

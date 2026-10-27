@@ -66,6 +66,9 @@ enum AsyncPendingKind {
     Refine,
     SuperRefine,
     Transform,
+    ContextRefine,
+    ContextSuperRefine,
+    ContextTransform,
     Overwrite,
     CatchFallback,
     Preprocess,
@@ -278,6 +281,7 @@ pub(crate) struct AsyncSession {
     missing: Option<Py<PyAny>>,
     issue_type: Option<Py<PyAny>>,
     error_type: Option<Py<PyAny>>,
+    callback_context: Option<Py<PyAny>>,
     frames: Vec<AsyncFrame>,
     pending: Option<AsyncPending>,
     awaitable: Option<Py<PyAny>>,
@@ -290,12 +294,14 @@ pub(crate) struct AsyncSession {
 #[pymethods]
 impl AsyncSession {
     #[new]
+    #[pyo3(signature = (node, value, missing, issue_type, error_type, context=None))]
     fn new(
         node: Py<NativeSchema>,
         value: Py<PyAny>,
         missing: Py<PyAny>,
         issue_type: Py<PyAny>,
         error_type: Py<PyAny>,
+        context: Option<Py<PyAny>>,
     ) -> Self {
         Self {
             node: Some(node),
@@ -303,6 +309,7 @@ impl AsyncSession {
             missing: Some(missing),
             issue_type: Some(issue_type),
             error_type: Some(error_type),
+            callback_context: context,
             frames: Vec::new(),
             pending: None,
             awaitable: None,
@@ -359,6 +366,9 @@ impl AsyncSession {
                 missing.bind(py).clone(),
                 issue_type.bind(py).clone(),
                 error_type.bind(py).clone(),
+                self.callback_context
+                    .as_ref()
+                    .map(|context| context.bind(py).clone()),
             );
             return match parsed {
                 Ok(value) => {
@@ -473,6 +483,7 @@ impl AsyncSession {
             &self.missing,
             &self.issue_type,
             &self.error_type,
+            &self.callback_context,
             &self.awaitable,
         ]
         .into_iter()
@@ -534,6 +545,11 @@ impl AsyncSession {
                 .ok_or_else(|| PyRuntimeError::new_err("Async session is closed"))?
                 .bind(py)
                 .clone(),
+            callback_context: self
+                .callback_context
+                .as_ref()
+                .map(|context| context.bind(py).clone())
+                .unwrap_or_else(|| py.None().bind(py).clone()),
             lazy_store: LazyHandle::Shared(self.lazy_store.clone()),
         })
     }
@@ -561,6 +577,7 @@ impl AsyncSession {
         self.missing = None;
         self.issue_type = None;
         self.error_type = None;
+        self.callback_context = None;
         self.frames.clear();
         self.pending = None;
         self.awaitable = None;

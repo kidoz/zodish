@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   forms a type checker can see. See `examples/README.md`.
 - `z.adapter()` builds ordinary schemas from supported runtime annotations;
   `@z.validate_call` validates sync/async function arguments and return values.
+- Parse APIs accept per-call `context` with six context-aware sync/async
+  refinement, super-refinement, and transform builders.
 
 ## [0.11.1] - 2026-10-23
 

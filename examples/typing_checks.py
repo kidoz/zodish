@@ -84,6 +84,12 @@ assert_type(
 assert_type(typed_user.strict(), z.TypedObjectSchema[TypedUser])
 wired_name = z.string().wire("userName")
 assert_type(wired_name, Schema[str, str])
+assert_type(
+    z.string().refine_with_context(lambda value, context: value == context).parse(
+        "x", context="x",
+    ),
+    str,
+)
 assert_type(wired_name.parse("Alex"), str)
 UserId = NewType("UserId", int)
 branded_id = z.integer().positive().brand(UserId)

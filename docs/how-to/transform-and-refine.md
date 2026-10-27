@@ -120,6 +120,28 @@ Structural edits on objects preserve refinements, but refinements return a
 general `Schema[T]`, as do transforms, pipes, and optional/default wrappers.
 Type-specific methods therefore must come before those wrappers.
 
+## Pass per-parse context
+
+Use `context=` when a callback needs request-specific data such as a tenant,
+locale, or authorization decision:
+
+```python
+tenant_email = z.string().email().refine_with_context(
+    lambda email, tenant: email.endswith(f"@{tenant}"),
+    "Email belongs to another tenant",
+)
+tenant_email.parse("alex@example.com", context="example.com")
+```
+
+Parse, safe-parse, validate, JSON, and async variants accept `context=`, with
+`None` as the default. Context is not stored on the schema and concurrent async
+sessions keep independent references. Use `refine_with_context`,
+`super_refine_with_context`, `transform_with_context`, or their
+`refine_with_context_async`, `super_refine_with_context_async`, and
+`transform_with_context_async` counterparts. These callbacks receive
+`(value, context)`; existing callbacks keep their one-argument signature.
+Context-aware transforms remain irreversible and unrepresentable in JSON Schema.
+
 ## Handle callback errors
 
 Synchronous callbacks are the default. Async callbacks passed to `refine`,

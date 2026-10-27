@@ -1394,8 +1394,11 @@ class ValidatedModel:
         value: dict[str, Any] | Missing = MISSING,
         *,
         error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Self:
-        return cast(Self, _validated_model_codec(cls).parse(value, error=error))
+        return cast(
+            Self, _validated_model_codec(cls).parse(value, error=error, context=context),
+        )
 
     @classmethod
     def safe_parse(
@@ -1403,17 +1406,18 @@ class ValidatedModel:
         value: dict[str, Any] | Missing = MISSING,
         *,
         error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Success[Self] | Failure:
         return cast(
             Success[Self] | Failure,
-            _validated_model_codec(cls).safe_parse(value, error=error),
+            _validated_model_codec(cls).safe_parse(value, error=error, context=context),
         )
 
     @classmethod
     def validate(
-        cls, value: dict[str, Any] | Missing = MISSING,
+        cls, value: dict[str, Any] | Missing = MISSING, *, context: Any = None,
     ) -> bool:
-        return cast(bool, _validated_model_codec(cls).validate(value))
+        return cast(bool, _validated_model_codec(cls).validate(value, context=context))
 
     @classmethod
     async def acreate(cls, *args: Any, **kwargs: Any) -> Self:
@@ -1427,9 +1431,11 @@ class ValidatedModel:
         data: str | builtins.bytes | bytearray,
         *,
         error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Self:
         return cast(
-            Self, _validated_model_codec(cls).parse_json(data, error=error),
+            Self,
+            _validated_model_codec(cls).parse_json(data, error=error, context=context),
         )
 
     @classmethod
@@ -1438,17 +1444,22 @@ class ValidatedModel:
         data: str | builtins.bytes | bytearray,
         *,
         error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Success[Self] | Failure:
         return cast(
             Success[Self] | Failure,
-            _validated_model_codec(cls).safe_parse_json(data, error=error),
+            _validated_model_codec(cls).safe_parse_json(
+                data, error=error, context=context,
+            ),
         )
 
     @classmethod
     def validate_json(
-        cls, data: str | builtins.bytes | bytearray,
+        cls, data: str | builtins.bytes | bytearray, *, context: Any = None,
     ) -> bool:
-        return cast(bool, _validated_model_codec(cls).validate_json(data))
+        return cast(
+            bool, _validated_model_codec(cls).validate_json(data, context=context),
+        )
 
     @classmethod
     async def parse_async(
@@ -1456,10 +1467,13 @@ class ValidatedModel:
         value: dict[str, Any] | Missing = MISSING,
         *,
         error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Self:
         return cast(
             Self,
-            await _validated_model_codec(cls).parse_async(value, error=error),
+            await _validated_model_codec(cls).parse_async(
+                value, error=error, context=context,
+            ),
         )
 
     @classmethod
@@ -1468,20 +1482,21 @@ class ValidatedModel:
         value: dict[str, Any] | Missing = MISSING,
         *,
         error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Success[Self] | Failure:
         return cast(
             Success[Self] | Failure,
             await _validated_model_codec(cls).safe_parse_async(
-                value, error=error,
+                value, error=error, context=context,
             ),
         )
 
     @classmethod
     async def validate_async(
-        cls, value: dict[str, Any] | Missing = MISSING,
+        cls, value: dict[str, Any] | Missing = MISSING, *, context: Any = None,
     ) -> bool:
         return cast(
-            bool, await _validated_model_codec(cls).validate_async(value),
+            bool, await _validated_model_codec(cls).validate_async(value, context=context),
         )
 
     @classmethod
@@ -1490,11 +1505,12 @@ class ValidatedModel:
         data: str | builtins.bytes | bytearray,
         *,
         error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Self:
         return cast(
             Self,
             await _validated_model_codec(cls).parse_json_async(
-                data, error=error,
+                data, error=error, context=context,
             ),
         )
 
@@ -1504,11 +1520,12 @@ class ValidatedModel:
         data: str | builtins.bytes | bytearray,
         *,
         error: ErrorMap | None = None,
+        context: Any = None,
     ) -> Success[Self] | Failure:
         return cast(
             Success[Self] | Failure,
             await _validated_model_codec(cls).safe_parse_json_async(
-                data, error=error,
+                data, error=error, context=context,
             ),
         )
 

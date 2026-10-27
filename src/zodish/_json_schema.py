@@ -257,7 +257,9 @@ def _node_accepts_missing(node: NativeSchema, io: JSONSchemaIO) -> bool:
     if kind in (
         "pipe", "refine", "super_refine", "transform", "overwrite",
         "async_refine", "async_super_refine", "async_transform",
-        "async_overwrite",
+        "async_overwrite", "context_refine", "context_super_refine",
+        "context_transform", "async_context_refine", "async_context_super_refine",
+        "async_context_transform",
     ):
         return _node_accepts_missing(node.children[0], io)
     return False

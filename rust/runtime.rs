@@ -118,6 +118,7 @@ pub(crate) struct Context<'py> {
     pub(crate) missing: Bound<'py, PyAny>,
     pub(crate) issue_type: Bound<'py, PyAny>,
     pub(crate) error_type: Bound<'py, PyAny>,
+    pub(crate) callback_context: Bound<'py, PyAny>,
     pub(crate) lazy_store: LazyHandle,
 }
 
@@ -127,12 +128,14 @@ impl<'py> Context<'py> {
         missing: Bound<'py, PyAny>,
         issue_type: Bound<'py, PyAny>,
         error_type: Bound<'py, PyAny>,
+        callback_context: Bound<'py, PyAny>,
     ) -> Self {
         Self {
             py,
             missing,
             issue_type,
             error_type,
+            callback_context,
             lazy_store: LazyHandle::Local(RefCell::new(LazyState::default())),
         }
     }

@@ -296,6 +296,7 @@ impl NativeSchema {
         Ok(PyTuple::new(py, self.args.iter().map(|arg| arg.clone_ref(py)))?.unbind())
     }
 
+    #[pyo3(signature = (value, missing, issue_type, error_type, context=None))]
     pub(crate) fn parse<'py>(
         &self,
         py: Python<'py>,
@@ -303,8 +304,10 @@ impl NativeSchema {
         missing: Bound<'py, PyAny>,
         issue_type: Bound<'py, PyAny>,
         error_type: Bound<'py, PyAny>,
+        context: Option<Bound<'py, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let ctx = Context::new(py, missing, issue_type, error_type);
+        let callback_context = context.unwrap_or_else(|| py.None().bind(py).clone());
+        let ctx = Context::new(py, missing, issue_type, error_type, callback_context);
         self.validate(&ctx, &value, &mut Vec::new(), 0)
             .map_err(|error| ctx.make_exception(error))
     }

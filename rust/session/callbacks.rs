@@ -31,6 +31,9 @@ impl AsyncSession {
             Kind::AsyncRefine => AsyncPendingKind::Refine,
             Kind::AsyncSuperRefine => AsyncPendingKind::SuperRefine,
             Kind::AsyncTransform => AsyncPendingKind::Transform,
+            Kind::AsyncContextRefine => AsyncPendingKind::ContextRefine,
+            Kind::AsyncContextSuperRefine => AsyncPendingKind::ContextSuperRefine,
+            Kind::AsyncContextTransform => AsyncPendingKind::ContextTransform,
             Kind::AsyncOverwrite => AsyncPendingKind::Overwrite,
             _ => {
                 drop(node);
@@ -44,7 +47,20 @@ impl AsyncSession {
             }
         };
         drop(node);
-        let result = match callback.bind(py).call1((parsed.bind(py),)) {
+        let result = if matches!(
+            pending_kind,
+            AsyncPendingKind::ContextRefine
+                | AsyncPendingKind::ContextSuperRefine
+                | AsyncPendingKind::ContextTransform
+        ) {
+            let ctx = self.context(py)?;
+            callback
+                .bind(py)
+                .call1((parsed.bind(py), &ctx.callback_context))
+        } else {
+            callback.bind(py).call1((parsed.bind(py),))
+        };
+        let result = match result {
             Ok(result) => result,
             Err(error) => {
                 return Ok(deliver_at(Err(Error::Python(error)), frame.path));
@@ -82,7 +98,7 @@ impl AsyncSession {
             depth,
         } = pending;
         match kind {
-            AsyncPendingKind::Refine => {
+            AsyncPendingKind::Refine | AsyncPendingKind::ContextRefine => {
                 let parsed =
                     parsed.ok_or_else(|| PyRuntimeError::new_err("Async session has no result"))?;
                 let truthy = match value.bind(py).is_truthy() {
@@ -105,7 +121,7 @@ impl AsyncSession {
                 let issue = Issue::new(py, "custom", &message, &issue_path, params.into_any());
                 Ok(deliver_at(Err(Error::Invalid(vec![issue])), path))
             }
-            AsyncPendingKind::SuperRefine => {
+            AsyncPendingKind::SuperRefine | AsyncPendingKind::ContextSuperRefine => {
                 let parsed =
                     parsed.ok_or_else(|| PyRuntimeError::new_err("Async session has no result"))?;
                 let ctx = self.context(py)?;
@@ -119,6 +135,7 @@ impl AsyncSession {
                 Ok(deliver_at(outcome, path))
             }
             AsyncPendingKind::Transform
+            | AsyncPendingKind::ContextTransform
             | AsyncPendingKind::Overwrite
             | AsyncPendingKind::CatchFallback => Ok(deliver_at(Ok(value), path)),
             AsyncPendingKind::Preprocess | AsyncPendingKind::DefaultFactory => {

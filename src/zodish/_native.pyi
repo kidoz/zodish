@@ -17,7 +17,12 @@ class NativeSchema:
     @property
     def args(self) -> tuple[Any, ...]: ...
     def parse(
-        self, value: Any, missing: Any, issue_type: type[Any], error_type: type[Exception],
+        self,
+        value: Any,
+        missing: Any,
+        issue_type: type[Any],
+        error_type: type[Exception],
+        context: Any = None,
     ) -> Any: ...
     def parse_json(self, data: str | bytes | bytearray) -> tuple[bool, Any]: ...
 
@@ -32,6 +37,7 @@ class AsyncSession:
         missing: Any,
         issue_type: type[Any],
         error_type: type[Exception],
+        context: Any = None,
     ) -> None: ...
     def start(self) -> tuple[bool, Any]: ...
     def resume_value(self, token: int, value: Any) -> tuple[bool, Any]: ...

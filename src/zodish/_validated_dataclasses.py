@@ -29,7 +29,8 @@ from ._native import NativeSchema
 _MARKER_ATTR = "__zodish_validated_dataclass__"
 _UNSUPPORTED_CONSTRUCTION_KINDS = frozenset({
     "preprocess", "transform", "coerce", "string_bool", "pipe",
-    "async_preprocess", "async_transform",
+    "async_preprocess", "async_transform", "context_transform",
+    "async_context_transform",
 })
 _SCALAR_KINDS = frozenset({"string", "integer", "number", "boolean", "none"})
 _INIT_PARAMETER_KINDS = (

@@ -49,6 +49,53 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         except ValidationError as error:
             return Failure(error)
 
+    async def test_validation_context_async(self):
+        async def matches(value, expected):
+            await asyncio.sleep(0)
+            return value == expected
+
+        schema = z.string().refine_with_context_async(matches)
+        success, failure = await asyncio.gather(
+            schema.safe_parse_async("x", context="x"),
+            schema.safe_parse_async("x", context="y"),
+        )
+        self.assertEqual(success, Success("x"))
+        self.assertIsInstance(failure, Failure)
+
+        async def append(value, context):
+            return f"{value}{context}"
+
+        transformed = z.string().transform_with_context_async(append)
+        self.assertEqual(
+            await transformed.parse_json_async('"value"', context="!"),
+            "value!",
+        )
+
+        async def contextual_issue(value, context):
+            return Issue("custom", context, ("field",)) if value == "bad" else None
+
+        result = await z.string().super_refine_with_context_async(
+            contextual_issue,
+        ).safe_parse_async("bad", context="Context mismatch")
+        self.assertIsInstance(result, Failure)
+        self.assertEqual(result.error.issues[0].message, "Context mismatch")
+        self.assertEqual(result.error.issues[0].path, ("field",))
+
+        sync_in_async = z.string().refine_with_context(
+            lambda value, expected: value == expected,
+        ).transform_with_context_async(append)
+        self.assertEqual(
+            await sync_in_async.parse_async("x", context="x"),
+            "xx",
+        )
+
+        @z.dataclass(async_fields=True)
+        class ContextModel:
+            value: Annotated[str, z.string().refine_with_context_async(matches)]
+
+        parsed = await ContextModel.parse_async({"value": "x"}, context="x")
+        self.assertEqual(parsed.value, "x")
+
     async def test_calendar_dates_match_sync_results(self):
         async def passthrough(value):
             return value

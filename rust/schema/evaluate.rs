@@ -69,6 +69,9 @@ impl NativeSchema {
             Kind::AsyncRefine
             | Kind::AsyncSuperRefine
             | Kind::AsyncTransform
+            | Kind::AsyncContextRefine
+            | Kind::AsyncContextSuperRefine
+            | Kind::AsyncContextTransform
             | Kind::AsyncPreprocess
             | Kind::AsyncDefaultFactory
             | Kind::AsyncCatch
@@ -157,10 +160,18 @@ impl NativeSchema {
                 let processed = self.args[0].bind(py).call1((value,))?;
                 self.child(0, ctx, &processed, path, depth)
             }
-            Kind::Refine => {
+            Kind::Refine | Kind::ContextRefine => {
                 let parsed = self.child(0, ctx, value, path, depth)?;
                 let parsed = parsed.bind(py);
-                if self.args[0].bind(py).call1((parsed,))?.is_truthy()? {
+                let accepted = if matches!(self.kind, Kind::ContextRefine) {
+                    self.args[0]
+                        .bind(py)
+                        .call1((parsed, &ctx.callback_context))?
+                        .is_truthy()?
+                } else {
+                    self.args[0].bind(py).call1((parsed,))?.is_truthy()?
+                };
+                if accepted {
                     return Ok(parsed.clone().unbind());
                 }
                 let message: String = self.args[1].bind(py).extract()?;
@@ -174,12 +185,19 @@ impl NativeSchema {
                 }
                 ctx.fail("custom", &message, &issue_path)
             }
-            Kind::SuperRefine => {
+            Kind::SuperRefine | Kind::ContextSuperRefine => {
                 let parsed = self.child(0, ctx, value, path, depth)?;
-                let result = self.args[0].bind(py).call1((parsed.bind(py),))?;
+                let result = if matches!(self.kind, Kind::ContextSuperRefine) {
+                    self.args[0]
+                        .bind(py)
+                        .call1((parsed.bind(py), &ctx.callback_context))?
+                } else {
+                    self.args[0].bind(py).call1((parsed.bind(py),))?
+                };
                 interpret_super_refine(ctx, parsed, &result, path, "super_refine")
             }
             Kind::Transform
+            | Kind::ContextTransform
             | Kind::RequiredOutput
             | Kind::Overwrite
             | Kind::LengthMin

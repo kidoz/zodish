@@ -965,6 +965,32 @@ class AsyncSessionProtocolTests(unittest.IsolatedAsyncioTestCase):
         gc.collect()
         self.assertEqual([reference() for reference in refs], [None, None, None])
 
+    async def test_terminal_session_releases_context(self):
+        class Payload:
+            pass
+
+        async def callback(value, context):
+            return True
+
+        context = Payload()
+        schema = z.string().refine_with_context_async(callback)
+        session = _native.AsyncSession(
+            schema._node, "value", MISSING, Issue, ValidationError, context,
+        )
+        refs = (weakref.ref(context), weakref.ref(session))
+        done, payload = session.start()
+        self.assertFalse(done)
+        token, awaitable = payload
+        awaitable.close()
+        done, output = session.resume_value(token, True)
+        self.assertTrue(done)
+        self.assertEqual(output, "value")
+
+        del context, schema, session
+        del payload, token, awaitable, output, done
+        gc.collect()
+        self.assertEqual([reference() for reference in refs], [None, None])
+
     async def test_failed_session_releases_references(self):
         class Payload:
             pass

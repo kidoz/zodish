@@ -111,6 +111,8 @@ except ValidationError as error:
 | JSON Schema | `z.to_json_schema(schema, *, target=..., io=..., unrepresentable=...)` |
 | Composition | `z.intersection(left, right)` / `schema.and_(other)`, `z.preprocess(fn, schema)`, `z.preprocess_async(fn, schema)`, `z.lazy(factory)` |
 
+Parse and async variants accept keyword-only `context=`. Context-aware callbacks use `.refine_with_context()`, `.super_refine_with_context()`, `.transform_with_context()`, and their async counterparts, receiving `(value, context)` without changing existing callback signatures.
+
 Built-in constraints accept a keyword-only `message=`. `.refine()` accepts a relative `path=`, and `.super_refine()` may return one `Issue`, a list or tuple of `Issue` objects, or `None`; returned issue paths are relative to the current location. `z.enum()` reports one `invalid_value` issue rather than a union branch.
 
 Object fields can declare an input-only wire name: `z.object({"user_name": z.string().wire("userName")})` accepts `userName`, returns `user_name`, and encodes back to `userName`. Missing and `None` behavior comes from the field schema. Wire names must be unique; `.keyof()` and shape methods use canonical keys, and the discriminated-union key cannot be aliased.

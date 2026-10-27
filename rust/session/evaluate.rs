@@ -56,6 +56,9 @@ impl AsyncSession {
             Kind::AsyncRefine
             | Kind::AsyncSuperRefine
             | Kind::AsyncTransform
+            | Kind::AsyncContextRefine
+            | Kind::AsyncContextSuperRefine
+            | Kind::AsyncContextTransform
             | Kind::AsyncOverwrite => {
                 let child = node_ref.children[0].clone_ref(py);
                 self.frames
@@ -394,7 +397,7 @@ impl AsyncSession {
                     depth: depth + 1,
                 }))
             }
-            Kind::Refine => {
+            Kind::Refine | Kind::ContextRefine => {
                 let child = node_ref.children[0].clone_ref(py);
                 self.frames.push(AsyncFrame::Refine(RefineFrame {
                     node: node.clone_ref(py),
@@ -408,7 +411,7 @@ impl AsyncSession {
                     depth: depth + 1,
                 }))
             }
-            Kind::SuperRefine => {
+            Kind::SuperRefine | Kind::ContextSuperRefine => {
                 let child = node_ref.children[0].clone_ref(py);
                 self.frames.push(AsyncFrame::SuperRefine(SuperRefineFrame {
                     node: node.clone_ref(py),
@@ -423,6 +426,7 @@ impl AsyncSession {
                 }))
             }
             Kind::Transform
+            | Kind::ContextTransform
             | Kind::RequiredOutput
             | Kind::Overwrite
             | Kind::LengthMin
