@@ -14,24 +14,33 @@ import dataclasses
 import functools
 import inspect
 import typing
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass as _dataclass
 from typing import Any
 
 from . import _annotations
 from . import schemas as _schemas
 from ._codecs import CodecSchema
-from ._core import _UNSET, MISSING, Schema
+from ._core import _UNSET, MISSING, Schema, _sync_callback
 from ._errors import ValidationError, _prefix_issue
 from ._native import NativeSchema
 
 
 _MARKER_ATTR = "__zodish_validated_dataclass__"
+_MODEL_VALIDATOR_ATTR = "__zodish_model_validator__"
+_MODEL_VALIDATOR_MARKER = "__zodish_is_model_validator__"
 _UNSUPPORTED_CONSTRUCTION_KINDS = frozenset({
     "preprocess", "transform", "coerce", "string_bool", "pipe",
     "async_preprocess", "async_transform", "context_transform",
     "async_context_transform",
 })
+
+
+def model_validator[F: Callable[..., Any]](fn: F) -> F:
+    """Mark one instance method for post-construction model validation."""
+    fn = _sync_callback(fn, "model validator")
+    setattr(fn, _MODEL_VALIDATOR_MARKER, True)
+    return fn
 _SCALAR_KINDS = frozenset({"string", "integer", "number", "boolean", "none"})
 _INIT_PARAMETER_KINDS = (
     inspect.Parameter.POSITIONAL_ONLY,
@@ -136,6 +145,9 @@ def _assign(
     post_init = getattr(instance, "__post_init__", None)
     if post_init is not None:
         post_init(*initvar_values)
+    validator = getattr(instance, _MODEL_VALIDATOR_ATTR, None)
+    if validator is not None and validator() is not None:
+        raise TypeError("Model validator must return None")
 
 
 def _contains_kind(node: NativeSchema, kinds: frozenset[str]) -> bool:
@@ -578,6 +590,34 @@ def _reject_allocation_hooks(cls: type[Any]) -> None:
         )
 
 
+def _install_model_validator(cls: type[Any]) -> None:
+    validators = [
+        value
+        for value in cls.__dict__.values()
+        if getattr(value, _MODEL_VALIDATOR_MARKER, False)
+    ]
+    if not validators:
+        return
+    if len(validators) != 1:
+        raise TypeError("Validated dataclasses allow one own model validator")
+    validator = validators[0]
+    if isinstance(
+        getattr(validator, "__wrapped__", None),
+        (classmethod, staticmethod),
+    ):
+        raise TypeError("Model validator must be an instance method")
+    parameters = list(inspect.signature(validator).parameters.values())
+    if (
+        len(parameters) != 1
+        or parameters[0].kind not in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        )
+    ):
+        raise TypeError("Model validator must accept only self")
+    type.__setattr__(cls, _MODEL_VALIDATOR_ATTR, validator)
+
+
 _CLASSMETHOD_NAMES = (
     "parse",
     "safe_parse",
@@ -656,6 +696,7 @@ def _decorate(
 
     _reject_unsupported(cls)
     _reject_allocation_hooks(cls)
+    _install_model_validator(cls)
 
     effective_validate_assignment = (
         _inherited_assignment_validation(cls)

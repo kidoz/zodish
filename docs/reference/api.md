@@ -316,6 +316,7 @@ Sync and async functions are supported, and metadata/signature are preserved.
 | `@z.dataclass(validate_assignment=True)` | Validate later declared-field assignments |
 | `@z.dataclass(async_fields=True)` | Permit async construction schemas |
 | `z.dataclass(ExistingDataclass)` | Wrap an existing supported dataclass |
+| `@z.model_validator` | Run one instance method after fields and `__post_init__` |
 | `z.create_model(name, fields, *, defaults=None, ...)` | Create a validated dataclass from runtime field schemas |
 | `z.ValidatedModel` | Typed mixin for class-level codec methods |
 | `Cls.parse`, `safe_parse`, `validate` | Decode encoded input through the cached codec |
@@ -332,6 +333,13 @@ default factories are validated; a factory runs once for an omitted field and
 not for supplied fields. Missing required, extra, and incorrectly bound
 arguments raise `TypeError`; field and default failures raise `ValidationError`
 with aggregated field paths.
+
+A model validator accepts only `self`, returns `None`, and runs after field
+validation, assignment, and `__post_init__`. It runs for direct construction,
+`acreate`, and codec decoding. Raise `ValidationError` containing model-relative
+issues to reject the instance; other exceptions propagate. Multiple own
+validators, invalid signatures, and asynchronous validator methods are rejected
+at decoration.
 
 Explicit `Annotated[T, schema]` field schemas must produce `T`. Clearly
 incompatible output kinds fail at decoration with `TypeError`; other explicit

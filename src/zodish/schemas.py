@@ -1771,6 +1771,12 @@ def create_model(
     )
 
 
+def model_validator[F: Callable[..., Any]](fn: F) -> F:
+    """Mark a dataclass instance method for post-construction validation."""
+    from ._validated_dataclasses import model_validator as _model_validator
+
+    return _model_validator(fn)
+
 
 def adapter[T](annotation: type[T]) -> Schema[T, Any]:
     """Build a schema from a runtime type annotation."""

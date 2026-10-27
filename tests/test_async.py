@@ -130,6 +130,35 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(duplicate, Failure)
         self.assertEqual(duplicate.error.issues[0].code, "duplicate_key")
 
+    async def test_model_validator_async_fields(self):
+        async def passthrough(value):
+            await asyncio.sleep(0)
+            return value
+
+        @z.dataclass(async_fields=True)
+        class Period:
+            start: Annotated[int, z.integer().refine_async(passthrough)]
+            end: int
+
+            @z.model_validator
+            def check_order(self) -> None:
+                if self.end < self.start:
+                    raise ValidationError([
+                        Issue("custom", "end must not precede start", ("end",)),
+                    ])
+
+        created = await Period.acreate(1, 2)
+        self.assertEqual((created.start, created.end), (1, 2))
+        parsed = await Period.parse_async({"start": 1, "end": 2})
+        self.assertEqual((parsed.start, parsed.end), (1, 2))
+        for parse in (
+            lambda: Period.acreate(2, 1),
+            lambda: Period.parse_async({"start": 2, "end": 1}),
+        ):
+            with self.subTest(parse=parse), self.assertRaises(ValidationError) as caught:
+                await parse()
+            self.assertEqual(caught.exception.issues[0].path, ("end",))
+
     async def test_calendar_dates_match_sync_results(self):
         async def passthrough(value):
             return value

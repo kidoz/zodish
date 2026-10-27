@@ -5369,6 +5369,88 @@ class SchemaTests(unittest.TestCase):
         self.assertIsInstance(duplicate, Failure)
         self.assertEqual(duplicate.error.issues[0].code, "duplicate_key")
 
+    def test_model_validator(self):
+        events = []
+
+        @z.dataclass
+        class Period:
+            start: int
+            end: int
+
+            def __post_init__(self):
+                events.append("post_init")
+
+            @z.model_validator
+            def check_order(self) -> None:
+                events.append("validator")
+                if self.end < self.start:
+                    raise ValidationError([
+                        Issue("custom", "end must not precede start", ("end",)),
+                    ])
+
+        self.assertEqual(Period(1, 2), Period(start=1, end=2))
+        self.assertEqual(events, ["post_init", "validator", "post_init", "validator"])
+        events.clear()
+        parsed = Period.parse({"start": 1, "end": 2})
+        self.assertEqual(parsed, Period(1, 2))
+        self.assertEqual(events, [
+            "post_init", "validator", "post_init", "validator",
+        ])
+        for parse in (
+            lambda: Period(2, 1),
+            lambda: Period.parse({"start": 2, "end": 1}),
+        ):
+            with self.subTest(parse=parse), self.assertRaises(ValidationError) as caught:
+                parse()
+            self.assertEqual(caught.exception.issues[0].path, ("end",))
+
+        calls = 0
+        @z.dataclass
+        class NotCalled:
+            value: int
+
+            @z.model_validator
+            def check(self) -> None:
+                nonlocal calls
+                calls += 1
+
+        self.assertIsInstance(NotCalled.safe_parse({"value": "bad"}), Failure)
+        self.assertEqual(calls, 0)
+
+        @z.dataclass
+        class BadReturn:
+            value: int
+
+            @z.model_validator
+            def check(self):
+                return self
+
+        with self.assertRaisesRegex(TypeError, "return None"):
+            BadReturn(1)
+
+        with self.assertRaisesRegex(TypeError, "one own model validator"):
+            @z.dataclass
+            class MultipleValidators:
+                @z.model_validator
+                def first(self) -> None:
+                    pass
+
+                @z.model_validator
+                def second(self) -> None:
+                    pass
+
+        with self.assertRaisesRegex(TypeError, "only self"):
+            @z.dataclass
+            class InvalidSignature:
+                @z.model_validator
+                def check() -> None:
+                    pass
+
+        with self.assertRaises(TypeError):
+            @z.model_validator
+            async def async_validator(self) -> None:
+                pass
+
     def test_public_annotations_resolve(self):
         self.assertIn("params", get_type_hints(z.Issue))
         self.assertIn("path", get_type_hints(z.Issue))

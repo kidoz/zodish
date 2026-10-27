@@ -56,6 +56,14 @@ pub(crate) fn assemble_instance(
             post_init.call1(args)?;
         }
     }
+    if cls.hasattr("__zodish_model_validator__")?
+        && !cls.getattr("__zodish_model_validator__")?.is_none()
+    {
+        let result = instance.getattr("__zodish_model_validator__")?.call0()?;
+        if !result.is_none() {
+            return Err(PyTypeError::new_err("Model validator must return None"));
+        }
+    }
     Ok(instance.unbind())
 }
 

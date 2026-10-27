@@ -110,6 +110,7 @@ except ValidationError as error:
 | Coercion | `z.coerce.string()`, `z.coerce.number()`, `z.coerce.integer()`, `z.coerce.boolean()`, `z.string().stringbool(...)` |
 | JSON Schema | `z.to_json_schema(schema, *, target=..., io=..., unrepresentable=...)` |
 | Composition | `z.intersection(left, right)` / `schema.and_(other)`, `z.preprocess(fn, schema)`, `z.preprocess_async(fn, schema)`, `z.lazy(factory)` |
+| Annotation workflows | `z.adapter(annotation)`, `@z.validate_call`, `@z.model_validator` |
 
 Parse and async variants accept keyword-only `context=`. Context-aware callbacks use `.refine_with_context()`, `.super_refine_with_context()`, `.transform_with_context()`, and their async counterparts, receiving `(value, context)` without changing existing callback signatures.
 

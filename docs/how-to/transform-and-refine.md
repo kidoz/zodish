@@ -142,6 +142,11 @@ sessions keep independent references. Use `refine_with_context`,
 `(value, context)`; existing callbacks keep their one-argument signature.
 Context-aware transforms remain irreversible and unrepresentable in JSON Schema.
 
+For cross-field checks on a validated dataclass, use one instance method marked
+with `@z.model_validator`. It runs after field assignment and `__post_init__`
+during direct construction, `acreate`, and codec decoding. Return `None` on
+success and raise `ValidationError` with relative issue paths on failure.
+
 ## Handle callback errors
 
 Synchronous callbacks are the default. Async callbacks passed to `refine`,
