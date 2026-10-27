@@ -25,6 +25,23 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         result = await z.string().http_url().safe_parse_async("https://example.com\n")
         self.assertIsInstance(result, Failure)
 
+    async def test_calendar_dates_match_sync_results(self):
+        async def passthrough(value):
+            return value
+
+        for schema, value in (
+            (z.string().date(), "2026-02-29"),
+            (z.string().date(), "2026-04-31"),
+            (z.string().datetime(), "2026-02-29T12:00:00Z"),
+        ):
+            with self.subTest(value=value):
+                async_schema = z.unknown().transform_async(passthrough).pipe(schema)
+                sync_result = schema.safe_parse(value)
+                async_result = await async_schema.safe_parse_async(value)
+                self.assertIsInstance(sync_result, Failure)
+                self.assertIsInstance(async_result, Failure)
+                self.assertEqual(sync_result.error.issues, async_result.error.issues)
+
     async def test_wired_dataclass_and_typed_encoders(self):
         async def decode(value):
             return int(value)

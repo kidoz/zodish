@@ -502,6 +502,29 @@ class SchemaTests(unittest.TestCase):
             "Bad URL",
         )
 
+    def test_string_calendar_dates(self):
+        valid = (
+            (z.string().date(), "2024-02-29"),
+            (z.string().date(), "2000-02-29"),
+            (z.string().datetime(), "2024-02-29T23:59:59Z"),
+        )
+        for schema, value in valid:
+            with self.subTest(value=value):
+                self.assertEqual(schema.parse(value), value)
+
+        invalid = (
+            (z.string().date(), "2026-02-29"),
+            (z.string().date(), "2026-04-31"),
+            (z.string().date(), "1900-02-29"),
+            (z.string().date(), "0000-01-01"),
+            (z.string().datetime(), "2026-02-29T12:00:00Z"),
+        )
+        for schema, value in invalid:
+            with self.subTest(value=value):
+                result = schema.safe_parse(value)
+                self.assertIsInstance(result, Failure)
+                self.assertEqual(result.error.issues[0].code, "invalid_format")
+
     def test_additional_string_formats(self):
         cases = (
             (z.string().ulid(), "01ARZ3NDEKTSV4RRFFQ69G5FAV", "ulid"),

@@ -237,10 +237,14 @@ impl NativeSchema {
             Kind::Integral => {
                 parsed.is_exact_instance_of::<PyInt>() || parsed.extract::<f64>()?.fract() == 0.0
             }
-            Kind::Regex => !self.args[0]
-                .bind(py)
-                .call_method1("search", (parsed,))?
-                .is_none(),
+            Kind::Regex => {
+                let matched = !self.args[0]
+                    .bind(py)
+                    .call_method1("search", (parsed,))?
+                    .is_none();
+                let format = self.args[2].bind(py).extract::<String>()?;
+                matched && valid_calendar_date(parsed, &format)?
+            }
             Kind::StartsWith => py
                 .get_type::<PyString>()
                 .call_method1("startswith", (parsed, self.args[0].bind(py)))?
@@ -440,6 +444,39 @@ impl NativeSchema {
         };
         ctx.fail_with(code, &message, path, params)
     }
+}
+
+fn valid_calendar_date(value: &Bound<'_, PyAny>, format: &str) -> PyResult<bool> {
+    if !matches!(format, "date" | "date-time") {
+        return Ok(true);
+    }
+    let text = value.extract::<String>()?;
+    let bytes = text.as_bytes();
+    let component = |start, end| {
+        bytes.get(start..end).and_then(|part| {
+            if part.iter().all(|byte| byte.is_ascii_digit()) {
+                std::str::from_utf8(part).ok()?.parse::<u32>().ok()
+            } else {
+                None
+            }
+        })
+    };
+    let (Some(year), Some(month), Some(day)) = (component(0, 4), component(5, 7), component(8, 10))
+    else {
+        return Ok(false);
+    };
+    if year == 0 || month == 0 || day == 0 {
+        return Ok(false);
+    }
+    let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let maximum_day = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => return Ok(false),
+    };
+    Ok(day <= maximum_day)
 }
 
 fn length_origin(parsed: &Bound<'_, PyAny>) -> &'static str {
