@@ -46,6 +46,24 @@ class _RecursiveNode:
 
 
 class SchemaTests(unittest.TestCase):
+    def test_numeric_coercion_uses_ascii_decimal_tokens(self):
+        for schema in (z.coerce.integer(), z.coerce.number()):
+            self.assertEqual(schema.parse("\u2003+010\t"), 10)
+            self.assertIs(type(schema.parse("-000")), int)
+            for token in (
+                "1_000", "\u0661\u0660", "\uff10.\uff15", "0x10", "+", "--1", "1 0", "1e\u0662",
+            ):
+                with self.subTest(schema=schema, token=token):
+                    issue, = schema.safe_parse(token).error.issues
+                    self.assertEqual(issue.code, "invalid_type")
+        for token, value in ((".5", 0.5), ("2.", 2.0), ("-1.5e+2", -150.0), ("3E-2", 0.03)):
+            with self.subTest(token=token):
+                self.assertEqual(z.coerce.number().parse(token), value)
+                self.assertIsInstance(z.coerce.integer().safe_parse(token), Failure)
+        for token in ("1e", ".", "1..2", "2e9999", "-Infinity", "+NaN"):
+            with self.subTest(token=token):
+                self.assertIsInstance(z.coerce.number().safe_parse(token), Failure)
+
     def test_builtin_formats_reject_trailing_newlines(self):
         cases = (
             (z.string().email(), "a@example.com"),

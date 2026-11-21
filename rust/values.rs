@@ -1,6 +1,6 @@
 //! Shared Python value semantics for native validation and callbacks.
 
-use pyo3::exceptions::{PyRecursionError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyRecursionError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 
@@ -160,7 +160,7 @@ pub(crate) fn coerce_value<'py>(
                 return Ok(Some(value.clone()));
             }
             if value.is_instance_of::<PyString>() {
-                return coerce_number(py, value);
+                return coerce_numeric(py, value, false);
             }
             Ok(None)
         }
@@ -176,7 +176,7 @@ pub(crate) fn coerce_value<'py>(
                 }
             }
             if value.is_instance_of::<PyString>() {
-                return coerce_integer(py, value);
+                return coerce_numeric(py, value, true);
             }
             Ok(None)
         }
@@ -185,58 +185,36 @@ pub(crate) fn coerce_value<'py>(
     }
 }
 
-fn coerce_number<'py>(
+fn coerce_numeric<'py>(
     py: Python<'py>,
     value: &Bound<'py, PyAny>,
+    integer_only: bool,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
-    let text: String = value.call_method0("strip")?.extract()?;
-    if text.is_empty() {
+    let stripped = py.get_type::<PyString>().call_method1("strip", (value,))?;
+    let Ok(text) = stripped.cast::<PyString>()?.to_str() else {
+        // Lone Python surrogates cannot be part of an ASCII number.
+        return Ok(None);
+    };
+    let unsigned = text.strip_prefix(['+', '-']).unwrap_or(text);
+    if unsigned.is_empty() {
         return Ok(None);
     }
-    let builtins = py.import("builtins")?;
-    match builtins.getattr("int")?.call1((&text,)) {
-        Ok(parsed) => return Ok(Some(parsed)),
-        Err(error)
-            if error.is_instance_of::<PyValueError>(py)
-                || error.is_instance_of::<PyTypeError>(py) => {}
-        Err(error) => return Err(error),
+    if unsigned.bytes().all(|byte| byte.is_ascii_digit()) {
+        // Keep arbitrary precision and the interpreter's integer digit limit.
+        return match py.get_type::<PyInt>().call1((&stripped,)) {
+            Ok(number) => Ok(Some(number)),
+            Err(error) if error.is_instance_of::<PyValueError>(py) => Ok(None),
+            Err(error) => Err(error),
+        };
     }
-    match builtins.getattr("float")?.call1((&text,)) {
-        Ok(parsed) => {
-            let number: f64 = parsed.extract()?;
-            if number.is_finite() {
-                Ok(Some(parsed))
-            } else {
-                Ok(None)
-            }
-        }
-        Err(error)
-            if error.is_instance_of::<PyValueError>(py)
-                || error.is_instance_of::<PyTypeError>(py) =>
-        {
-            Ok(None)
-        }
-        Err(error) => Err(error),
-    }
-}
-
-fn coerce_integer<'py>(
-    py: Python<'py>,
-    value: &Bound<'py, PyAny>,
-) -> PyResult<Option<Bound<'py, PyAny>>> {
-    let text: String = value.call_method0("strip")?.extract()?;
-    if text.is_empty() {
+    if integer_only {
         return Ok(None);
     }
-    match py.import("builtins")?.getattr("int")?.call1((&text,)) {
-        Ok(parsed) => Ok(Some(parsed)),
-        Err(error)
-            if error.is_instance_of::<PyValueError>(py)
-                || error.is_instance_of::<PyTypeError>(py) =>
-        {
-            Ok(None)
-        }
-        Err(error) => Err(error),
+    // Rust's decimal float parser consumes the whole ASCII token. Its special
+    // spellings for NaN and infinity, as well as overflow, fail the finite check.
+    match text.parse::<f64>() {
+        Ok(number) if number.is_finite() => Ok(Some(number.into_pyobject(py)?.into_any())),
+        _ => Ok(None),
     }
 }
 

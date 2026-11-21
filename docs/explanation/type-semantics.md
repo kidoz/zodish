@@ -80,8 +80,11 @@ Coercion is opt-in and Python-specific:
 | `z.coerce.integer()` | `int`, integral float, integer string | `int` |
 | `z.coerce.boolean()` | `bool`, `0`/`1`, true/false-like strings | `bool` |
 
-Numbers parse with `int` first, then `float`. `"3.5"` is rejected by
-`z.coerce.integer()`. Booleans accept `true`, `1`, `yes`, `on`, `false`, `0`,
+Numeric coercion strips surrounding whitespace. Integer tokens match
+`[+-]?[0-9]+` and preserve Python integer precision and the interpreter's digit limit.
+Number tokens also allow a decimal point and an exponent, as in `.5`, `2.`, and
+`-1.5e+2`. These produce finite floats. Separators, non-ASCII digits, and base
+prefixes are rejected. Booleans accept `true`, `1`, `yes`, `on`, `false`, `0`,
 `no`, and `off`, case-insensitively. Failed conversions report `invalid_type`
 instead of raising programming errors.
 

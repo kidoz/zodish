@@ -238,6 +238,10 @@ complete status and limitations.
 | `z.coerce.integer()` | `int`, integral float, integer string |
 | `z.coerce.boolean()` | `bool`, `0`/`1`, true/false-like strings |
 
+Numeric strings are trimmed and use ASCII decimal digits with an optional sign.
+Numbers additionally allow a decimal point and a signed exponent. An underscore,
+a non-ASCII digit, or a non-finite result produces `invalid_type`.
+
 `z.string().stringbool()` returns a Python `bool`. It accepts `truthy`, `falsy`,
 `case_sensitive`, and `message` options; it normalizes case by default.
 

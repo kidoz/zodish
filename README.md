@@ -334,8 +334,8 @@ z.string().trim().stringbool()
 Coercion is explicit and Python-specific:
 
 - Strings accept `str`, exact `int`, and finite exact `float`; booleans and containers are rejected.
-- Numbers accept exact `int`/finite `float` and strings parsed with `int` first, then `float`; booleans and non-finite results are rejected.
-- Integers accept `int`, integral floats, and integer strings; `"3.5"` is rejected.
+- Numbers accept exact `int`/finite `float` and trimmed ASCII decimal strings with an optional sign, decimal point, and exponent; booleans and non-finite results are rejected.
+- Integers accept `int`, integral floats, and trimmed, optionally signed ASCII digit strings; `"3.5"` is rejected.
 - Booleans accept `bool`, `0`/`1`, and the case-insensitive strings `true`, `1`, `yes`, `on`, `false`, `0`, `no`, and `off`.
 - Failed conversions report `invalid_type` instead of raising programming errors.
 - Static annotations still describe the validated type; coercion widens runtime inputs beyond what the type checker sees.

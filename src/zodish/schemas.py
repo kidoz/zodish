@@ -636,6 +636,7 @@ class _Coerce:
 
     @staticmethod
     def number() -> NumberSchema[int | float]:
+        """Coerce trimmed ASCII decimals with an optional sign, fraction and exponent."""
         base = number()
         return NumberSchema(
             NativeSchema("coerce", (base._node,), ("number",)),
@@ -644,6 +645,7 @@ class _Coerce:
 
     @staticmethod
     def integer() -> NumberSchema[int]:
+        """Coerce trimmed, optionally signed ASCII digit strings and integral numbers."""
         base = integer()
         return NumberSchema(
             NativeSchema("coerce", (base._node,), ("integer",)),
