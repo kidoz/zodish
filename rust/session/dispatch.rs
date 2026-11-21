@@ -2,11 +2,11 @@
 //! Node evaluation lives in `evaluate`; continuation bodies live in the sibling
 //! container, composition, callback, and wrapper modules.
 
-use pyo3::exceptions::{PyException, PyRuntimeError};
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 
 use super::{AsyncFrame, AsyncNext, AsyncSession, AsyncTask};
-use crate::errors::{Error, Result};
+use crate::errors::Result;
 
 impl AsyncSession {
     pub(super) fn run(&mut self, py: Python<'_>, mut task: AsyncTask) -> PyResult<AsyncNext> {
@@ -29,15 +29,11 @@ impl AsyncSession {
                         Ok(value) => Ok(value),
                         Err(error) => Err(ctx.normalize(error, &path)),
                     };
-                    if let Err(Error::Python(error)) = &outcome {
-                        if !error.is_instance_of::<PyException>(py) {
-                            if let Err(error) = outcome {
-                                return Ok(AsyncNext::Error(error));
-                            }
-                            unreachable!();
-                        }
-                    }
-                    task = match self.deliver(py, outcome)? {
+                    let next = match outcome {
+                        Err(error) if error.is_control(py) => return Ok(AsyncNext::Error(error)),
+                        other => self.deliver(py, other)?,
+                    };
+                    task = match next {
                         AsyncNext::Task(task) => task,
                         other => return Ok(other),
                     };

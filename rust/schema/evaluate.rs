@@ -350,7 +350,13 @@ impl NativeSchema {
             }
             Kind::Intersection => {
                 let left = self.child(0, ctx, value, path, depth);
+                if left.as_ref().is_err_and(|error| error.is_control(py)) {
+                    return left;
+                }
                 let right = self.child(1, ctx, value, path, depth);
+                if right.as_ref().is_err_and(|error| error.is_control(py)) {
+                    return right;
+                }
                 match (left, right) {
                     (Ok(left), Ok(right)) => {
                         let left = left.bind(py);

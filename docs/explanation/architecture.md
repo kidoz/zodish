@@ -95,6 +95,11 @@ use the ordinary native evaluator and its fast paths. The Python adapter only
 awaits a requested callback result and resumes the session; it never walks
 schemas or validates values.
 
+In both modes, a control exception such as `asyncio.CancelledError` stops an
+intersection immediately. Ordinary errors allow the other branch to run and
+validation issues from both branches accumulate. Closing a suspended session
+closes its pending coroutine. GC cleanup releases the session's references.
+
 ## What stays in Python
 
 Some behavior must run with Python semantics:

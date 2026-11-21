@@ -16,6 +16,41 @@ from zodish._native import AsyncSession
 
 
 class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_intersection_control_exceptions_take_precedence(self):
+        def branch(side, error, calls, is_async):
+            def callback(value):
+                calls.append(side)
+                raise error
+
+            async def async_callback(value):
+                await asyncio.sleep(0)
+                return callback(value)
+
+            if is_async:
+                return z.integer().refine_async(async_callback)
+            return z.integer().refine(callback)
+
+        for is_async in (False, True):
+            for cancel_side in ("left", "right"):
+                with self.subTest(is_async=is_async, cancel_side=cancel_side):
+                    calls = []
+                    cancel = asyncio.CancelledError()
+
+                    left = cancel if cancel_side == "left" else ValueError("left")
+                    right = cancel if cancel_side == "right" else ValueError("right")
+                    schema = z.intersection(
+                        branch("left", left, calls, is_async),
+                        branch("right", right, calls, is_async),
+                    )
+                    with self.assertRaises(asyncio.CancelledError) as caught:
+                        if is_async:
+                            await schema.parse_async(1)
+                        else:
+                            schema.parse(1)
+                    self.assertIs(caught.exception, cancel)
+                    expected_calls = ["left"] if cancel_side == "left" else ["left", "right"]
+                    self.assertEqual(calls, expected_calls)
+
     async def test_review_numeric_and_json_boundaries(self):
         schema = z.number().multiple_of(2)
         self.assertIsInstance(await schema.safe_parse_async(1000000000000001.0), Failure)

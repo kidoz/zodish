@@ -60,6 +60,10 @@ pub(crate) enum Error {
 }
 
 impl Error {
+    pub(crate) fn is_control(&self, py: Python<'_>) -> bool {
+        matches!(self, Self::Python(error) if !error.is_instance_of::<pyo3::exceptions::PyException>(py))
+    }
+
     // Compound codecs locate every child rejection at its item, including
     // paths supplied by Python callbacks and nested union branch issues.
     pub(crate) fn at_codec_item(mut self, py: Python<'_>, path: &Path) -> Self {
