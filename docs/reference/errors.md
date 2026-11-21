@@ -104,6 +104,8 @@ treated as new categories rather than parsed by message text. Malformed input to
 - A discriminated union reports `required` at `(key,)` when the discriminator is
   missing, and `invalid_value` when it is unknown.
 
+Human-readable error paths escape non-printable characters. Structured issue paths retain the original keys.
+
 ## Issues from callbacks
 
 Any callback can raise `ValidationError` to contribute issues to the surrounding

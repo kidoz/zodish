@@ -64,6 +64,21 @@ class SchemaTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIsInstance(z.coerce.number().safe_parse(token), Failure)
 
+    def test_error_display_escapes_keys_and_preserves_structured_paths(self):
+        key = "é\n\r\t\x1b\u2028b"
+        display = r"é\n\r\t\x1b\u2028b"
+        schema = z.object({"age": z.integer()}).strict()
+        for mapper in (None, lambda issue: issue.message):
+            for materialize in (False, True):
+                with self.subTest(mapper=mapper, materialize=materialize):
+                    error = schema.safe_parse({"age": "x", key: 1}, error=mapper).error
+                    if materialize:
+                        self.assertEqual(error.issues[1].path, (key,))
+                    lines = ["age: Expected integer", f"{display}: Unrecognized key"]
+                    self.assertEqual(str(error), "; ".join(lines))
+                    self.assertEqual(error.prettify(), "\n".join(lines))
+                    self.assertEqual(error.to_dict()["issues"][1]["path"], [key])
+
     def test_builtin_formats_reject_trailing_newlines(self):
         cases = (
             (z.string().email(), "a@example.com"),

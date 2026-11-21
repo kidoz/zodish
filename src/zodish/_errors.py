@@ -119,6 +119,13 @@ def _map_issue(issue: Issue, mapper: ErrorMap) -> Issue:
 _VALIDATION_ERROR_MESSAGE = "Validation failed"
 
 
+def _display_path(path: Path) -> str:
+    text = ".".join(builtins.map(str, path)) or "<root>"
+    if text.isprintable():
+        return text
+    return "".join(char if char.isprintable() else ascii(char)[1:-1] for char in text)
+
+
 class ValidationError(ValueError):
     _issues: builtins.tuple[Issue, ...] | None
     _raw_issues: builtins.tuple[builtins.tuple[Any, ...], ...] | None
@@ -204,7 +211,7 @@ class ValidationError(ValueError):
         if cached is None:
             if self._error_mapper is not None:
                 cached = "; ".join(
-                    f"{'.'.join(builtins.map(str, issue.path)) or '<root>'}: "
+                    f"{_display_path(issue.path)}: "
                     f"{issue.message}"
                     for issue in self.issues
                 )
@@ -214,13 +221,13 @@ class ValidationError(ValueError):
                     raw_issues = self._bundle.to_raw()
                 if raw_issues is None:
                     cached = "; ".join(
-                        f"{'.'.join(builtins.map(str, issue.path)) or '<root>'}: "
+                        f"{_display_path(issue.path)}: "
                         f"{issue.message}"
                         for issue in self.issues
                     )
                 else:
                     cached = "; ".join(
-                        f"{'.'.join(builtins.map(str, raw[2])) or '<root>'}: {raw[1]}"
+                        f"{_display_path(raw[2])}: {raw[1]}"
                         for raw in raw_issues
                     )
             self._message = cached
@@ -253,7 +260,7 @@ class ValidationError(ValueError):
 
     def prettify(self) -> str:
         return "\n".join(
-            f"{'.'.join(builtins.map(str, issue.path)) or '<root>'}: {issue.message}"
+            f"{_display_path(issue.path)}: {issue.message}"
             for issue in self.issues
         )
 
