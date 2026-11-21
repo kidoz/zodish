@@ -139,6 +139,32 @@ impl Issue {
         ))
     }
 
+    /// Track source keys independently of value success so collisions still
+    /// aggregate when either value is invalid.
+    pub(crate) fn check_record_key(
+        seen: &Bound<'_, PyDict>,
+        source: &Bound<'_, PyAny>,
+        parsed: &Bound<'_, PyAny>,
+        path: &Path,
+        issues: &mut Vec<Issue>,
+    ) -> PyResult<()> {
+        if let Some(first) = seen.get_item(parsed)? {
+            let py = seen.py();
+            let params = PyDict::new(py);
+            params.set_item("keys", (first, source))?;
+            issues.push(Issue::new(
+                py,
+                "duplicate_key",
+                "Multiple input keys map to the same key",
+                path,
+                params.into_any(),
+            ));
+        } else {
+            seen.set_item(parsed, source)?;
+        }
+        Ok(())
+    }
+
     fn to_raw(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         self.to_raw_at(py, 0)
     }

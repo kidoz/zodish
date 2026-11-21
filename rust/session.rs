@@ -223,6 +223,7 @@ struct RecordFrame {
     result: Py<PyDict>,
     issues: Vec<Issue>,
     key_node: Option<Py<NativeSchema>>,
+    seen_keys: Option<Py<PyDict>>,
 }
 
 struct UnionFrame {

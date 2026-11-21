@@ -345,6 +345,7 @@ impl NativeSchema {
                         .map_err(PyErr::from)?,
                 )
             };
+            let seen = key_node.as_ref().map(|_| PyDict::new(py));
             for (key, raw) in snapshot.iter() {
                 let parsed_key = if let Some(node) = key_node.as_ref() {
                     match node.validate(ctx, &key, path, depth + 1) {
@@ -371,10 +372,21 @@ impl NativeSchema {
                     key.clone().unbind()
                 };
                 path.push(PathPart::Value(parsed_key.clone_ref(py)));
-                let parsed = self.child(0, ctx, &raw, path, depth);
+                let key_check = match &seen {
+                    Some(seen) => {
+                        Issue::check_record_key(seen, &key, parsed_key.bind(py), path, &mut issues)
+                    }
+                    None => Ok(()),
+                };
+                let parsed = key_check
+                    .map_err(Error::Python)
+                    .and_then(|()| self.child(0, ctx, &raw, path, depth));
                 path.pop();
                 match parsed {
-                    Ok(value) => result.set_item(parsed_key.bind(py), value)?,
+                    Ok(value) if issues.is_empty() => {
+                        result.set_item(parsed_key.bind(py), value)?
+                    }
+                    Ok(_) => {}
                     Err(Error::Invalid(mut errors)) => issues.append(&mut errors),
                     Err(error) => return Err(error),
                 }

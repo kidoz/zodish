@@ -51,6 +51,37 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
                     expected_calls = ["left"] if cancel_side == "left" else ["left", "right"]
                     self.assertEqual(calls, expected_calls)
 
+    async def test_normalized_key_collisions_aggregate_with_value_errors(self):
+        async def lower(value):
+            await asyncio.sleep(0)
+            return value.lower()
+
+        for factory in (z.record, z.map):
+            for is_async in (False, True):
+                with self.subTest(factory=factory, is_async=is_async):
+                    key = z.string().transform_async(lower) if is_async else z.string().lower()
+                    schema = z.object({"items": factory(key, z.integer())})
+                    colliding = {"items": {"A": 1, "a": 2}}
+                    data = {"items": {"A": "first", "a": "second", "B": "third"}}
+                    if is_async:
+                        collision = await schema.safe_parse_async(colliding)
+                        result = await schema.safe_parse_async(data)
+                    else:
+                        collision = schema.safe_parse(colliding)
+                        result = schema.safe_parse(data)
+                    duplicate, = collision.error.issues
+                    self.assertEqual(
+                        (duplicate.code, duplicate.path), ("duplicate_key", ("items", "a")),
+                    )
+                    issues = result.error.issues
+                    self.assertEqual([(i.code, i.path) for i in issues], [
+                        ("invalid_type", ("items", "a")),
+                        ("duplicate_key", ("items", "a")),
+                        ("invalid_type", ("items", "a")),
+                        ("invalid_type", ("items", "b")),
+                    ])
+                    self.assertEqual(issues[1].params["keys"], ("A", "a"))
+
     async def test_review_numeric_and_json_boundaries(self):
         schema = z.number().multiple_of(2)
         self.assertIsInstance(await schema.safe_parse_async(1000000000000001.0), Failure)

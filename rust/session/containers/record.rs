@@ -57,6 +57,7 @@ impl AsyncSession {
                 parsed_key: None,
                 result: PyDict::new(py).unbind(),
                 issues: Vec::new(),
+                seen_keys: key_node.as_ref().map(|_| PyDict::new(py).unbind()),
                 key_node,
             })
         })();
@@ -124,7 +125,19 @@ impl AsyncSession {
                         .clone_ref(py);
                     frame.stage = RecordStage::ValueWaiting;
                     let depth = frame.depth;
-                    let path = child_path(py, &frame.path, PathPart::Value(parsed_key));
+                    let path =
+                        child_path(py, &frame.path, PathPart::Value(parsed_key.clone_ref(py)));
+                    if let Some(seen) = &frame.seen_keys {
+                        if let Err(error) = Issue::check_record_key(
+                            seen.bind(py),
+                            frame.entries[frame.index].0.bind(py),
+                            parsed_key.bind(py),
+                            &path,
+                            &mut frame.issues,
+                        ) {
+                            return Ok(deliver_at(Err(Error::Python(error)), frame.path));
+                        }
+                    }
                     let child = frame
                         .node
                         .bind(py)
@@ -178,20 +191,18 @@ impl AsyncSession {
                     .take()
                     .ok_or_else(|| PyRuntimeError::new_err("Record has no parsed key"))?;
                 match outcome {
-                    Ok(value) => {
+                    Ok(value) if frame.issues.is_empty() => {
                         if let Err(error) =
                             frame.result.bind(py).set_item(parsed_key.bind(py), value)
                         {
                             return Ok(deliver_at(Err(Error::Python(error)), frame.path));
                         }
-                        frame.index += 1;
                     }
-                    Err(Error::Invalid(mut issues)) => {
-                        frame.issues.append(&mut issues);
-                        frame.index += 1;
-                    }
+                    Ok(_) => {}
+                    Err(Error::Invalid(mut issues)) => frame.issues.append(&mut issues),
                     Err(error) => return Ok(deliver_at(Err(error), frame.path)),
                 }
+                frame.index += 1;
             }
             RecordStage::Key | RecordStage::Value => {
                 return Err(PyRuntimeError::new_err(

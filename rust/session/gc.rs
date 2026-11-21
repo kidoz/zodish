@@ -132,6 +132,9 @@ pub(super) fn visit_async_frame(
             for issue in &frame.issues {
                 visit_issue(issue, visit)?;
             }
+            if let Some(seen) = &frame.seen_keys {
+                visit.call(seen)?;
+            }
             if let Some(key) = &frame.key_node {
                 visit.call(key)?;
             }

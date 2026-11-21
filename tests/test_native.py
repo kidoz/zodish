@@ -21,6 +21,17 @@ from zodish._errors import _issue_from_raw
 
 
 class NativeTests(unittest.TestCase):
+    def test_encoding_reports_colliding_record_keys(self):
+        key = z.codec(z.string(), z.string(), decode=str.upper, encode=str.lower)
+        for factory in (z.record, z.map):
+            with self.subTest(factory=factory):
+                schema = factory(key, z.integer())
+                self.assertEqual(schema.encode({"A": 1, "B": 2}), {"a": 1, "b": 2})
+                result = schema.safe_encode({"A": 1, "a": 2})
+                issue, = result.error.issues
+                self.assertEqual((issue.code, issue.path), ("duplicate_key", ("a",)))
+                self.assertEqual(issue.params["keys"], ("A", "a"))
+
     def test_unknown_fast_paths_reject_missing(self):
         required = z.unknown()
         for schema, raw, paths in (

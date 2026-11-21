@@ -117,6 +117,9 @@ export uses an array with `uniqueItems: true`, and `.min()`, `.max()`, and
 `.length()` map to array length bounds. `parse_json` still requires Python set
 input; JSON array-to-set conversion is not implemented.
 
+When two input keys normalize to one key, keyed records and maps report
+`duplicate_key` at the normalized key and collect value errors for both entries.
+
 `z.map(key_schema, value_schema)` validates a Python dictionary through the same
 native record evaluator as `z.record(key_schema, value_schema)`. It is
 reversibly encodable when both key and value schemas are reversible.
