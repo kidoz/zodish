@@ -517,7 +517,18 @@ impl AsyncSession {
                     depth: depth + 1,
                 }))
             }
-            _ => Ok(AsyncNext::Task(AsyncTask::Deliver {
+            Kind::String
+            | Kind::Number
+            | Kind::Integer
+            | Kind::Boolean
+            | Kind::Unknown
+            | Kind::None
+            | Kind::ExactInstance
+            | Kind::Json
+            | Kind::NativeEnum
+            | Kind::Literal
+            | Kind::Enum
+            | Kind::Instance => Ok(AsyncNext::Task(AsyncTask::Deliver {
                 outcome: Err(PyTypeError::new_err(
                     "Async schema composition is not supported for this operation",
                 )
