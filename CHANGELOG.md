@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-21
+
+### Added
+
+- Native `codec_item` evaluation for compound codecs, so array, record/map,
+  tuple, union, optional, and nullable codecs preserve per-parse context and
+  relocate child issues at their item path, including across async suspension.
+- `.catch(value)` accepts a constant fallback, snapshots it at schema
+  construction, and returns a fresh deep copy for each failure.
+- Record and map decoding reports `duplicate_key` at the normalized key and
+  aggregates value issues for both colliding entries.
+- `z.coerce.integer()` and `z.coerce.number()` accept trimmed ASCII decimal
+  strings. Integers use an optional sign and digits; numbers also allow a
+  fraction and exponent. Integer precision and the interpreter digit limit are
+  preserved.
+- `.email()` validates an ASCII dot-atom local part with DNS-label domains.
+- `z.codecs.path()` decodes to `pathlib.PurePath` without touching the
+  filesystem.
+- JSON Schema tuple export omits `prefixItems` when a tuple has no fixed items.
+- `@z.validate_call` infers dataclass return annotations and checks returned
+  instances, including dataclasses nested in containers.
+- Model validators wrapped in `staticmethod` or `classmethod` are rejected with
+  `TypeError` at decoration or class assembly.
+- Release artifacts are verified in a dedicated job and published only from the
+  verified artifact set; the sdist requires `build.rs` and rejects local
+  `.ai-standard-install.json` metadata.
+- The test workflow declares `contents: read` permissions.
+
+### Changed
+
+- Missing input in native primitive fast paths is now rejected; required object
+  fields and container items report `required` instead of treating the sentinel
+  as a value.
+- Intersections stop immediately on control exceptions such as
+  `asyncio.CancelledError`, preserving the original exception instead of
+  converting it to issues.
+- Lazy schemas resolve through one shared cache; closing or resetting an async
+  session releases resolved nodes, and a poisoned cache reports `RuntimeError`
+  instead of panicking.
+- Async evaluation matches primitive kinds explicitly, so unhandled node kinds
+  fail at compile time.
+- Numeric coercion uses ASCII decimal parsing instead of Python `int()`/`float()`
+  fallbacks; boolean coercion uses ASCII case folding. Separators, non-ASCII
+  digits, base prefixes, and non-finite results are rejected.
+- String coercion and `stringbool` handle lone surrogates as validation issues
+  instead of raising `UnicodeEncodeError`; `stringbool` keeps Python Unicode
+  case folding.
+- Error display escapes non-printable characters in human-readable paths while
+  structured issue paths retain the original keys.
+- Compound codec recursion uses lazy native nodes instead of Python transform
+  callbacks.
+
+### Fixed
+
+- Compound codec issue paths from callbacks and union branches are relocated
+  under their container item, including after async suspension.
+- Missing values no longer pass through `unknown()` fast paths in objects,
+  arrays, and tuples.
+- Record key collisions aggregate even when either value is invalid.
+- Empty tuple JSON Schema exports no longer emit `"prefixItems": []`.
+- Lone surrogates no longer raise `UnicodeEncodeError` in coercion or
+  `stringbool` evaluation.
+- Validated dataclass return annotations in `@z.validate_call` no longer reject
+  returned instances by re-parsing them as mappings.
+
+### Security
+
+- The test workflow uses a read-only token.
+- The release sdist excludes local agent-install metadata and the verifier
+  rejects it if present.
+- Documentation adds request-body size guidance and clarifies that `.email()`,
+  `.jwt()`, and `.url()` validate syntax only; applications must verify
+  deliverability, signatures and claims, and destination policy.
+
 ## [0.12.0] - 2026-10-27
 
 ### Added
