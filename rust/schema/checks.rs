@@ -72,33 +72,16 @@ pub(crate) fn evaluate_string_bool(
     path: &Path,
 ) -> Result<Py<PyAny>> {
     let py = ctx.py;
-    let text: String = parsed.extract()?;
     let case_sensitive: bool = node.args[2].bind(py).extract()?;
-    let normalized = if case_sensitive {
-        text
-    } else {
-        text.to_lowercase()
-    };
-    for item in node.args[0].bind(py).try_iter()? {
-        let candidate: String = item?.extract()?;
-        let candidate = if case_sensitive {
-            candidate
-        } else {
-            candidate.to_lowercase()
-        };
-        if normalized == candidate {
-            return Ok(true.into_pyobject(py)?.to_owned().into_any().unbind());
-        }
-    }
-    for item in node.args[1].bind(py).try_iter()? {
-        let candidate: String = item?.extract()?;
-        let candidate = if case_sensitive {
-            candidate
-        } else {
-            candidate.to_lowercase()
-        };
-        if normalized == candidate {
-            return Ok(false.into_pyobject(py)?.to_owned().into_any().unbind());
+    let str_type = py.get_type::<PyString>();
+    let method = if case_sensitive { "__str__" } else { "lower" };
+    let normalized = str_type.call_method1(method, (parsed,))?;
+    for (choices, truth) in [(&node.args[0], true), (&node.args[1], false)] {
+        for item in choices.bind(py).try_iter()? {
+            let candidate = str_type.call_method1(method, (item?,))?;
+            if normalized.eq(candidate)? {
+                return Ok(truth.into_pyobject(py)?.to_owned().into_any().unbind());
+            }
         }
     }
     let message: String = node.args[3].bind(py).extract()?;

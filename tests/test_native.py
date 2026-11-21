@@ -21,6 +21,23 @@ from zodish._errors import _issue_from_raw
 
 
 class NativeTests(unittest.TestCase):
+    def test_surrogates_in_coercion_and_stringbool(self):
+        for schema, code in (
+            (z.coerce.integer(), "invalid_type"),
+            (z.coerce.number(), "invalid_type"),
+            (z.coerce.boolean(), "invalid_type"),
+            (z.string().stringbool(), "invalid_value"),
+            (z.string().stringbool(case_sensitive=True), "invalid_value"),
+        ):
+            with self.subTest(schema=schema):
+                result = schema.array().safe_parse(["\ud800"])
+                self.assertIsInstance(result, Failure)
+                issue, = result.error.issues
+                self.assertEqual((issue.code, issue.path), (code, (0,)))
+        schema = z.string().stringbool(truthy=("İ",), falsy=("\ud800",))
+        self.assertIs(schema.parse("i\u0307"), True)
+        self.assertIs(schema.parse("\ud800"), False)
+
     def test_encoding_reports_colliding_record_keys(self):
         key = z.codec(z.string(), z.string(), decode=str.upper, encode=str.lower)
         for factory in (z.record, z.map):

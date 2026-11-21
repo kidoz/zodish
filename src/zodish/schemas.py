@@ -391,8 +391,8 @@ class StringSchema(Schema[str, str]):
             overlap = builtins.set(truthy_values) & builtins.set(falsy_values)
         else:
             overlap = (
-                {value.lower() for value in truthy_values}
-                & {value.lower() for value in falsy_values}
+                {str.lower(value) for value in truthy_values}
+                & {str.lower(value) for value in falsy_values}
             )
         if overlap:
             raise ValueError("truthy and falsy values must not overlap")

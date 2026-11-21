@@ -235,10 +235,11 @@ fn coerce_boolean<'py>(
         return Ok(None);
     }
     if value.is_instance_of::<PyString>() {
-        let normalized: String = value
-            .call_method0("strip")?
-            .extract::<String>()?
-            .to_lowercase();
+        let stripped = py.get_type::<PyString>().call_method1("strip", (value,))?;
+        let Ok(text) = stripped.cast::<PyString>()?.to_str() else {
+            return Ok(None);
+        };
+        let normalized = text.to_ascii_lowercase();
         if matches!(normalized.as_str(), "true" | "1" | "yes" | "on") {
             return Ok(Some(true.into_pyobject(py)?.to_owned().into_any()));
         }
