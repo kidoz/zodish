@@ -38,9 +38,13 @@ _UNSUPPORTED_CONSTRUCTION_KINDS = frozenset({
 
 def model_validator[F: Callable[..., Any]](fn: F) -> F:
     """Mark one instance method for post-construction model validation."""
+    if isinstance(fn, (classmethod, staticmethod)):
+        raise TypeError("Model validator must be an instance method")
     fn = _sync_callback(fn, "model validator")
     setattr(fn, _MODEL_VALIDATOR_MARKER, True)
     return fn
+
+
 _SCALAR_KINDS = frozenset({"string", "integer", "number", "boolean", "none"})
 _INIT_PARAMETER_KINDS = (
     inspect.Parameter.POSITIONAL_ONLY,
@@ -580,21 +584,18 @@ def _reject_allocation_hooks(cls: type[Any]) -> None:
 
 
 def _install_model_validator(cls: type[Any]) -> None:
-    validators = [
-        value
-        for value in cls.__dict__.values()
-        if getattr(value, _MODEL_VALIDATOR_MARKER, False)
-    ]
+    validators = []
+    for value in cls.__dict__.values():
+        if isinstance(value, (classmethod, staticmethod)):
+            if getattr(value.__func__, _MODEL_VALIDATOR_MARKER, False):
+                raise TypeError("Model validator must be an instance method")
+        elif getattr(value, _MODEL_VALIDATOR_MARKER, False):
+            validators.append(value)
     if not validators:
         return
     if len(validators) != 1:
         raise TypeError("Validated dataclasses allow one own model validator")
     validator = validators[0]
-    if isinstance(
-        getattr(validator, "__wrapped__", None),
-        (classmethod, staticmethod),
-    ):
-        raise TypeError("Model validator must be an instance method")
     parameters = list(inspect.signature(validator).parameters.values())
     if (
         len(parameters) != 1

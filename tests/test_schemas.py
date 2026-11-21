@@ -5512,6 +5512,22 @@ class SchemaTests(unittest.TestCase):
             async def async_validator(self) -> None:
                 pass
 
+    def test_model_validator_rejects_descriptors_in_either_order(self):
+        for descriptor in (staticmethod, classmethod):
+            for descriptor_first in (False, True):
+                with (
+                    self.subTest(descriptor=descriptor, descriptor_first=descriptor_first),
+                    self.assertRaisesRegex(TypeError, "instance method"),
+                ):
+                    def check(self):
+                        pass
+
+                    method = (
+                        z.model_validator(descriptor(check)) if descriptor_first
+                        else descriptor(z.model_validator(check))
+                    )
+                    z.dataclass(type("Model", (), {"check": method}))
+
     def test_public_annotations_resolve(self):
         self.assertIn("params", get_type_hints(z.Issue))
         self.assertIn("path", get_type_hints(z.Issue))
