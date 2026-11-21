@@ -50,7 +50,7 @@ include = [
   { path = "benchmarks/requirements.lock", format = "sdist" },
   { path = ".github/workflows/*.yml", format = "sdist" },
 ]
-exclude = ["benchmarks/results/**"]
+exclude = ["benchmarks/results/**", ".ai-standard-install.json"]
 
 [tool.ruff]
 target-version = "py314"

@@ -129,7 +129,10 @@ def verify_wheel(wheel: Path) -> str:
 
 def verify_sdist(sdist: Path) -> str:
     with tarfile.open(sdist, "r:gz") as archive:
-        names = {member.name for member in archive.getmembers() if member.isfile()}
+        members = archive.getmembers()
+        if any(PurePosixPath(m.name).name == ".ai-standard-install.json" for m in members):
+            raise SystemExit(f"{sdist.name} contains local .ai-standard-install.json metadata")
+        names = {member.name for member in members if member.isfile()}
         pyprojects = sorted(
             name
             for name in names

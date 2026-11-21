@@ -19,11 +19,13 @@ env:
 jobs:
   verify-version:
     name: Verify version metadata
+    outputs:
+      commit: ${{ steps.revision.outputs.commit }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ github.event_name == 'release' && github.sha || format('refs/tags/{0}', inputs.tag) }}
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.14'
@@ -53,6 +55,9 @@ jobs:
               )
           print(f"version ok: {project_version}")
           PY
+      - name: Record the verified commit
+        id: revision
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   build-sdist:
     name: Build sdist
@@ -65,7 +70,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ needs.verify-version.outputs.commit }}
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.14'
@@ -127,7 +132,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ needs.verify-version.outputs.commit }}
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.14'
@@ -195,7 +200,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ needs.verify-version.outputs.commit }}
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ matrix.python }}
@@ -222,18 +227,16 @@ jobs:
           name: dist-free-threaded-${{ matrix.os }}-${{ matrix.target }}-${{ matrix.python }}
           path: dist/*.whl
 
-  publish:
-    name: Publish to PyPI
-    needs: [build-sdist, build-wheels, build-free-threaded-wheels]
+  verify-artifacts:
+    name: Verify distribution artifacts
+    needs: [verify-version, build-sdist, build-wheels, build-free-threaded-wheels]
     runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      contents: read
-      id-token: write
+    outputs:
+      artifact-id: ${{ steps.verified.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ needs.verify-version.outputs.commit }}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: dist-*
@@ -244,4 +247,26 @@ jobs:
           python-version: '3.14'
       - name: Verify distribution artifacts
         run: python scripts/verify_dist.py dist
+      - name: Store verified distributions
+        id: verified
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: verified-distributions-${{ github.run_attempt }}
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: verify-artifacts
+    if: needs.verify-artifacts.outputs.artifact-id != ''
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.verify-artifacts.outputs.artifact-id }}
+          merge-multiple: true
+          path: dist
       - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
