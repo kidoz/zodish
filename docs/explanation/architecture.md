@@ -86,7 +86,8 @@ including primitive leaves, numeric constraints, literals/enums, nullable and
 optional wrappers, and strict objects without extra keys. When the schema or
 value falls outside that subset, the input is decoded with Python's `json` module
 and validated through the same evaluator, so the fallback does not change
-validation semantics.
+validation semantics. For a missing object key, the fast path omits a direct
+optional child. It delegates other wrappers to the ordinary evaluator.
 
 Async validation extends the boundary with a native resumable session. Rust owns a continuation frame stack for containers, wrappers, unions,
 intersections, pipes, and lazy schemas, and retains snapshots, paths, issues, and
@@ -129,9 +130,9 @@ native boundary, not implementation details:
   input_aliases)` as its five positional arguments. Each alias entry contains
   the canonical input key followed by any accepted alternatives.
 
-`zodish/_boundary.py` encodes these shapes as protocols and checks the concrete
-classes against them. Change the Python definitions and the Rust accessors
-together.
+`zodish/_boundary.py` gives mypy protocols for the Python attributes and a
+type alias for raw issues. The Rust object constructor checks the five
+positional arguments, including the field and alias tuple shapes, at runtime.
 
 ## Bidirectional codecs
 
@@ -182,7 +183,8 @@ Inputs must be acyclic. The native evaluator raises `RecursionError` at 256 nest
 schema-node evaluations, including wrappers, to bound Rust stack use. It also
 raises `RecursionError` when the remaining thread stack is too small, so a
 callback that re-enters `parse` on a small-stack thread fails cleanly instead of
-exhausting the native stack. Each lazy node resolves its factory once per parse
+exhausting the native stack. When the platform cannot report remaining stack
+space, only the depth check applies. Each lazy node resolves its factory once per parse
 and reuses the result for the rest of that parse; later parses resolve it again.
 Python callbacks may additionally hit Python's recursion limit.
 

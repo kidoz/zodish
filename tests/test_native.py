@@ -588,6 +588,11 @@ assert isinstance(Concrete.safe_parse({"value": "text"}), Failure)
         self.assertIs(_schema_conforms(schema), schema)
         self.assertIsInstance(schema._node, _native.NativeSchema)
 
+        obj = z.object({"field": schema}).strict()._node
+        self.assertEqual(obj.args, (("field",), "strict", None, ("field",), (("field",),)))
+        with self.assertRaises(ValueError):
+            _native.NativeSchema("object", obj.children, (*obj.args[:4], ((),)))
+
     def test_cyclic_issue_branches_raise_recursion_error(self):
         issue = Issue("custom", "boom")
         object.__setattr__(issue, "branches", ((issue,),))

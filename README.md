@@ -594,6 +594,7 @@ Inputs must be acyclic. The native evaluator raises `RecursionError` at 256 nest
 ## Limits and security notes
 
 - `.regex()` evaluates author-supplied Python patterns with `re.search`. A pathological pattern can backtrack catastrophically on crafted input; never use untrusted patterns. The built-in format helpers use fixed patterns.
+- Enforce request-body size limits before JSON decoding.
 - Nested non-discriminated unions evaluate every failing branch, so worst-case cost grows exponentially with nesting. Use `z.discriminated_union()` when branches share a discriminator.
 - On GIL builds, native evaluation holds the GIL for the duration of a synchronous parse. Very large inputs can block other Python threads; there is no GIL-release path. Free-threaded wheels do not use a GIL, but evaluation still runs on the calling thread.
 

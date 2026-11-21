@@ -283,6 +283,18 @@ class SchemaTests(unittest.TestCase):
         )
         self.assertEqual(z.integer().nullable().parse_json(b"null"), None)
         self.assertEqual(z.integer().optional().nonoptional().parse_json(b"1"), 1)
+        for field in (
+            z.integer().optional(), z.integer().nullish(), z.integer().optional().nullable(),
+            z.integer().optional().nonoptional(), z.integer().default(42), z.integer().catch(0),
+        ):
+            with self.subTest(field=field):
+                wrapped = z.object({"x": field}).strict()
+                ordinary = wrapped.safe_parse({})
+                decoded = wrapped.safe_parse_json(b"{}")
+                if isinstance(ordinary, Failure):
+                    self.assertEqual(decoded.error.to_dict(), ordinary.error.to_dict())
+                else:
+                    self.assertEqual(decoded.data, ordinary.data)
         self.assertEqual(z.string().regex("^a+$").parse_json(b'"aaa"'), "aaa")
         self.assertIsInstance(
             z.string().regex("^a+$").safe_parse_json(b'"b"'), Failure,
