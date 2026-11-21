@@ -60,10 +60,14 @@ z.codecs.iso_datetime()   # ISO datetime <-> datetime
 z.codecs.iso_duration()   # ISO 8601 duration <-> timedelta
 z.codecs.decimal()        # decimal string <-> Decimal
 z.codecs.json_text()      # JSON text <-> JSON-compatible values
-z.codecs.path()           # path string <-> pathlib.Path
+z.codecs.path()           # path string <-> pathlib.PurePath
 z.codecs.bytes_base64()   # padded base64 <-> bytes
 z.codecs.bytes_base64(urlsafe=True)
 ```
+
+`z.codecs.path()` decodes to a lexical `pathlib.PurePath`. `z.path()` accepts
+existing pure and concrete paths. Both accept absolute paths and parent
+components. Enforce the application's allowed directory before opening a file.
 
 Each helper returns a `CodecSchema` and accepts an optional `message` where a
 syntax error is possible. Invalid JSON reports `invalid_format` with a

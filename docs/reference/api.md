@@ -262,7 +262,7 @@ a non-ASCII digit, or a non-finite result produces `invalid_type`.
 | `z.codecs.iso_date()`, `iso_time()`, `iso_datetime()` | ISO strings ↔ `date`, `time`, `datetime` |
 | `z.codecs.iso_duration()` | ISO 8601 duration string ↔ `timedelta` |
 | `z.codecs.decimal()`, `json_text()` | String ↔ `Decimal` or JSON-compatible values |
-| `z.codecs.path()`, `bytes_base64(urlsafe=False)` | String ↔ `Path` or `bytes` |
+| `z.codecs.path()`, `bytes_base64(urlsafe=False)` | String ↔ `PurePath` or `bytes` |
 | `z.codecs.dataclass(Cls, fields=None)` | Encoded dictionary ↔ dataclass instance; infers annotations, `Annotated[T, schema]`, and aliases with ordinary type parameters and defaults; `fields=` overrides inference |
 | `.decode(value)`, `.safe_decode(value)` | Decode; equivalent to `.parse()` and `.safe_parse()` |
 | `.decode_async(value)`, `.safe_decode_async(value)` | Await decoding, including async codecs |

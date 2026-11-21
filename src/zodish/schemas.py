@@ -241,7 +241,7 @@ def _encode_base64(value: builtins.bytes, urlsafe: bool) -> str:
 
 
 def _parse_path(value: str) -> _pathlib.PurePath:
-    return _pathlib.Path(value)
+    return _pathlib.PurePath(value)
 
 
 @_dataclass(frozen=True)

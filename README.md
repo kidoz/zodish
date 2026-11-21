@@ -390,7 +390,7 @@ z.codecs.iso_time()       # "12:30:00" <-> time
 z.codecs.iso_datetime()   # ISO datetime <-> datetime
 z.codecs.decimal()        # decimal string <-> Decimal
 z.codecs.json_text()      # JSON text <-> JSON-compatible values
-z.codecs.path()           # path string <-> pathlib.Path
+z.codecs.path()           # path string <-> pathlib.PurePath
 z.codecs.bytes_base64()   # padded base64 <-> bytes
 z.codecs.bytes_base64(urlsafe=True)
 ```
