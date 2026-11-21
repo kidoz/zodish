@@ -173,7 +173,7 @@ z.integer().validate(1)                           # True
 z.string().optional().unwrap()                    # the original string schema
 ```
 
-* `.catch(value)` returns a deep-copied fallback for validation failures and
+* `.catch(value)` snapshots its argument and returns a fresh deep copy for validation failures and
   missing input. A zero-argument callable is invoked instead of copied.
   Exceptions raised by callbacks still propagate.
 * `.nonoptional()` rejects missing input, overriding an inner optional/default.

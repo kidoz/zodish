@@ -64,6 +64,25 @@ class SchemaTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIsInstance(z.coerce.number().safe_parse(token), Failure)
 
+    def test_catch_snapshots_constants_and_enum_snapshots_choices(self):
+        source = [{"a": [1]}]
+        schema = z.integer().catch(source)
+        source[0]["a"].append(2)
+        first = schema.parse("bad")
+        self.assertEqual(first, [{"a": [1]}])
+        first.clear()
+        self.assertEqual(schema.parse(), [{"a": [1]}])
+        self.assertEqual(z.integer().catch(lambda: source).parse("bad"), [{"a": [1, 2]}])
+        choices = ["first", "second"]
+        enum_schema = z.enum(choices)
+        choices[0] = "later"
+        self.assertEqual(enum_schema.parse("first"), "first")
+        self.assertIsInstance(enum_schema.safe_parse("later"), Failure)
+        with self.assertRaises(TypeError):
+            z.literal([])
+        with self.assertRaises(TypeError):
+            z.enum([[]])
+
     def test_error_display_escapes_keys_and_preserves_structured_paths(self):
         key = "é\n\r\t\x1b\u2028b"
         display = r"é\n\r\t\x1b\u2028b"

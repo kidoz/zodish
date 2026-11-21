@@ -744,6 +744,8 @@ class Schema[Out, In = Out]:
         """
         if callable(fallback):
             fallback = _sync_callback(fallback, "catch fallback")
+        else:
+            fallback = _copy.deepcopy(fallback)
         return Schema[Out | U, In](
             NativeSchema("catch", (self._node,), (fallback,)),
             _inner=self,
