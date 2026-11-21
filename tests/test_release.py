@@ -16,6 +16,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_test_workflow_uses_a_read_only_token(self):
+        workflow = (ROOT / ".github/workflows/tests.yml").read_text(encoding="utf-8")
+        self.assertRegex(workflow, r"(?m)^permissions:\n  contents: read\n\S")
+        self.assertNotRegex(workflow, r"(?m)^\s*[\w-]+: (?:write|write-all)\s*$")
+
     def test_maturin_excludes_local_install_metadata(self):
         with (ROOT / "pyproject.toml").open("rb") as manifest:
             excluded = tomllib.load(manifest)["tool"]["maturin"]["exclude"]
