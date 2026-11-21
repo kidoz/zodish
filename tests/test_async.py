@@ -49,6 +49,15 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         except ValidationError as error:
             return Failure(error)
 
+    async def test_async_object_fast_path_rejects_missing(self):
+        async def identity(value):
+            return value
+
+        schema = z.object({"a": z.unknown(), "b": z.string().transform_async(identity)})
+        failure = await schema.safe_parse_async({"a": MISSING, "b": "ok"})
+        self.assertEqual([(i.code, i.path) for i in failure.error.issues], [("required", ("a",))])
+        self.assertEqual(await schema.parse_async({"a": None, "b": "ok"}), {"a": None, "b": "ok"})
+
     async def test_compound_codec_context_and_issue_paths_across_suspension(self):
         async def check(value, context):
             await asyncio.sleep(0)

@@ -55,7 +55,7 @@ impl NativeSchema {
                         PyRecursionError::new_err("Native schema depth exceeds 256 nodes").into(),
                     );
                 }
-                if let Some(parsed) = fast_array_list(py, list, child_kind)? {
+                if let Some(parsed) = fast_array_list(ctx, list, child_kind)? {
                     return Ok(parsed);
                 }
             }
@@ -247,7 +247,7 @@ impl NativeSchema {
                 if is_present
                     && depth + 1 < MAX_DEPTH
                     && is_primitive_kind(child.kind)
-                    && primitive_matches(&raw, child.kind)?
+                    && primitive_matches(&raw, child.kind, &ctx.missing)?
                 {
                     result.set_item(&key, &raw)?;
                     continue;
@@ -442,16 +442,16 @@ impl<'py> ItemBuffer<'py> {
 }
 
 fn fast_array_list(
-    py: Python<'_>,
+    ctx: &Context<'_>,
     list: &Bound<'_, PyList>,
     kind: Kind,
 ) -> PyResult<Option<Py<PyAny>>> {
     let mut parsed = Vec::with_capacity(list.len());
     for item in list.iter() {
-        if !primitive_matches(&item, kind)? {
+        if !primitive_matches(&item, kind, &ctx.missing)? {
             return Ok(None);
         }
         parsed.push(item.unbind());
     }
-    Ok(Some(PyList::new(py, parsed)?.into_any().unbind()))
+    Ok(Some(PyList::new(ctx.py, parsed)?.into_any().unbind()))
 }

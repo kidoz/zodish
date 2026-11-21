@@ -21,6 +21,22 @@ from zodish._errors import _issue_from_raw
 
 
 class NativeTests(unittest.TestCase):
+    def test_unknown_fast_paths_reject_missing(self):
+        required = z.unknown()
+        for schema, raw, paths in (
+            (required, MISSING, [()]),
+            (required.array(), [None, MISSING, MISSING], [(1,), (2,)]),
+            (z.tuple(required), (MISSING,), [(0,)]),
+            (z.object({"a": required, "b": required}), {"a": MISSING}, [("a",), ("b",)]),
+        ):
+            with self.subTest(schema=schema):
+                result = schema.safe_parse(raw)
+                self.assertIsInstance(result, Failure)
+                self.assertEqual([(i.code, i.path) for i in result.error.issues],
+                                 [("required", path) for path in paths])
+        self.assertEqual(required.array().parse([None]), [None])
+        self.assertEqual(z.object({"a": required.optional()}).parse({"a": MISSING}), {})
+
     def test_multiple_of_preserves_large_float_remainders(self):
         valid = (
             (1000000000000000.0, 2),

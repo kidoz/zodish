@@ -22,7 +22,14 @@ pub(crate) fn literal_description(value: &Bound<'_, PyAny>) -> PyResult<String> 
     }
 }
 
-pub(crate) fn primitive_matches(item: &Bound<'_, PyAny>, kind: Kind) -> PyResult<bool> {
+pub(crate) fn primitive_matches(
+    item: &Bound<'_, PyAny>,
+    kind: Kind,
+    missing: &Bound<'_, PyAny>,
+) -> PyResult<bool> {
+    if item.is(missing) {
+        return Ok(false);
+    }
     Ok(match kind {
         Kind::String => item.is_instance_of::<PyString>(),
         Kind::Integer => item.is_exact_instance_of::<PyInt>(),

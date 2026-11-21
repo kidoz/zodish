@@ -90,7 +90,11 @@ impl AsyncSession {
                     && raw.is_some()
                     && depth + 1 < MAX_DEPTH
                     && is_primitive_kind(child.kind)
-                    && primitive_matches(raw.as_ref().expect("present value"), child.kind)?;
+                    && primitive_matches(
+                        raw.as_ref().expect("present value"),
+                        child.kind,
+                        &ctx.missing,
+                    )?;
                 values.push(Some(match raw {
                     Some(raw) => raw.unbind(),
                     None => ctx.missing.clone().unbind(),
