@@ -16,7 +16,6 @@ use super::{
 };
 use crate::MAX_DEPTH;
 use crate::errors::{Error, Path};
-use crate::runtime::LazyStore;
 use crate::schema::{Kind, NativeSchema, select_discriminated_branch};
 use crate::values::{coerce_value, deepcopy};
 
@@ -245,55 +244,12 @@ impl AsyncSession {
             }
             Kind::Lazy => {
                 let key = &*node_ref as *const NativeSchema as usize;
-                let resolved = match ctx.lazy_store.last(py, key) {
-                    Some(node) => node,
-                    None => match ctx.lazy_store.find(py, key) {
-                        Some(node) => {
-                            ctx.lazy_store.set_last(key, node.clone_ref(py));
-                            node
-                        }
-                        None => {
-                            let factory = node_ref.args[0].clone_ref(py);
-                            drop(node_ref);
-                            let schema = match factory.bind(py).call0() {
-                                Ok(schema) => schema,
-                                Err(error) => {
-                                    return Ok(AsyncNext::Task(AsyncTask::Deliver {
-                                        outcome: Err(Error::Python(error)),
-                                        path,
-                                    }));
-                                }
-                            };
-                            let schema = match schema.getattr("_node") {
-                                Ok(schema) => schema,
-                                Err(error) => {
-                                    return Ok(AsyncNext::Task(AsyncTask::Deliver {
-                                        outcome: Err(Error::Python(error)),
-                                        path,
-                                    }));
-                                }
-                            };
-                            let node = match schema.cast_into::<NativeSchema>() {
-                                Ok(node) => node.unbind(),
-                                Err(error) => {
-                                    return Ok(AsyncNext::Task(AsyncTask::Deliver {
-                                        outcome: Err(Error::Python(error.into())),
-                                        path,
-                                    }));
-                                }
-                            };
-                            ctx.lazy_store.push(key, node.clone_ref(py));
-                            ctx.lazy_store.set_last(key, node.clone_ref(py));
-                            return Ok(AsyncNext::Task(AsyncTask::Eval {
-                                node,
-                                value,
-                                path,
-                                depth: depth + 1,
-                            }));
-                        }
-                    },
-                };
+                let factory = node_ref.args[0].clone_ref(py);
                 drop(node_ref);
+                let resolved = match ctx.lazy_store.resolve(py, key, factory.bind(py)) {
+                    Ok(resolved) => resolved,
+                    Err(error) => return Ok(super::deliver_at(Err(Error::Python(error)), path)),
+                };
                 Ok(AsyncNext::Task(AsyncTask::Eval {
                     node: resolved,
                     value,

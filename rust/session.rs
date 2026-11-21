@@ -332,8 +332,6 @@ impl AsyncSession {
         self.frames.clear();
         self.pending = None;
         self.awaitable = None;
-        self.lazy_store.lock().unwrap().cache.clear();
-        self.lazy_store.lock().unwrap().last = None;
         let node = self
             .node
             .as_ref()
@@ -509,11 +507,12 @@ impl AsyncSession {
         for frame in &self.frames {
             visit_async_frame(frame, &visit)?;
         }
-        if let Ok(store) = self.lazy_store.lock() {
+        {
+            let store = self
+                .lazy_store
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
             for (_, node) in store.cache.iter() {
-                visit.call(node)?;
-            }
-            if let Some((_, node)) = store.last.as_ref() {
                 visit.call(node)?;
             }
         }
@@ -584,8 +583,14 @@ impl AsyncSession {
         self.frames.clear();
         self.pending = None;
         self.awaitable = None;
-        self.lazy_store.lock().unwrap().cache.clear();
-        self.lazy_store.lock().unwrap().last = None;
+        let cached = {
+            let mut guard = self
+                .lazy_store
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            std::mem::take(&mut *guard)
+        };
+        drop(cached);
         self.thread = None;
     }
 

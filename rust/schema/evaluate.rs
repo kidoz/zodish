@@ -12,7 +12,7 @@ use super::{
 };
 use crate::MAX_DEPTH;
 use crate::errors::{Error, Issue, Path, PathPart, Result};
-use crate::runtime::{Context, LazyStore};
+use crate::runtime::Context;
 use crate::stack::ensure_stack;
 use crate::values::{
     coerce_value, deepcopy, enum_message, is_json_value, literal_description, merge_dicts,
@@ -106,25 +106,7 @@ impl NativeSchema {
             }
             Kind::Lazy => {
                 let key = self as *const Self as usize;
-                let node = match ctx.lazy_store.last(py, key) {
-                    Some(node) => node,
-                    None => match ctx.lazy_store.find(py, key) {
-                        Some(node) => {
-                            ctx.lazy_store.set_last(key, node.clone_ref(py));
-                            node
-                        }
-                        None => {
-                            let schema = self.args[0].bind(py).call0()?.getattr("_node")?;
-                            let node: Py<NativeSchema> = schema
-                                .cast_into::<NativeSchema>()
-                                .map_err(PyErr::from)?
-                                .unbind();
-                            ctx.lazy_store.push(key, node.clone_ref(py));
-                            ctx.lazy_store.set_last(key, node.clone_ref(py));
-                            node
-                        }
-                    },
-                };
+                let node = ctx.lazy_store.resolve(py, key, self.args[0].bind(py))?;
                 node.try_borrow(py)
                     .map_err(PyErr::from)?
                     .validate(ctx, value, path, depth + 1)

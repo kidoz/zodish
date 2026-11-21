@@ -3,6 +3,7 @@
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -12,42 +13,7 @@ use crate::schema::NativeSchema;
 #[derive(Default)]
 pub(crate) struct LazyState {
     pub(crate) cache: Vec<(usize, Py<NativeSchema>)>,
-    pub(crate) last: Option<(usize, Py<NativeSchema>)>,
-}
-
-pub(crate) trait LazyStore {
-    fn last(&self, py: Python<'_>, key: usize) -> Option<Py<NativeSchema>>;
-    fn set_last(&self, key: usize, node: Py<NativeSchema>);
-    fn find(&self, py: Python<'_>, key: usize) -> Option<Py<NativeSchema>>;
-    fn push(&self, key: usize, node: Py<NativeSchema>);
-}
-
-impl LazyStore for RefCell<LazyState> {
-    fn last(&self, py: Python<'_>, key: usize) -> Option<Py<NativeSchema>> {
-        let store = self.borrow();
-        store
-            .last
-            .as_ref()
-            .and_then(|(cached_key, node)| (*cached_key == key).then(|| node.clone_ref(py)))
-    }
-
-    fn set_last(&self, key: usize, node: Py<NativeSchema>) {
-        self.borrow_mut().last = Some((key, node));
-    }
-
-    fn find(&self, py: Python<'_>, key: usize) -> Option<Py<NativeSchema>> {
-        let store = self.borrow();
-        store
-            .cache
-            .iter()
-            .rev()
-            .find(|(cached_key, _)| *cached_key == key)
-            .map(|(_, node)| node.clone_ref(py))
-    }
-
-    fn push(&self, key: usize, node: Py<NativeSchema>) {
-        self.borrow_mut().cache.push((key, node));
-    }
+    last: usize,
 }
 
 pub(crate) enum LazyHandle {
@@ -55,61 +21,49 @@ pub(crate) enum LazyHandle {
     Shared(Arc<Mutex<LazyState>>),
 }
 
-impl LazyStore for LazyHandle {
-    fn last(&self, py: Python<'_>, key: usize) -> Option<Py<NativeSchema>> {
+impl LazyHandle {
+    fn with_state<T>(&self, f: impl FnOnce(&mut LazyState) -> T) -> PyResult<T> {
         match self {
-            Self::Local(store) => store.last(py, key),
-            Self::Shared(store) => store.last(py, key),
+            Self::Local(state) => Ok(f(&mut state.borrow_mut())),
+            Self::Shared(state) => {
+                let mut guard = state
+                    .lock()
+                    .map_err(|_| PyRuntimeError::new_err("Lazy cache lock poisoned"))?;
+                Ok(f(&mut guard))
+            }
         }
     }
 
-    fn set_last(&self, key: usize, node: Py<NativeSchema>) {
-        match self {
-            Self::Local(store) => store.set_last(key, node),
-            Self::Shared(store) => store.set_last(key, node),
+    pub(crate) fn resolve(
+        &self,
+        py: Python<'_>,
+        key: usize,
+        factory: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<NativeSchema>> {
+        let cached = self.with_state(|state| {
+            if !state
+                .cache
+                .get(state.last)
+                .is_some_and(|(id, _)| *id == key)
+            {
+                state.last = state.cache.iter().rposition(|(id, _)| *id == key)?;
+            }
+            Some(state.cache[state.last].1.clone_ref(py))
+        })?;
+        if let Some(node) = cached {
+            return Ok(node);
         }
-    }
-
-    fn find(&self, py: Python<'_>, key: usize) -> Option<Py<NativeSchema>> {
-        match self {
-            Self::Local(store) => store.find(py, key),
-            Self::Shared(store) => store.find(py, key),
-        }
-    }
-
-    fn push(&self, key: usize, node: Py<NativeSchema>) {
-        match self {
-            Self::Local(store) => store.push(key, node),
-            Self::Shared(store) => store.push(key, node),
-        }
-    }
-}
-
-impl LazyStore for Mutex<LazyState> {
-    fn last(&self, py: Python<'_>, key: usize) -> Option<Py<NativeSchema>> {
-        let store = self.lock().unwrap();
-        store
-            .last
-            .as_ref()
-            .and_then(|(cached_key, node)| (*cached_key == key).then(|| node.clone_ref(py)))
-    }
-
-    fn set_last(&self, key: usize, node: Py<NativeSchema>) {
-        self.lock().unwrap().last = Some((key, node));
-    }
-
-    fn find(&self, py: Python<'_>, key: usize) -> Option<Py<NativeSchema>> {
-        let store = self.lock().unwrap();
-        store
-            .cache
-            .iter()
-            .rev()
-            .find(|(cached_key, _)| *cached_key == key)
-            .map(|(_, node)| node.clone_ref(py))
-    }
-
-    fn push(&self, key: usize, node: Py<NativeSchema>) {
-        self.lock().unwrap().cache.push((key, node));
+        // Factory calls and Python finalizers must run outside the cache lock.
+        let node = factory
+            .call0()?
+            .getattr("_node")?
+            .cast_into::<NativeSchema>()?
+            .unbind();
+        self.with_state(|state| {
+            state.last = state.cache.len();
+            state.cache.push((key, node.clone_ref(py)));
+        })?;
+        Ok(node)
     }
 }
 
@@ -216,5 +170,22 @@ impl Context<'_> {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn poisoned_lazy_cache_returns_an_error() {
+        let state = Arc::new(Mutex::new(LazyState::default()));
+        let holder = Arc::clone(&state);
+        let worker = std::thread::spawn(move || {
+            let _guard = holder.lock().unwrap();
+            panic!("simulate a failed cache update");
+        });
+        assert!(worker.join().is_err());
+        assert!(LazyHandle::Shared(state).with_state(|_| ()).is_err());
     }
 }

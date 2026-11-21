@@ -949,6 +949,32 @@ print("all cases ok")
 
 
 class AsyncSessionProtocolTests(unittest.IsolatedAsyncioTestCase):
+    async def test_close_releases_resolved_lazy_nodes(self):
+        refs = []
+
+        def factory():
+            async def identity(value):
+                return value
+
+            refs.append(weakref.ref(identity))
+            return z.integer().transform_async(identity)
+
+        left, right = z.lazy(factory), z.lazy(factory)
+        schema = z.tuple(left, right, left)
+        session = _native.AsyncSession(schema._node, [1, 2, 3], MISSING, Issue, ValidationError)
+        done, pending = session.start()
+        for _ in range(2):
+            self.assertFalse(done)
+            token, awaiting = pending
+            done, pending = session.resume_value(token, await awaiting)
+        self.assertFalse(done)
+        self.assertEqual(len(refs), 2)
+        self.assertTrue(all(ref() is not None for ref in refs))
+        session.close()
+        del pending, awaiting
+        gc.collect()
+        self.assertEqual([ref() for ref in refs], [None, None])
+
     async def test_successful_session_releases_references(self):
         class Payload:
             pass
