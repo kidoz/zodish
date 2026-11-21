@@ -64,6 +64,18 @@ class SchemaTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIsInstance(z.coerce.number().safe_parse(token), Failure)
 
+    def test_email_domain_labels(self):
+        email = z.string().email()
+        for address in ("a.b+tag@xn--bcher-kva.example", "USER@" + "a" * 63 + ".com"):
+            self.assertEqual(email.parse(address), address)
+        for address in (
+            "user@example.com,evil", "user@a_b.com", "user@-bad.com", "user@bad-.com",
+            "user@a..com", "user@" + "a" * 64 + ".com", "user@é.com", "a..b@example.com",
+        ):
+            with self.subTest(address=address):
+                issue, = email.safe_parse(address).error.issues
+                self.assertEqual((issue.code, issue.params["format"]), ("invalid_format", "email"))
+
     def test_catch_snapshots_constants_and_enum_snapshots_choices(self):
         source = [{"a": [1]}]
         schema = z.integer().catch(source)

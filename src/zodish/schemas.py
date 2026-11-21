@@ -115,11 +115,10 @@ _BASE64URL_PATTERN = (
     r"^(?:[A-Za-z0-9_-]{4})*"
     r"(?:[A-Za-z0-9_-]{2}==|[A-Za-z0-9_-]{3}=|[A-Za-z0-9_-]{2,3})?(?![\s\S])"
 )
-_HOSTNAME_PATTERN = (
-    r"^(?=.{1,253}$)"
-    r"(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)"
-    r"(?:\.(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))*(?![\s\S])"
-)
+_DOMAIN_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+_HOSTNAME_PATTERN = rf"^(?=.{{1,253}}$){_DOMAIN_LABEL}(?:\.{_DOMAIN_LABEL})*(?![\s\S])"
+_EMAIL_ATOM = r"[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+"
+_EMAIL_PATTERN = rf"^{_EMAIL_ATOM}(?:\.{_EMAIL_ATOM})*@{_DOMAIN_LABEL}(?:\.{_DOMAIN_LABEL})+\Z"
 _ULID_PATTERN = r"(?i)^[0-7][0-9A-HJKMNP-TV-Z]{25}(?![\s\S])"
 _CUID_PATTERN = r"(?i)^c[^\s-]{8,}(?![\s\S])"
 _CUID2_PATTERN = r"^[a-z][a-z0-9]{1,31}(?![\s\S])"
@@ -283,10 +282,8 @@ class StringSchema(Schema[str, str]):
         return self._regex(pattern, message, "regex")
 
     def email(self, *, message: str = "Invalid email address") -> Self:
-        """Basic ASCII-style address syntax, not deliverability validation."""
-        return self._regex(
-            r"^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+\Z", message, "email",
-        )
+        """Check an ASCII dot-atom address with dot-separated DNS labels."""
+        return self._regex(_EMAIL_PATTERN, message, "email")
 
     def url(self, *, message: str = "Invalid URL") -> Self:
         return self._regex(_URL_PATTERN, message, "uri")
@@ -340,6 +337,7 @@ class StringSchema(Schema[str, str]):
         return self._regex(_NANOID_PATTERN, message, "nanoid")
 
     def jwt(self, *, message: str = "Invalid JWT") -> Self:
+        """Check three base64url-shaped segments. Signature, algorithm and claims are unchecked."""
         return self._regex(_JWT_PATTERN, message, "jwt")
 
     def e164(self, *, message: str = "Invalid E.164 number") -> Self:

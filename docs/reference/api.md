@@ -49,8 +49,16 @@ formats.
 backtrack exponentially on crafted input. The built-in format helpers use fixed
 patterns and do not take pattern input.
 
-`.http_url()` accepts only `http` and `https` schemes. `.hex()` accepts one or
-more hexadecimal digits and does not require an even length. `.cidrv4()` and
+`.email()` accepts an ASCII dot-atom local part followed by two or more DNS labels.
+Each label contains 1–63 ASCII letters, digits, or internal hyphens. Mailbox
+existence and deliverability require separate checks. `.jwt()` checks the shape
+of three base64url segments. Applications must verify the algorithm, signature,
+and claims before trusting a token.
+
+`.url()` checks scheme syntax and allows user information. Applications that fetch
+a URL must enforce their own host and destination policy. `.http_url()` accepts
+only `http` and `https` schemes. `.hex()` accepts one or more hexadecimal digits
+and permits odd lengths. `.cidrv4()` and
 `.cidrv6()` validate address syntax and the prefix range; host bits may be set.
 `.duration()` accepts an optional sign, weeks, days, and time components.
 Calendar years and months are rejected because `timedelta` cannot represent
