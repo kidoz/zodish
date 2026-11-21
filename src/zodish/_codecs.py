@@ -142,29 +142,62 @@ class CodecSchema[Out, In = Out](Schema[Out, In]):
         return await self.safe_parse_async(value, error=error)
 
     def optional(self) -> CodecSchema[Out | Missing, In | Missing]:
-        result = _optional_codec(self)
-        return cast(
-            CodecSchema[Out | Missing, In | Missing],
-            replace(result, _meta=self._meta),
+        output_schema = self.output_schema.optional()
+        json_output_schema = _json_output_schema_for(self).optional()
+        return _compound_codec_type(self)(
+            NativeSchema("optional", (self._node,), ()),
+            _encode_node=NativeSchema("optional", (self._encode_node,), ()),
+            _input_schema=self.input_schema.optional(),
+            _output_schema=output_schema,
+            _json_output_schema=json_output_schema,
+            _inner=output_schema,
+            _meta=self._meta,
         )
 
     def nonoptional(self) -> CodecSchema[Out, In]:
-        result = _nonoptional_codec(self)
-        return cast(CodecSchema[Out, In], replace(result, _meta=self._meta))
-
-    def nullable(self) -> CodecSchema[Out | None, In | None]:
-        result = _nullable_codec(self)
-        return cast(
-            CodecSchema[Out | None, In | None],
-            replace(result, _meta=self._meta),
+        output_schema = self.output_schema.nonoptional()
+        json_output_schema = _json_output_schema_for(self).nonoptional()
+        return _compound_codec_type(self)(
+            NativeSchema("nonoptional", (self._node,), ()),
+            _encode_node=NativeSchema("nonoptional", (self._encode_node,), ()),
+            _input_schema=self.input_schema.nonoptional(),
+            _output_schema=output_schema,
+            _json_output_schema=json_output_schema,
+            _inner=output_schema,
+            _meta=self._meta,
         )
 
-    def nullish(self) -> CodecSchema[Out | Missing | None, In | Missing | None]:
+    def nullable(self) -> CodecSchema[Out | None, In | None]:
+        output_schema = self.output_schema.nullable()
+        json_output_schema = _json_output_schema_for(self).nullable()
+        return _compound_codec_type(self)(
+            NativeSchema("nullable", (self._node,), ()),
+            _encode_node=NativeSchema("nullable", (self._encode_node,), ()),
+            _input_schema=self.input_schema.nullable(),
+            _output_schema=output_schema,
+            _json_output_schema=json_output_schema,
+            _inner=output_schema,
+            _meta=self._meta,
+        )
+
+    def nullish(
+        self,
+    ) -> CodecSchema[Out | Missing | None, In | Missing | None]:
         return self.nullable().optional()
 
     def record(self) -> CodecSchema[dict[str, Out], dict[str, In]]:
-        result = _record_codec(self)
-        return cast(CodecSchema[dict[str, Out], dict[str, In]], result)
+        output_schema = record(self.output_schema)
+        json_output_schema = record(_json_output_schema_for(self))
+        return _compound_codec_type(self)(
+            NativeSchema("record", (_codec_item(self._node),), (None,)),
+            _encode_node=NativeSchema(
+                "record", (_codec_item(self._encode_node),), (None,),
+            ),
+            _input_schema=record(self.input_schema),
+            _output_schema=output_schema,
+            _json_output_schema=json_output_schema,
+            _inner=output_schema,
+        )
 
 
 @dataclass(frozen=True)
@@ -190,92 +223,41 @@ class AsyncCodecSchema[Out, In = Out](CodecSchema[Out, In]):
         )
 
     def optional(self) -> AsyncCodecSchema[Out | Missing, In | Missing]:
-        output_schema = self.output_schema.optional()
-        json_output_schema = _json_output_schema_for(self).optional()
-        return AsyncCodecSchema[Out | Missing, In | Missing](
-            NativeSchema("optional", (self._node,), ()),
-            _encode_node=NativeSchema("optional", (self._encode_node,), ()),
-            _input_schema=self.input_schema.optional(),
-            _output_schema=output_schema,
-            _json_output_schema=json_output_schema,
-            _inner=output_schema,
-            _meta=self._meta,
-        )
+        return cast(AsyncCodecSchema[Out | Missing, In | Missing], super().optional())
 
     def nonoptional(self) -> AsyncCodecSchema[Out, In]:
-        output_schema = self.output_schema.nonoptional()
-        json_output_schema = _json_output_schema_for(self).nonoptional()
-        return AsyncCodecSchema[Out, In](
-            NativeSchema("nonoptional", (self._node,), ()),
-            _encode_node=NativeSchema("nonoptional", (self._encode_node,), ()),
-            _input_schema=self.input_schema.nonoptional(),
-            _output_schema=output_schema,
-            _json_output_schema=json_output_schema,
-            _inner=output_schema,
-            _meta=self._meta,
-        )
+        return cast(AsyncCodecSchema[Out, In], super().nonoptional())
 
     def nullable(self) -> AsyncCodecSchema[Out | None, In | None]:
-        output_schema = self.output_schema.nullable()
-        json_output_schema = _json_output_schema_for(self).nullable()
-        return AsyncCodecSchema[Out | None, In | None](
-            NativeSchema("nullable", (self._node,), ()),
-            _encode_node=NativeSchema("nullable", (self._encode_node,), ()),
-            _input_schema=self.input_schema.nullable(),
-            _output_schema=output_schema,
-            _json_output_schema=json_output_schema,
-            _inner=output_schema,
-            _meta=self._meta,
-        )
+        return cast(AsyncCodecSchema[Out | None, In | None], super().nullable())
 
-    def nullish(
-        self,
-    ) -> AsyncCodecSchema[Out | Missing | None, In | Missing | None]:
+    def nullish(self) -> AsyncCodecSchema[Out | Missing | None, In | Missing | None]:
         return self.nullable().optional()
 
     def record(self) -> AsyncCodecSchema[dict[str, Out], dict[str, In]]:
-        output_schema = record(self.output_schema)
-        json_output_schema = record(_json_output_schema_for(self))
-        return AsyncCodecSchema[dict[str, Out], dict[str, In]](
-            NativeSchema("record", (self._node,), (None,)),
-            _encode_node=NativeSchema(
-                "record", (self._encode_node,), (None,),
-            ),
-            _input_schema=record(self.input_schema),
-            _output_schema=output_schema,
-            _json_output_schema=json_output_schema,
-            _inner=output_schema,
-        )
+        return cast(AsyncCodecSchema[dict[str, Out], dict[str, In]], super().record())
 
 
-def _is_async_codec(codec: CodecSchema[Any, Any]) -> bool:
-    return codec._node.has_async or codec._encode_node.has_async
+def _compound_codec_type(
+    *children: CodecSchema[Any, Any],
+) -> type[_CompoundCodecSchema[Any, Any]] | type[AsyncCodecSchema[Any, Any]]:
+    if any(child._node.has_async or child._encode_node.has_async for child in children):
+        return AsyncCodecSchema
+    return _CompoundCodecSchema
 
 
-def _promote_async_codec(
-    codec: CodecSchema[Any, Any],
-) -> AsyncCodecSchema[Any, Any]:
-    if isinstance(codec, AsyncCodecSchema):
-        return codec
-    return AsyncCodecSchema[Any, Any](
-        codec._node,
-        _encode_node=codec._encode_node,
-        _input_schema=codec.input_schema,
-        _output_schema=codec.output_schema,
-        _json_output_schema=_json_output_schema_for(codec),
-        _inner=codec._inner,
-        _meta=codec._meta,
-    )
+def _codec_item(node: NativeSchema) -> NativeSchema:
+    return NativeSchema("codec_item", (node,), ())
 
 
-def _async_array_codec(
+def _array_codec(
     inner: CodecSchema[Any, Any],
-) -> AsyncCodecSchema[Any, Any]:
+) -> CodecSchema[Any, Any]:
     output_schema = array(inner.output_schema)
     # Collection constructors start with empty metadata.
-    return AsyncCodecSchema[Any, Any](
-        NativeSchema("array", (inner._node,), ()),
-        _encode_node=NativeSchema("array", (inner._encode_node,), ()),
+    return _compound_codec_type(inner)(
+        NativeSchema("array", (_codec_item(inner._node),), ()),
+        _encode_node=NativeSchema("array", (_codec_item(inner._encode_node),), ()),
         _input_schema=array(inner.input_schema),
         _output_schema=output_schema,
         _json_output_schema=array(_json_output_schema_for(inner)),
@@ -283,13 +265,20 @@ def _async_array_codec(
     )
 
 
-def _async_union_codec(
-    branches: Sequence[CodecSchema[Any, Any]],
-) -> AsyncCodecSchema[Any, Any]:
+def _union_codec(options: Sequence[Schema[Any, Any]]) -> CodecSchema[Any, Any]:
+    if not options:
+        raise ValueError("Union codec requires at least one schema")
+    if len(options) == 1:
+        option = options[0]
+        return option if isinstance(option, CodecSchema) else _identity_codec(option)
+    branches = [
+        option if isinstance(option, CodecSchema) else _identity_codec(option)
+        for option in options
+    ]
     output_schema = union(*(branch.output_schema for branch in branches))
     # Composition constructors start with empty metadata; no single branch owns
     # the container's title or description.
-    return AsyncCodecSchema[Any, Any](
+    return _compound_codec_type(*branches)(
         NativeSchema(
             "union",
             builtins.tuple(branch._node for branch in branches),
@@ -309,21 +298,23 @@ def _async_union_codec(
     )
 
 
-def _async_tuple_codec(
-    branches: Sequence[CodecSchema[Any, Any]],
-) -> AsyncCodecSchema[Any, Any]:
+def _tuple_codec(options: Sequence[Schema[Any, Any]]) -> CodecSchema[Any, Any]:
+    branches = [
+        option if isinstance(option, CodecSchema) else _identity_codec(option)
+        for option in options
+    ]
     output_schema = tuple(*(branch.output_schema for branch in branches))
     # Composition constructors start with empty metadata; no single branch owns
     # the container's title or description.
-    return AsyncCodecSchema[Any, Any](
+    return _compound_codec_type(*branches)(
         NativeSchema(
             "tuple",
-            builtins.tuple(branch._node for branch in branches),
+            builtins.tuple(_codec_item(branch._node) for branch in branches),
             (None,),
         ),
         _encode_node=NativeSchema(
             "tuple",
-            builtins.tuple(branch._encode_node for branch in branches),
+            builtins.tuple(_codec_item(branch._encode_node) for branch in branches),
             (None,),
         ),
         _input_schema=tuple(*(branch.input_schema for branch in branches)),
@@ -585,305 +576,12 @@ def _replace_json_class_ref(
     return schema
 
 
-def _node_has_async_without_lazy(node: NativeSchema) -> bool:
-    """Detect async callbacks while ignoring lazy recursion placeholders."""
-    if node.kind == "lazy":
-        return False
-    if node.kind.startswith("async_"):
-        return True
-    if builtins.any(
-        _node_has_async_without_lazy(child) for child in node.children
-    ):
-        return True
-    for arg in node.args:
-        if isinstance(arg, NativeSchema):
-            if _node_has_async_without_lazy(arg):
-                return True
-        elif isinstance(arg, (builtins.tuple, builtins.list)):
-            if builtins.any(
-                isinstance(item, NativeSchema)
-                and _node_has_async_without_lazy(item)
-                for item in arg
-            ):
-                return True
-        elif isinstance(arg, Mapping) and builtins.any(
-            isinstance(item, NativeSchema)
-            and _node_has_async_without_lazy(item)
-            for item in arg.values()
-        ):
-            return True
-    return False
-
-
 def _identity_codec(schema: Schema[Any, Any]) -> CodecSchema[Any, Any]:
     return codec(
         schema,
         schema,
         decode=lambda value: value,
         encode=lambda value: value,
-    )
-
-
-def _codec_transform(
-    input_schema: Schema[Any, Any],
-    callback: Callable[[Any], Any],
-) -> NativeSchema:
-    """Validate only the container shape; inner codecs validate their items."""
-    return NativeSchema("transform", (input_schema._node,), (callback,))
-
-
-def _array_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
-    if _is_async_codec(inner):
-        return _async_array_codec(_promote_async_codec(inner))
-
-    def decode_values(values: list[Any]) -> list[Any]:
-        result: list[Any] = []
-        issues: list[Issue] = []
-        for index, value in enumerate(values):
-            try:
-                result.append(inner.decode(value))
-            except ValidationError as error:
-                issues.extend(_prefix_issue(item, index) for item in error.issues)
-        if issues:
-            raise ValidationError(issues)
-        return result
-
-    def encode_values(values: list[Any]) -> list[Any]:
-        result: list[Any] = []
-        issues: list[Issue] = []
-        for index, value in enumerate(values):
-            try:
-                result.append(inner.encode(value))
-            except ValidationError as error:
-                issues.extend(_prefix_issue(item, index) for item in error.issues)
-        if issues:
-            raise ValidationError(issues)
-        return result
-
-    output_schema = array(inner.output_schema)
-    placeholder = array(unknown())
-    # Collection constructors start with empty metadata.
-    return _CompoundCodecSchema[Any, Any](
-        _codec_transform(placeholder, decode_values),
-        _encode_node=_codec_transform(placeholder, encode_values),
-        _input_schema=array(inner.input_schema),
-        _output_schema=output_schema,
-        _json_output_schema=array(_json_output_schema_for(inner)),
-        _inner=output_schema,
-    )
-
-
-def _record_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
-    if _is_async_codec(inner):
-        return _promote_async_codec(inner).record()
-
-    def decode_values(values: dict[str, Any]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        issues: list[Issue] = []
-        for key, value in values.items():
-            try:
-                result[key] = inner.decode(value)
-            except ValidationError as error:
-                issues.extend(_prefix_issue(item, key) for item in error.issues)
-        if issues:
-            raise ValidationError(issues)
-        return result
-
-    def encode_values(values: dict[str, Any]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        issues: list[Issue] = []
-        for key, value in values.items():
-            try:
-                result[key] = inner.encode(value)
-            except ValidationError as error:
-                issues.extend(_prefix_issue(item, key) for item in error.issues)
-        if issues:
-            raise ValidationError(issues)
-        return result
-
-    output_schema = record(inner.output_schema)
-    placeholder = record(unknown())
-    # Collection constructors start with empty metadata.
-    return _CompoundCodecSchema[Any, Any](
-        _codec_transform(placeholder, decode_values),
-        _encode_node=_codec_transform(placeholder, encode_values),
-        _input_schema=record(inner.input_schema),
-        _output_schema=output_schema,
-        _json_output_schema=record(_json_output_schema_for(inner)),
-        _inner=output_schema,
-    )
-
-
-def _optional_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
-    if _is_async_codec(inner):
-        return _promote_async_codec(inner).optional()
-
-    def decode_value(value: Any) -> Any:
-        return MISSING if value is MISSING else inner.decode(value)
-
-    def encode_value(value: Any) -> Any:
-        return MISSING if value is MISSING else inner.encode(value)
-
-    output_schema = inner.output_schema.optional()
-    placeholder = unknown().optional()
-    return _CompoundCodecSchema[Any, Any](
-        _codec_transform(placeholder, decode_value),
-        _encode_node=_codec_transform(placeholder, encode_value),
-        _input_schema=inner.input_schema.optional(),
-        _output_schema=output_schema,
-        _json_output_schema=_json_output_schema_for(inner).optional(),
-        _inner=output_schema,
-        _meta=inner._meta,
-    )
-
-
-def _nonoptional_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
-    if _is_async_codec(inner):
-        return _promote_async_codec(inner).nonoptional()
-    output_schema = inner.output_schema.nonoptional()
-    placeholder = unknown().nonoptional()
-    return _CompoundCodecSchema[Any, Any](
-        _codec_transform(placeholder, inner.decode),
-        _encode_node=_codec_transform(placeholder, inner.encode),
-        _input_schema=inner.input_schema.nonoptional(),
-        _output_schema=output_schema,
-        _json_output_schema=_json_output_schema_for(inner).nonoptional(),
-        _inner=output_schema,
-        _meta=inner._meta,
-    )
-
-
-def _nullable_codec(inner: CodecSchema[Any, Any]) -> CodecSchema[Any, Any]:
-    if _is_async_codec(inner):
-        return _promote_async_codec(inner).nullable()
-
-    def decode_value(value: Any) -> Any:
-        return None if value is None else inner.decode(value)
-
-    def encode_value(value: Any) -> Any:
-        return None if value is None else inner.encode(value)
-
-    output_schema = inner.output_schema.nullable()
-    placeholder = unknown().nullable()
-    return _CompoundCodecSchema[Any, Any](
-        _codec_transform(placeholder, decode_value),
-        _encode_node=_codec_transform(placeholder, encode_value),
-        _input_schema=inner.input_schema.nullable(),
-        _output_schema=output_schema,
-        _json_output_schema=_json_output_schema_for(inner).nullable(),
-        _inner=output_schema,
-        _meta=inner._meta,
-    )
-
-
-def _union_codec(options: Sequence[Schema[Any, Any]]) -> CodecSchema[Any, Any]:
-    if not options:
-        raise ValueError("Union codec requires at least one schema")
-    if len(options) == 1:
-        option = options[0]
-        return option if isinstance(option, CodecSchema) else _identity_codec(option)
-    branches = [
-        option if isinstance(option, CodecSchema) else _identity_codec(option)
-        for option in options
-    ]
-    if any(_is_async_codec(branch) for branch in branches):
-        return _async_union_codec(branches)
-
-    def decode_value(value: Any) -> Any:
-        branch_issues: list[builtins.tuple[Issue, ...]] = []
-        for branch in branches:
-            try:
-                return branch.decode(value)
-            except ValidationError as error:
-                branch_issues.append(error.issues)
-        raise ValidationError([
-            Issue(
-                "invalid_union",
-                "No union branch matched",
-                branches=builtins.tuple(branch_issues),
-            ),
-        ])
-
-    def encode_value(value: Any) -> Any:
-        branch_issues: list[builtins.tuple[Issue, ...]] = []
-        for branch in branches:
-            try:
-                return branch.encode(value)
-            except ValidationError as error:
-                branch_issues.append(error.issues)
-        raise ValidationError([
-            Issue(
-                "invalid_union",
-                "No union branch matched",
-                branches=builtins.tuple(branch_issues),
-            ),
-        ])
-
-    output_schema = union(*(branch.output_schema for branch in branches))
-    placeholder = unknown().optional()
-    # Composition constructors start with empty metadata; no single branch owns
-    # the container's title or description.
-    return _CompoundCodecSchema[Any, Any](
-        _codec_transform(placeholder, decode_value),
-        _encode_node=_codec_transform(placeholder, encode_value),
-        _input_schema=union(*(branch.input_schema for branch in branches)),
-        _output_schema=output_schema,
-        _json_output_schema=union(
-            *(_json_output_schema_for(option) for option in options)
-        ),
-        _inner=output_schema,
-    )
-
-
-def _tuple_codec(options: Sequence[Schema[Any, Any]]) -> CodecSchema[Any, Any]:
-    branches = [
-        option if isinstance(option, CodecSchema) else _identity_codec(option)
-        for option in options
-    ]
-    if any(_is_async_codec(branch) for branch in branches):
-        return _async_tuple_codec(branches)
-
-    def decode_values(values: builtins.tuple[Any, ...]) -> builtins.tuple[Any, ...]:
-        result: list[Any] = []
-        issues: list[Issue] = []
-        for index, (branch, value) in enumerate(
-            zip(branches, values, strict=True),
-        ):
-            try:
-                result.append(branch.decode(value))
-            except ValidationError as error:
-                issues.extend(_prefix_issue(item, index) for item in error.issues)
-        if issues:
-            raise ValidationError(issues)
-        return builtins.tuple(result)
-
-    def encode_values(values: builtins.tuple[Any, ...]) -> builtins.tuple[Any, ...]:
-        result: list[Any] = []
-        issues: list[Issue] = []
-        for index, (branch, value) in enumerate(
-            zip(branches, values, strict=True),
-        ):
-            try:
-                result.append(branch.encode(value))
-            except ValidationError as error:
-                issues.extend(_prefix_issue(item, index) for item in error.issues)
-        if issues:
-            raise ValidationError(issues)
-        return builtins.tuple(result)
-
-    output_schema = tuple(*(branch.output_schema for branch in branches))
-    placeholder = tuple(*(unknown() for _ in branches))
-    # Composition constructors start with empty metadata; no single branch owns
-    # the container's title or description.
-    return _CompoundCodecSchema[Any, Any](
-        _codec_transform(placeholder, decode_values),
-        _encode_node=_codec_transform(placeholder, encode_values),
-        _input_schema=tuple(*(branch.input_schema for branch in branches)),
-        _output_schema=output_schema,
-        _json_output_schema=tuple(
-            *(_json_output_schema_for(option) for option in options)
-        ),
-        _inner=output_schema,
     )
 
 
@@ -1048,8 +746,6 @@ class _Codecs:
         from ._validated_dataclasses import (
             _initvar_annotation,
             _is_initvar_field,
-            assemble_validated,
-            default_value,
             marker_for,
         )
 
@@ -1134,7 +830,7 @@ class _Codecs:
             else {}
         )
 
-        recursion_holder: dict[str, Any] = {}
+        recursion_holder: dict[str, Schema[Any, Any]] = {}
         json_holder: dict[str, Any] = {}
         lazy_output: Schema[Any, Any] | None = None
         recursive_codec: CodecSchema[Any, Any] | None = None
@@ -1190,86 +886,6 @@ class _Codecs:
                 result[name] = schema
             return result
 
-        def make_recursive_codec(
-            asynchronous: bool,
-        ) -> CodecSchema[Any, Any]:
-            assert lazy_output is not None
-            output_placeholder = instance_of(cls)
-            if asynchronous:
-                async def decode_recursive_async(value: Any) -> Any:
-                    return await recursion_holder["codec"].decode_async(value)
-
-                async def encode_recursive_async(value: Any) -> Any:
-                    return await recursion_holder["codec"].encode_async(value)
-
-                return AsyncCodecSchema[Any, Any](
-                    NativeSchema(
-                        "pipe",
-                        (
-                            NativeSchema(
-                                "async_transform",
-                                (lazy_input._node,),
-                                (decode_recursive_async,),
-                            ),
-                            output_placeholder._node,
-                        ),
-                        (),
-                    ),
-                    _encode_node=NativeSchema(
-                        "pipe",
-                        (
-                            NativeSchema(
-                                "async_transform",
-                                (output_placeholder._node,),
-                                (encode_recursive_async,),
-                            ),
-                            lazy_input._node,
-                        ),
-                        (),
-                    ),
-                    _input_schema=lazy_input,
-                    _output_schema=output_placeholder,
-                    _json_output_schema=lazy_output,
-                    _inner=output_placeholder,
-                )
-
-            def decode_recursive(value: Any) -> Any:
-                return recursion_holder["codec"].decode(value)
-
-            def encode_recursive(value: Any) -> Any:
-                return recursion_holder["codec"].encode(value)
-
-            return _CompoundCodecSchema[Any, Any](
-                NativeSchema(
-                    "pipe",
-                    (
-                        NativeSchema(
-                            "transform",
-                            (lazy_input._node,),
-                            (decode_recursive,),
-                        ),
-                        output_placeholder._node,
-                    ),
-                    (),
-                ),
-                _encode_node=NativeSchema(
-                    "pipe",
-                    (
-                        NativeSchema(
-                            "transform",
-                            (output_placeholder._node,),
-                            (encode_recursive,),
-                        ),
-                        lazy_input._node,
-                    ),
-                    (),
-                ),
-                _input_schema=lazy_input,
-                _output_schema=output_placeholder,
-                _json_output_schema=lazy_output,
-                _inner=output_placeholder,
-            )
-
         if marker is not None and marker.recursive:
             json_id = f"{cls.__module__}.{cls.__qualname__}"
             lazy_input = lazy(
@@ -1278,29 +894,16 @@ class _Codecs:
             lazy_output = lazy(
                 lambda: json_holder["output_json_schema"],
             ).meta({"id": json_id})
-            recursive_codec = make_recursive_codec(False)
-            schemas_by_name = infer_schemas(recursive_codec)
-            recursive_async_needed = (
-                builtins.any(
-                    _node_has_async_without_lazy(schema._node)
-                    for schema in schemas_by_name.values()
-                )
-                or builtins.any(
-                    _node_has_async_without_lazy(
-                        schema._encode_node
-                        if isinstance(schema, CodecSchema)
-                        else schema._node,
-                    )
-                    for schema in (
-                        schemas_by_name[name] for name in stored_names
-                    )
-                )
+            output_placeholder = instance_of(cls)
+            recursive_codec = _CompoundCodecSchema[Any, Any](
+                lazy(lambda: recursion_holder["decode"])._node,
+                _encode_node=lazy(lambda: recursion_holder["encode"])._node,
+                _input_schema=lazy_input,
+                _output_schema=output_placeholder,
+                _json_output_schema=lazy_output,
+                _inner=output_placeholder,
             )
-            if recursive_async_needed:
-                recursive_codec = make_recursive_codec(True)
-                schemas_by_name = infer_schemas(recursive_codec)
-        else:
-            schemas_by_name = infer_schemas(None)
+        schemas_by_name = infer_schemas(recursive_codec)
 
         def input_field_schema(name: str) -> Schema[Any, Any]:
             schema = schemas_by_name[name]
@@ -1356,159 +959,45 @@ class _Codecs:
             )
         output_json_schema = object(output_shape)
 
-        def decode_value(data: dict[str, Any]) -> DataclassT:
-            decoded: dict[str, Any] = {}
-            initvar_decoded: dict[str, Any] = {}
+        def decode_value(data: dict[str, Any], context: Any) -> DataclassT:
             issues: list[Issue] = []
             for name in names:
-                schema = schemas_by_name[name]
-                value = data.get(name, MISSING)
-                if value is MISSING:
+                if name not in data:
                     if not has_default[name]:
                         issues.append(Issue("required", "Required", (name,)))
-                        continue
-                    if marker is None:
-                        continue
-                    try:
-                        value = marker.construction_schemas[name].parse(
-                            default_value(fields_by_name[name]),
-                        )
-                    except ValidationError as error:
-                        issues.extend(
-                            _prefix_issue(item, name) for item in error.issues
-                        )
-                        continue
-                    if value is MISSING:
-                        raise TypeError(
-                            f"Field {name!r} default produced MISSING",
-                        )
-                    if name in initvar_names:
-                        initvar_decoded[name] = value
-                    else:
-                        decoded[name] = value
                     continue
+                value = data[name]
+                schema = schemas_by_name[name]
                 if isinstance(schema, CodecSchema):
                     try:
-                        value = schema.decode(value)
+                        data[name] = schema.parse(value, context=context)
                     except ValidationError as error:
                         issues.extend(
                             _prefix_issue(item, encoded_names[name]) for item in error.issues
                         )
-                        continue
-                if marker is not None:
-                    guard = marker.annotation_guards[name]
-                    if guard is not None and (
-                        name in overrides or marker.guards[name] is not None
-                    ):
-                        value = guard.parse(value)
-                if marker is not None and name in initvar_names:
-                    initvar_decoded[name] = value
-                else:
-                    decoded[name] = value
-            if marker is not None:
-                for name in non_init_names:
-                    try:
-                        value = marker.construction_schemas[name].parse(
-                            default_value(fields_by_name[name]),
-                        )
-                    except ValidationError as error:
-                        issues.extend(
-                            _prefix_issue(item, name) for item in error.issues
-                        )
-                        continue
-                    if value is MISSING:
-                        raise TypeError(
-                            f"Field {name!r} default produced MISSING",
-                        )
-                    decoded[name] = value
             if issues:
                 raise ValidationError(issues)
-            if marker is not None:
-                initvar_values = [
-                    initvar_decoded[name] for name in initvar_names
-                ]
-                return cast(
-                    DataclassT,
-                    assemble_validated(cls, decoded, initvar_values),
-                )
-            return cls(**decoded)
+            return cls(**data)
 
-        async def decode_value_async(data: dict[str, Any]) -> DataclassT:
-            decoded: dict[str, Any] = {}
-            initvar_decoded: dict[str, Any] = {}
+        async def decode_value_async(data: dict[str, Any], context: Any) -> DataclassT:
             issues: list[Issue] = []
             for name in names:
-                schema = schemas_by_name[name]
-                value = data.get(name, MISSING)
-                if value is MISSING:
+                if name not in data:
                     if not has_default[name]:
                         issues.append(Issue("required", "Required", (name,)))
-                        continue
-                    if marker is None:
-                        continue
-                    try:
-                        value = marker.construction_schemas[name].parse(
-                            default_value(fields_by_name[name]),
-                        )
-                    except ValidationError as error:
-                        issues.extend(
-                            _prefix_issue(item, name) for item in error.issues
-                        )
-                        continue
-                    if value is MISSING:
-                        raise TypeError(
-                            f"Field {name!r} default produced MISSING",
-                        )
-                    if name in initvar_names:
-                        initvar_decoded[name] = value
-                    else:
-                        decoded[name] = value
                     continue
+                value = data[name]
+                schema = schemas_by_name[name]
                 if isinstance(schema, CodecSchema):
                     try:
-                        value = await schema.decode_async(value)
+                        data[name] = await schema.parse_async(value, context=context)
                     except ValidationError as error:
                         issues.extend(
                             _prefix_issue(item, encoded_names[name]) for item in error.issues
                         )
-                        continue
-                if marker is not None:
-                    guard = marker.annotation_guards[name]
-                    if guard is not None and (
-                        name in overrides or marker.guards[name] is not None
-                    ):
-                        value = guard.parse(value)
-                if marker is not None and name in initvar_names:
-                    initvar_decoded[name] = value
-                else:
-                    decoded[name] = value
-            if marker is not None:
-                for name in non_init_names:
-                    try:
-                        value = marker.construction_schemas[name].parse(
-                            default_value(fields_by_name[name]),
-                        )
-                    except ValidationError as error:
-                        issues.extend(
-                            _prefix_issue(item, name) for item in error.issues
-                        )
-                        continue
-                    if value is MISSING:
-                        raise TypeError(
-                            f"Field {name!r} default produced MISSING",
-                        )
-                    decoded[name] = value
             if issues:
                 raise ValidationError(issues)
-            if marker is not None:
-                initvar_values = [
-                    initvar_decoded[name] for name in initvar_names
-                ]
-                return cast(
-                    DataclassT,
-                    assemble_validated(cls, decoded, initvar_values),
-                )
-            return cls(**decoded)
+            return cls(**data)
 
         def encode_value(value: DataclassT) -> dict[str, Any]:
             encoded: dict[str, Any] = {}
@@ -1554,36 +1043,6 @@ class _Codecs:
                 raise ValidationError(issues)
             return encoded
 
-        if recursive_codec is None:
-            decode_async_needed = any(
-                isinstance(schema, CodecSchema) and schema._node.has_async
-                for schema in schemas_by_name.values()
-            )
-            encode_async_needed = any(
-                (
-                    schema._encode_node.has_async
-                    if isinstance(schema, CodecSchema)
-                    else schema._node.has_async
-                )
-                for schema in (
-                    schemas_by_name[name] for name in stored_names
-                )
-            )
-        else:
-            decode_async_needed = any(
-                _node_has_async_without_lazy(schema._node)
-                for schema in schemas_by_name.values()
-            )
-            encode_async_needed = any(
-                _node_has_async_without_lazy(
-                    schema._encode_node
-                    if isinstance(schema, CodecSchema)
-                    else schema._node,
-                )
-                for schema in (
-                    schemas_by_name[name] for name in stored_names
-                )
-            )
         if marker is not None:
             placeholder = unknown()._node
             decode_children: list[NativeSchema] = []
@@ -1664,8 +1123,12 @@ class _Codecs:
                 ),
             )
         else:
+            decode_async_needed = any(
+                isinstance(schema, CodecSchema) and schema._node.has_async
+                for schema in schemas_by_name.values()
+            )
             decode_transform = NativeSchema(
-                "async_transform" if decode_async_needed else "transform",
+                "async_context_transform" if decode_async_needed else "context_transform",
                 (decode_input_schema._node,),
                 (decode_value_async if decode_async_needed else decode_value,),
             )
@@ -1692,6 +1155,10 @@ class _Codecs:
                 ),
             )
         else:
+            encode_async_needed = any(
+                (schema._encode_node if isinstance(schema, CodecSchema) else schema._node).has_async
+                for schema in schemas_by_name.values()
+            )
             encode_node = NativeSchema(
                 "async_transform" if encode_async_needed else "transform",
                 (output_schema._node,),
@@ -1707,7 +1174,8 @@ class _Codecs:
             _inner=output_schema,
         )
         if recursive_codec is not None:
-            recursion_holder["codec"] = result
+            recursion_holder["decode"] = result
+            recursion_holder["encode"] = Schema[Any, Any](encode_node)
             json_holder["input_schema"] = input_schema
             json_holder["output_json_schema"] = output_json_schema
         return result

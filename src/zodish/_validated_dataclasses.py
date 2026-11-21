@@ -106,17 +106,6 @@ def codec_for(cls: type[Any]) -> CodecSchema[Any, Any]:
     return codec
 
 
-def assemble_validated(
-    cls: type[Any],
-    values: Mapping[str, Any],
-    initvar_values: Sequence[Any] = (),
-) -> Any:
-    """Allocate and populate an instance without calling its initializer."""
-    instance = object.__new__(cls)
-    _assign(instance, values, initvar_values)
-    return instance
-
-
 def default_value(field: dataclasses.Field[Any]) -> Any:
     """Resolve one omitted dataclass field; factories run exactly once."""
     if field.default is not dataclasses.MISSING:

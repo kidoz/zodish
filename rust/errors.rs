@@ -59,6 +59,23 @@ pub(crate) enum Error {
     Python(PyErr),
 }
 
+impl Error {
+    // Compound codecs locate every child rejection at its item, including
+    // paths supplied by Python callbacks and nested union branch issues.
+    pub(crate) fn at_codec_item(mut self, py: Python<'_>, path: &Path) -> Self {
+        if let Self::Invalid(issues) = &mut self {
+            let mut pending: Vec<_> = issues.iter_mut().collect();
+            while let Some(issue) = pending.pop() {
+                let mut absolute: Path = path.iter().map(|part| part.clone_ref(py)).collect();
+                absolute.append(&mut issue.path);
+                issue.path = absolute;
+                pending.extend(issue.branches.iter_mut().flatten());
+            }
+        }
+        self
+    }
+}
+
 impl From<PyErr> for Error {
     fn from(error: PyErr) -> Self {
         Self::Python(error)

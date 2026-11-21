@@ -79,6 +79,9 @@ impl NativeSchema {
                 "Async validation must be performed with parse_async()",
             )
             .into()),
+            Kind::CodecItem => self
+                .child(0, ctx, value, &mut Vec::new(), depth)
+                .map_err(|error| error.at_codec_item(py, path)),
             Kind::Optional if missing => keep(),
             Kind::Nullable if value.is_none() => keep(),
             Kind::Optional | Kind::Nullable | Kind::Wire => self.child(0, ctx, value, path, depth),

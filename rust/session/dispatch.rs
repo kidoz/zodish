@@ -65,6 +65,10 @@ impl AsyncSession {
         outcome: Result<Py<PyAny>>,
     ) -> PyResult<AsyncNext> {
         match frame {
+            AsyncFrame::CodecItem(path) => Ok(super::deliver_at(
+                outcome.map_err(|error| error.at_codec_item(py, &path)),
+                path,
+            )),
             AsyncFrame::AsyncCallback(frame) => self.resume_async_callback(py, frame, outcome),
             AsyncFrame::Catch(frame) => self.resume_catch(py, frame, outcome),
             AsyncFrame::Refine(frame) => self.resume_refine(py, frame, outcome),

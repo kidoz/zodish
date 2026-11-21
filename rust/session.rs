@@ -259,6 +259,7 @@ struct IntersectionFrame {
 // parents that must resume after an async descendant and for the async leaf
 // callbacks themselves.
 enum AsyncFrame {
+    CodecItem(Path),
     AsyncCallback(AsyncCallbackFrame),
     Catch(CatchFrame),
     Refine(RefineFrame),

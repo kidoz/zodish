@@ -2539,6 +2539,46 @@ class SchemaTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             z.codecs.tuple("not a schema")
 
+    def test_compound_codecs_preserve_validation_context(self):
+        expected = object()
+        codec = z.codec(
+            z.string().refine_with_context(lambda value, context: context is expected),
+            z.string(), decode=str, encode=str,
+        )
+        for schema, value in (
+            (z.codecs.array(codec), ["x"]),
+            (codec.record(), {"item": "x"}),
+            (codec.optional(), "x"),
+            (codec.nonoptional(), "x"),
+            (codec.nullable(), "x"),
+            (codec.nullish(), "x"),
+            (z.codecs.tuple(codec), ("x",)),
+            (z.codecs.union(codec, z.none()), "x"),
+        ):
+            with self.subTest(schema=schema):
+                self.assertEqual(schema.parse(value, context=expected), value)
+                self.assertIsInstance(schema.safe_parse(value, context=object()), Failure)
+
+        @dataclasses.dataclass
+        class Row:
+            label: Annotated[str, codec]
+
+        self.assertEqual(
+            z.adapter(list[Row]).parse([{"label": "x"}], context=expected), [Row("x")],
+        )
+
+        @z.dataclass
+        class Tree:
+            label: Annotated[str, z.string().refine_with_context(
+                lambda label, context: label in context,
+            )]
+            child: Tree | None = None
+
+        value = {"label": "root", "child": {"label": "leaf"}}
+        self.assertEqual(Tree.parse(value, context={"root", "leaf"}).child.label, "leaf")
+        failure = Tree.safe_parse(value, context={"root"})
+        self.assertEqual([issue.path for issue in failure.error.issues], [("child", "label")])
+
     def test_codec_combinator_metadata(self):
         codec = z.codecs.iso_date().meta({"title": "Date"})
         self.assertEqual(codec.metadata, {"title": "Date"})

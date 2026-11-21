@@ -270,11 +270,7 @@ def infer_dataclass_field(
         else:
             combined = _codecs._union_codec(options)
         if len(non_none) != len(args):
-            combined = (
-                _codecs._nullable_codec(combined)
-                if isinstance(combined, _codecs.CodecSchema)
-                else combined.nullable()
-            )
+            combined = combined.nullable()
         return combined
     if origin is list or origin is Sequence:
         item = child(args[0]) if args else _schemas.unknown()
@@ -296,7 +292,7 @@ def infer_dataclass_field(
             )
         value = child(value_type)
         return (
-            _codecs._record_codec(value)
+            value.record()
             if isinstance(value, _codecs.CodecSchema)
             else _schemas.record(value)
         )

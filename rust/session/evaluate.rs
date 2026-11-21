@@ -461,6 +461,16 @@ impl AsyncSession {
                     depth: depth + 1,
                 }))
             }
+            Kind::CodecItem => {
+                let child = node_ref.children[0].clone_ref(py);
+                self.frames.push(AsyncFrame::CodecItem(path));
+                Ok(AsyncNext::Task(AsyncTask::Eval {
+                    node: child,
+                    value,
+                    path: Vec::new(),
+                    depth: depth + 1,
+                }))
+            }
             Kind::OutputGuard => {
                 let child = node_ref.children[0].clone_ref(py);
                 self.frames.push(AsyncFrame::OutputGuard(OutputGuardFrame {

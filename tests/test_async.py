@@ -49,6 +49,35 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         except ValidationError as error:
             return Failure(error)
 
+    async def test_compound_codec_context_and_issue_paths_across_suspension(self):
+        async def check(value, context):
+            await asyncio.sleep(0)
+            if value != context:
+                raise ValidationError([Issue("custom", "mismatch", ("label",))])
+            return True
+
+        inner = z.codec(
+            z.string().refine_with_context_async(check), z.string(), decode=str, encode=str,
+        )
+        schema = z.codecs.array(z.codecs.tuple(z.codecs.union(inner, z.none()).record()))
+        raw = [({"a": "yes"},)]
+        success, failure = await asyncio.gather(
+            schema.safe_parse_async(raw, context="yes"),
+            schema.safe_parse_async(raw, context="no"),
+        )
+        self.assertEqual(success, Success(raw))
+        issue, = failure.error.issues
+        self.assertEqual(issue.path, (0, 0, "a"))
+        self.assertEqual(issue.branches[0][0].path, (0, 0, "a", "label"))
+        self.assertEqual(issue.branches[1][0].path, (0, 0, "a"))
+
+        @dataclass
+        class Row:
+            label: Annotated[str, inner]
+
+        self.assertEqual(await z.adapter(Row).parse_async({"label": "yes"}, context="yes"),
+                         Row("yes"))
+
     async def test_validation_context_async(self):
         async def matches(value, expected):
             await asyncio.sleep(0)

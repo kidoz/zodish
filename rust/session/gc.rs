@@ -12,6 +12,11 @@ pub(super) fn visit_async_frame(
     visit: &PyVisit<'_>,
 ) -> std::result::Result<(), PyTraverseError> {
     match frame {
+        AsyncFrame::CodecItem(path) => {
+            for part in path {
+                part.visit(visit)?;
+            }
+        }
         AsyncFrame::AsyncCallback(frame) => {
             visit.call(&frame.node)?;
             for part in &frame.path {
