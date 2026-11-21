@@ -9,6 +9,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from . import schemas as _schemas
+from ._annotations import infer_dataclass_field
 from ._core import Schema
 
 
@@ -28,7 +29,9 @@ def validate_call[F: Callable[..., Any]](fn: F) -> F:
     arguments_schema = _schemas.object(argument_schemas)
     return_schema: Schema[Any, Any] | None = (
         None if signature.return_annotation is inspect.Signature.empty
-        else _schemas.adapter(hints.get("return", Any))
+        else infer_dataclass_field(
+            hints.get("return", Any), "return", stack=(), allow_sets=True, decoded_dataclasses=True,
+        )
     )
 
     if inspect.iscoroutinefunction(fn):

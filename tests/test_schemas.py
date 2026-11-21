@@ -5278,6 +5278,27 @@ class SchemaTests(unittest.TestCase):
             invalid_return()
         self.assertEqual(caught.exception.issues[0].path, ())
 
+    def test_validate_call_returns_decoded_dataclasses(self):
+        @dataclasses.dataclass
+        class Point:
+            x: int
+
+        instance = Point(3)
+
+        @z.validate_call
+        def point() -> Point:
+            return instance
+
+        @z.validate_call
+        def points(value) -> list[Point | None]:
+            return value
+
+        self.assertIs(point(), instance)
+        self.assertIs(points([None, instance])[1], instance)
+        with self.assertRaises(ValidationError) as caught:
+            points([{"x": 3}])
+        self.assertEqual(caught.exception.issues[0].path, (0,))
+
     def test_validation_context(self):
         def matches(value, expected):
             return value == expected

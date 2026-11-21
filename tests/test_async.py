@@ -49,6 +49,20 @@ class AsyncValidationTests(unittest.IsolatedAsyncioTestCase):
         except ValidationError as error:
             return Failure(error)
 
+    async def test_validate_call_returns_decoded_dataclass(self):
+        @z.dataclass
+        class Point:
+            x: int
+
+        @z.validate_call
+        async def point(value) -> Point:
+            return value
+
+        value = Point(1)
+        self.assertIs(await point(value), value)
+        with self.assertRaises(ValidationError):
+            await point({"x": 1})
+
     async def test_async_object_fast_path_rejects_missing(self):
         async def identity(value):
             return value

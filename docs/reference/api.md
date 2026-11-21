@@ -301,7 +301,8 @@ tuple annotations and set codecs are not currently inferred.
 
 `@z.validate_call` resolves a function's annotations once at decoration. It
 validates bound arguments in one native object evaluation and validates an
-annotated return value. Python argument binding and defaults retain their normal
+annotated return value. An inferred dataclass return annotation checks that the
+returned value is an instance of the class, including inside containers. Python argument binding and defaults retain their normal
 behavior. Unannotated parameters accept anything, `*args` validates each item,
 `**kwargs` validates each value, and issue paths include the parameter name.
 Sync and async functions are supported, and metadata/signature are preserved.
