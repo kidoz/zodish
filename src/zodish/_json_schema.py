@@ -825,27 +825,18 @@ def _export_tuple(
         )
         for index, item in enumerate(items)
     ]
-    if rest is not None:
-        return {
-            "type": "array",
-            "prefixItems": prefix_items,
-            "items": _export_schema(
-                rest,
-                (*path, "items"),
-                target,
-                io,
-                unrepresentable,
-                relax_strip,
-            ),
-            "minItems": len(items),
-        }
-    return {
-        "type": "array",
-        "prefixItems": prefix_items,
-        "items": False,
-        "minItems": len(items),
-        "maxItems": len(items),
-    }
+    result: JSONSchema = {"type": "array", "minItems": len(items)}
+    if prefix_items:
+        result["prefixItems"] = prefix_items
+    if rest is None:
+        result["items"] = False
+        result["maxItems"] = len(items)
+    else:
+        result["items"] = _export_schema(
+            rest, (*path, "items"), target, io, unrepresentable, relax_strip,
+        )
+    return result
+
 
 
 def _export_union(

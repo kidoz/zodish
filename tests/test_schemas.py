@@ -5535,6 +5535,18 @@ class SchemaTests(unittest.TestCase):
 
 
 class JSONSchemaTests(unittest.TestCase):
+    def test_empty_tuple_prefix_is_omitted(self):
+        for io in ("input", "output"):
+            with self.subTest(io=io):
+                self.assertEqual(z.tuple().to_json_schema(io=io), {
+                    "type": "array", "items": False, "minItems": 0, "maxItems": 0,
+                })
+                self.assertEqual(z.tuple().rest(z.integer()).to_json_schema(io=io), {
+                    "type": "array", "items": {"type": "integer"}, "minItems": 0,
+                })
+                self.assertEqual(z.tuple(z.integer()).to_json_schema(io=io)["prefixItems"],
+                                 [{"type": "integer"}])
+
     def test_primitives_and_constraints(self):
         self.assertEqual(
             to_json_schema(z.string().min(2).max(5)),
