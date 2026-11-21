@@ -16,7 +16,8 @@ use session::AsyncSession;
 
 const MAX_DEPTH: usize = 256;
 
-#[pymodule]
+#[cfg_attr(Py_GIL_DISABLED, pymodule(gil_used = false))]
+#[cfg_attr(not(Py_GIL_DISABLED), pymodule(gil_used = true))]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<NativeSchema>()?;
     module.add_class::<AsyncSession>()?;

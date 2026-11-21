@@ -20,6 +20,9 @@ stacker = "0.1.25"
 # Constrain stacker's transitive dependency to retain Rust 1.85 support.
 psm = "=0.1.27"
 
+[build-dependencies]
+pyo3-build-config = { version = "=0.30.1", features = ["resolve-config"] }
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

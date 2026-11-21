@@ -24,6 +24,7 @@ WHEEL_REQUIRED = {
     "zodish/py.typed",
 }
 SDIST_REQUIRED = {
+    "build.rs",
     "pyproject.toml",
     "Cargo.toml",
     "Cargo.lock",
