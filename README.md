@@ -744,7 +744,7 @@ Artifacts are written to `dist/`. `just dist` runs the two maturin build command
 
 ## Stability & Versioning
 
-Zodish follows [Semantic Versioning](https://semver.org/). Until 1.0, minor releases may include breaking changes; they are recorded in [CHANGELOG.md](CHANGELOG.md).
+Starting with 1.0, breaking changes to the public contract below require a major release under [Semantic Versioning](https://semver.org/). Release changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 
 Covered by SemVer guarantees:
 
