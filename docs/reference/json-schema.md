@@ -53,12 +53,12 @@ schema.to_json_schema(...)
 
 ## Required fields and object policies
 
-- Output mode uses `additionalProperties: false` for stripping objects.
-- Input mode omits `additionalProperties`, matching which input keys are
-  accepted.
+- Strip objects omit `additionalProperties` in input mode and emit `false` in
+  output mode. In both modes, strict objects emit `false`, passthrough objects
+  emit `true`, and catchall objects emit the catchall schema.
 - Object fields with `.wire(name)` use wire names for input properties and
-  `required` entries; output mode uses shape keys. Multi-alias `.wire_names()`
-  input is unrepresentable; output uses the first, canonical name.
+  `required` entries. Output mode uses shape keys, including for fields with
+  multiple `.wire_names()` aliases. Multi-alias input is unrepresentable.
 - `optional` is represented through object `required` lists; it has no standalone
   JSON Schema equivalent.
 - Defaults are emitted as `default`; output mode requires a field whose default

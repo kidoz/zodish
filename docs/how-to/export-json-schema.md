@@ -33,10 +33,16 @@ to_json_schema(schema, target="openapi-3.0", io="input")
 | `io` | `"output"` (default), `"input"` | Whether the schema describes parsed output or accepted input |
 | `unrepresentable` | `"throw"` (default), `"any"` | Fail on unsupported nodes or replace them with `{}` |
 
-`io="output"` reflects defaults and the stripping object policy:
-`additionalProperties: false` is emitted and fields that always have a value are
-required. `io="input"` omits `additionalProperties` and does not require fields
-that may be absent from input.
+`io="output"` requires fields whose defaults guarantee a value. In `io="input"`,
+those fields may be absent. The object's unknown-key policy controls
+`additionalProperties`:
+
+| Object policy | Input mode | Output mode |
+| --- | --- | --- |
+| Strip (default) | Omitted | `false` |
+| Strict | `false` | `false` |
+| Passthrough | `true` | `true` |
+| Catchall | Catchall schema | Catchall schema |
 
 ## Attach metadata
 

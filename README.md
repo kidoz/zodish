@@ -615,7 +615,7 @@ user.describe("Updated description").metadata["description"]
 
 `metadata` is a read-only mapping. `.meta()` merges keys and overrides existing ones; `.describe()` replaces `description`. Metadata follows value-preserving derivations such as constraints, refinements, transforms, optional/default wrappers, and object structural methods. Collection and composition constructors such as `.array()`, `.or_()`, `z.union()`, `z.record()`, and `z.intersection()`/`.and_()` start with empty metadata. Metadata does not affect validation, equality, or hashing.
 
-Container and composition schemas retain their child schemas: `.item` on arrays, `.value_schema` on records, `.items` on tuples, `.options` on unions, and `.options` (a mapping) on discriminated unions. This keeps nested metadata available to tooling such as a future JSON Schema exporter.
+Container and composition schemas retain their child schemas: `.item` on arrays, `.value_schema` on records, `.items` on tuples, `.options` on unions, and `.options` (a mapping) on discriminated unions. The JSON Schema exporter reads metadata from these child schemas.
 
 ## JSON Schema Export
 
@@ -648,7 +648,7 @@ to_json_schema(schema, target="openapi-3.0", io="input")
 - String formats are JSON Schema annotations; validators enforce them only when format assertion is enabled. Python regex patterns are emitted as `pattern`, so Python-specific syntax may not be portable.
 - JSON Schema `multipleOf` uses exact numeric semantics. Runtime integer checks are exact, but float checks apply a small quotient tolerance, so results can differ for decimal values such as `0.3` with divisor `0.1`.
 - Python object schemas such as `z.date()`, `z.datetime()`, `z.time()`, `z.timedelta()`, `z.decimal()`, `z.bytes()`, `z.path()`, and `z.instance_of()` are not representable in JSON Schema. Native enum values must themselves be JSON-compatible.
-- Output mode uses `additionalProperties: false` for stripping objects; input mode omits it, matching which input keys are accepted.
+- Strip objects omit `additionalProperties` in input mode and emit `false` in output mode. Strict objects emit `false` in both modes, passthrough objects emit `true`, and catchall objects emit the catchall schema.
 - `optional` is represented through object `required` lists; it has no standalone JSON Schema equivalent. `unknown` becomes `{}` and can describe only JSON values.
 - JSON Schema cannot preserve Python's exact numeric-type distinctions, including `True`/`1`/`1.0` literals and int versus integral float. Runtime validation still enforces them.
 - Discriminated unions export as `oneOf`; include each discriminator literal in its branch for precise matching.

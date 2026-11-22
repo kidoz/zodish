@@ -62,8 +62,8 @@ invoice_wire = z.typed_object(Invoice, {
 
 
 def client_message(issue: Issue) -> str:
-    # These required fields report the TypedDict key. The extra key keeps
-    # the name the client sent.
+    # Validation failures on required fields use the TypedDict key.
+    # An unrecognized key keeps the name the client sent.
     if issue.path[:1] == ("issued_at",) and issue.code == "invalid_format":
         return "issuedAt must be an ISO-8601 datetime."
     if issue.code == "unrecognized_key" and issue.path:

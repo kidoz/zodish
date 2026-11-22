@@ -170,6 +170,9 @@ wire_schema = z.object({
 print(to_json_schema(wire_schema, target="openapi-3.0", io="input"))
 ```
 
+The exported schema includes `"additionalProperties": False` because
+`wire_schema` is strict.
+
 `to_json_schema` supports `draft-2020-12` (default) and `openapi-3.0`.
 Operations such as `trim`, `transform`, and `refine` have no JSON Schema
 equivalent; export a schema that describes the values you exchange over the

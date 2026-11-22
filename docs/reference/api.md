@@ -95,8 +95,10 @@ them exactly.
 `z.typed_object()`, or a dataclass codec. The shape key or dataclass attribute
 is the output name; the wire name is the input name. `.wire_names()` accepts a
 nonempty sequence of unique names, using the first as canonical for encoding.
-All aliases must be unique across the object. Input validation issue paths use
-the canonical wire name; typed-object required-output issues use the shape key.
+All aliases must be unique across the object. Field validation issues use the
+canonical wire name for plain object fields and optional TypedDict fields.
+For required TypedDict fields in `z.typed_object()`, field validation issues
+use the shape key, including issues for missing input and invalid values.
 Supplying multiple aliases for one field reports `duplicate_key` and skips that
 field's callback. `.keyof()`, `.pick()`, `.omit()`, `.extend()`, and
 typed-object keys use shape keys. Encoding and `io="input"` JSON Schema use

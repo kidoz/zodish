@@ -55,13 +55,13 @@ compatible_user.parse({"displayName": "Alex"})  # {"name": "Alex"}
 compatible_user.encode({"name": "Alex"})         # {"displayName": "Alex"}
 ```
 
-The first name is canonical for encoding and output-mode JSON Schema. Every
-alias counts as known under strict/strip/passthrough/catchall policies. Supplying
-more than one alias for a field produces a `duplicate_key` issue whose `keys`
-param lists the supplied aliases and whose path uses the canonical name; the
-field callback is not run. Multi-alias input is unrepresentable in JSON Schema:
-input export raises under `unrepresentable="throw"` and yields `{}` under
-`"any"` for the affected object.
+Encoding uses the first name (`displayName`). Output-mode JSON Schema uses the
+shape key (`name`). Every alias counts as known under
+strict/strip/passthrough/catchall policies. For this object, supplying more than
+one alias for a field produces a `duplicate_key` issue at `("displayName",)` and
+skips the field callback. The `keys` param lists the supplied aliases.
+Multi-alias input is unrepresentable in JSON Schema. Input export raises under
+`unrepresentable="throw"` and yields `{}` under `"any"` for the affected object.
 
 ## Validate JSON text
 
