@@ -193,41 +193,25 @@ original list or dictionary without invalidating the iteration.
 
 ## Performance
 
-The native core is the reason for the Rust dependency. Typical benchmark results
-(Apple M4 Max, Python 3.14.3, `parse` unless noted):
-
-| Scenario | Operations/sec | Time per operation |
-| --- | ---: | ---: |
-| `z.string().min(3).max(32)` | 7,475,470 | 0.13 µs |
-| Object parse | 2,642,532 | 0.38 µs |
-| Object failure (`safe_parse`) | 977,485 | 1.02 µs |
-| Object failure, issues inspected | 437,031 | 2.29 µs |
-| 1,000-element integer array | 173,938 | 5.75 µs |
-| Union, first branch | 4,802,304 | 0.21 µs |
-| Union, last branch | 1,457,000 | 0.69 µs |
-| Recursive tree (depth 4) | 110,799 | 9.03 µs |
-| Refinement callback | 7,066,718 | 0.14 µs |
-
-Numbers are medians over seven repetitions from `benchmarks/bench_parse.py`. The
-array row uses the native fast path for primitive item validators and exact-list
-iteration, the recursive row benefits from per-parse lazy resolution, object
-parsing skips the unknown-key scan and input copy when every input key belongs
-to the shape, and failures defer Python `Issue` materialization and message
-formatting until they are read. Materializing `.issues` builds and caches the
-`Issue` objects on first access.
+Array parsing has a native fast path for primitive item validators and exact
+lists. Recursive schemas resolve lazy nodes once per parse. Object parsing
+skips the unknown-key scan and input copy when every input key belongs to the
+shape. Failures defer Python `Issue` materialization and message formatting
+until they are read. Accessing `.issues` builds and caches the `Issue` objects
+on first access.
 
 On GIL builds the native evaluator holds the GIL for the entire synchronous
 parse, so long parses of very large inputs can block other Python threads.
 There is no GIL-release path. Free-threaded wheels do not use a GIL, but the
 parse still runs on the calling thread.
 
-Results depend on the host, Python version, and
-native build profile; the harness has no pass/fail thresholds.
+Benchmark results depend on the host, Python version, and native build profile.
+The harnesses have no performance thresholds.
 
-A [release comparison of the Rust module split](../../benchmarks/results/2026-10-21-macos-arm64-rust-decomposition.md)
-records 12 paired rounds across 22 scenarios, with unchanged Python code and
-benchmark fixtures. Its raw samples, variation, source review, and build hashes
-are available with the report.
+The Zodish 0.5.1 release comparison of the Rust module split records 12 paired
+rounds across 22 scenarios, with unchanged Python code and benchmark fixtures.
+Raw samples, variation, source review, and build hashes are in the
+[benchmark report](../../benchmarks/results/2026-10-21-macos-arm64-rust-decomposition.md).
 
 ## Packaging consequences
 

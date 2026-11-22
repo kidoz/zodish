@@ -662,21 +662,7 @@ The Rust core starts at `rust/lib.rs`, which declares modules and registers the 
 
 ## Performance
 
-Built in Rust for speed. Typical benchmarks (Apple M4 Max, Python 3.14.3, `parse` unless noted):
-
-| Scenario | Operations/sec | Time per operation |
-|---|---:|---:|
-| `z.string().min(3).max(32)` | 7,475,470 | 0.13 µs |
-| Object parse | 2,642,532 | 0.38 µs |
-| Object failure (`safe_parse`) | 977,485 | 1.02 µs |
-| Object failure, issues inspected | 437,031 | 2.29 µs |
-| 1,000-element integer array | 173,938 | 5.75 µs |
-| Union, first branch | 4,802,304 | 0.21 µs |
-| Union, last branch | 1,457,000 | 0.69 µs |
-| Recursive tree (depth 4) | 110,799 | 9.03 µs |
-| Refinement callback | 7,066,718 | 0.14 µs |
-
-Numbers are medians over seven repetitions from `benchmarks/bench_parse.py`. The array row uses the native fast path for primitive item validators and exact-list iteration, the recursive row benefits from per-parse lazy resolution, object parsing skips the unknown-key scan and input copy when every input key belongs to the shape, and failures defer Python `Issue` materialization and message formatting until they are read. Results depend on the host, Python version, and native build profile; the harness has no pass/fail thresholds. A pinned cross-library comparison with Pydantic, msgspec, and Marshmallow is recorded under [`benchmarks/results/`](benchmarks/results/), along with a release-wheel [async benchmark summary](benchmarks/results/2026-10-21-macos-arm64-async-release.md).
+The benchmark harnesses measure local performance for synchronous and async validation. The checked-in results cover pre-1.0 snapshots and include the measured builds, environment, and raw samples. See the [Zodish 0.5.1 release comparison](benchmarks/results/2026-10-21-macos-arm64-rust-decomposition.md) and the [recorded async and cross-library runs](benchmarks/results/).
 
 ## Development
 
