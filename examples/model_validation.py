@@ -1,6 +1,11 @@
+"""Validate a registration with wire aliases and a cross-field password check.
+
+Run with: python examples/model_validation.py
+"""
+
 from typing import Annotated
 
-from zodish import Issue, ValidationError, z
+from zodish import Failure, Issue, ValidationError, z
 
 
 @z.dataclass
@@ -17,23 +22,30 @@ class Registration(z.ValidatedModel):
             ])
 
 
-registration = Registration.parse({
-    "name": "Alex",
-    "password": "secret",
-    "confirmation": "secret",
-})
-assert registration.name == "Alex"
-assert Registration.encode(registration) == {
-    "displayName": "Alex",
-    "password": "secret",
-    "confirmation": "secret",
-}
+def main() -> None:
+    passwords = {"password": "secret", "confirmation": "secret"}
+    registration = Registration.parse({"displayName": "Alex", **passwords})
+    assert registration.name == "Alex"
+    assert Registration.parse({"name": "Alex", **passwords}) == registration
+    assert Registration.encode(registration) == {"displayName": "Alex", **passwords}
 
-tenant_name = z.string().refine_with_context(
-    lambda value, tenant: value == tenant,
-    "Name does not belong to this tenant",
-)
-assert tenant_name.parse("acme", context="acme") == "acme"
-assert not tenant_name.safe_parse("acme", context="other").success
+    mismatch = Registration.safe_parse({
+        "displayName": "Alex", "password": "secret", "confirmation": "different",
+    })
+    assert isinstance(mismatch, Failure)
+    assert [(issue.path, issue.code) for issue in mismatch.error.issues] == [
+        (("confirmation",), "custom"),
+    ]
 
-print("Model validators, aliases, and validation context passed")
+    tenant_name = z.string().refine_with_context(
+        lambda value, tenant: value == tenant,
+        "Name does not belong to this tenant",
+    )
+    assert tenant_name.parse("acme", context="acme") == "acme"
+    assert not tenant_name.safe_parse("acme", context="other").success
+
+    print("Model validators, aliases, and validation context passed")
+
+
+if __name__ == "__main__":
+    main()

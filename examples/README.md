@@ -1,7 +1,7 @@
 # Examples
 
-Runnable programs for the tasks the [quick start](../docs/tutorials/get-started.md)
-stops short of. Each file checks its own result. From an environment where
+Runnable programs extend the [quick start](../docs/tutorials/get-started.md).
+The usage examples assert expected runtime behavior. From an environment where
 Zodish is installed:
 
 ```bash
@@ -30,8 +30,9 @@ python examples/model_validation.py
 | [category_tree.py](category_tree.py) | A recursive lazy schema, copied default lists, and `$ref` export. |
 | [async_signup.py](async_signup.py) | `refine_async` beside a normal field check, awaited with `parse_async`. |
 | [typed_objects.py](typed_objects.py) | Which object forms mypy can see: plain `z.object`, `z.typed_object`, transform, `@z.dataclass`, and `z.create_model`. |
-| [annotation_validation.py](annotation_validation.py) | `z.adapter` for annotation-driven schemas and `@z.validate_call` for typed function boundaries. |
+| [annotation_validation.py](annotation_validation.py) | `z.adapter` for annotation-driven schemas and `@z.validate_call` for argument and return-value checks. |
 | [model_validation.py](model_validation.py) | Cross-field model validators, multiple input aliases, and per-parse context. |
 
-`typing_checks.py` is a mypy fixture. `verify_native.py` confirms that an
-installed build loaded the Rust extension.
+Mypy checks the static assertions in `typing_checks.py`. Run
+`python examples/verify_native.py` to verify that the installed Rust extension
+loads and can parse a value. CI runs every `examples/*.py` script.

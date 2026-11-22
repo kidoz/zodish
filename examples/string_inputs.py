@@ -61,6 +61,7 @@ def main() -> None:
         "log_level": "info",
         "database_url": "postgres://localhost/app",
     }
+    assert load_settings({"DATABASE_URL": "postgres://localhost/app"})["debug"] is False
 
     try:
         load_settings({})

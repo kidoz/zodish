@@ -3,7 +3,7 @@
 import json
 from dataclasses import dataclass
 
-from zodish import z
+from zodish import Failure, z
 
 
 user_schema = z.object({
@@ -15,13 +15,19 @@ user_schema = z.object({
 }).strict()
 
 user = user_schema.parse({
-    "name": " Alex ", "email": " ALEX@example.com ", "age": 30,
+    "name": " Alex ", "email": "ALEX@example.com", "age": 30,
 })
+assert user == {"name": "Alex", "email": "alex@example.com", "age": 30, "role": "user"}
 print(user)
 
-result = user_schema.safe_parse({"name": "", "email": "invalid", "age": 12})
-if not result.success:
-    print(json.dumps(result.error.to_dict(), indent=2))
+result = user_schema.safe_parse({"name": "", "email": "bad", "age": 12})
+assert isinstance(result, Failure)
+assert [(issue.path, issue.code) for issue in result.error.issues] == [
+    (("name",), "too_small"),
+    (("email",), "invalid_format"),
+    (("age",), "too_small"),
+]
+print(json.dumps(result.error.to_dict(), indent=2))
 
 
 @dataclass(frozen=True)
@@ -35,4 +41,5 @@ typed_user_schema = z.object({
 }).transform(lambda data: User(**data))
 
 typed_user: User = typed_user_schema.parse({"name": "Alex", "age": 30})
+assert typed_user == User(name="Alex", age=30)
 print(typed_user)
