@@ -27,14 +27,20 @@ edits, but does **not** rebuild the Rust extension after sources under `rust/` c
 From the repository root, with the environment activated:
 
 ```bash
-python -m unittest discover -s tests -v
-python examples/quickstart.py
-python benchmarks/bench_parse.py --smoke
+python -m pip install --group benchmark
 ruff check .
 mypy
 cargo fmt --check
 cargo clippy --locked -- -D warnings
+cargo test --locked
 cargo deny check
+python -m unittest discover -s tests -v
+for example in examples/*.py; do
+    python "$example" || exit 1
+done
+python benchmarks/bench_parse.py --smoke
+python benchmarks/bench_async.py --smoke
+python benchmarks/bench_compare.py --check-only
 ```
 
 Ruff and strict mypy settings live in `pyproject.toml`; the `dev` dependency
@@ -43,13 +49,14 @@ group installs both tools. `py.typed` is included for type checkers, and
 policy; install `cargo-deny` with `cargo install cargo-deny --locked` to run
 the check locally.
 
-If `just` is installed, the same workflows are available as recipes:
+`just` provides shortcuts for static checks, the Python test suite, and usage
+examples:
 
 ```bash
 just                  # list recipes
 just install          # install dependencies
 just check            # static checks (lint, mypy, rust fmt, clippy, cargo deny)
-just ci               # static checks, tests, and examples
+just ci               # static checks, Python tests, and usage examples
 just bench            # benchmark harness
 ```
 
@@ -83,16 +90,20 @@ other scenarios use `parse`. `--smoke` uses minimal counts for CI.
 
 ## Understand the CI gates
 
-The [CI workflow](https://github.com/kidoz/zodish/blob/main/.github/workflows/tests.yml)
-runs tests, the quickstart, and a benchmark smoke run on Ubuntu with Python 3.14
-and 3.15. A `cargo-deny` job checks the Rust dependency graph for security
-advisories, yanked releases, disallowed licenses, duplicate versions, wildcard
-requirements, and unexpected registry sources. Its packaging job builds the
-wheel and sdist on Ubuntu, macOS, and
+The Ubuntu matrix runs Rust formatting, Clippy, `cargo test`, the Python test
+suite, every `examples/*.py` script, both benchmark smoke runs, and the comparison
+harness's `--check-only` and worker smoke tests on CPython 3.14 and 3.15. Separate
+jobs run Ruff, mypy, and the Rust 1.85 compatibility check. A `cargo-deny` job
+checks the Rust dependency graph for security advisories, yanked releases,
+disallowed licenses, duplicate versions, wildcard requirements, and unexpected
+registry sources. See the [CI workflow](../../.github/workflows/tests.yml).
+
+The packaging job builds the wheel and sdist on Ubuntu, macOS, and
 Windows with Python 3.14, verifies both artifact contents, then installs each
 artifact and runs the test suite, quickstart, and native-extension check against
 it. The package job also re-runs the abi3 wheel smoke test under Python 3.15 on
-Linux. A separate free-threaded job runs the suite on CPython 3.14t and 3.15t.
+Linux. Free-threaded jobs run the Python suite, examples, and both benchmark
+smoke runs on CPython 3.14t and 3.15t.
 A non-publishing packaging preflight builds and smoke-tests cp314t and cp315t
 wheels on every supported platform, and the publish workflow builds those same
 wheels for Linux x86_64/aarch64 glibc, macOS x86_64/arm64, and Windows x64.

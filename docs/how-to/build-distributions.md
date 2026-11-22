@@ -35,8 +35,8 @@ Install an artifact and run the native check:
 python examples/verify_native.py
 ```
 
-This confirms that the compiled extension, rather than a source fallback, is
-loaded.
+This checks that the compiled Rust extension loads, preserves the interpreter's
+GIL state, and can parse a value.
 
 ## Publish from GitHub Actions
 

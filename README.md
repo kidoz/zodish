@@ -666,26 +666,34 @@ The benchmark harnesses measure local performance for synchronous and async vali
 
 ## Development
 
-With the virtual environment activated, install the package in editable mode with the development tools, then run the checks from the repository root:
+With the virtual environment activated, install the package in editable mode with the development and benchmark groups, then run the checks from the repository root:
 
 ```sh
-python -m pip install --group dev -e .
-python -m unittest discover -s tests -v
-python examples/quickstart.py
-python benchmarks/bench_parse.py --smoke
-python benchmarks/bench_async.py --smoke
+python -m pip install --group dev --group benchmark -e .
 ruff check .
 mypy
 cargo fmt --check
 cargo clippy --locked -- -D warnings
+cargo test --locked
 cargo deny check
+python -m unittest discover -s tests -v
+for example in examples/*.py; do
+    python "$example" || exit 1
+done
+python benchmarks/bench_parse.py --smoke
+python benchmarks/bench_async.py --smoke
+python benchmarks/bench_compare.py --check-only
 ```
 
 Editable installation picks up Python edits. After changing any source under `rust/`, rebuild the native extension with `python -m pip install -e .` before running tests; an editable install does not automatically rebuild Rust code.
 
-If `just` is installed, run `just` to list the recipes. Use `PYTHON=python just install` to install dependencies, `just check` for static checks, `PYTHON=python just ci` to run static checks, tests, and examples, or `just bench` for synchronous benchmarks or `just bench-async` for the async harness. `PYTHON` selects the interpreter for recipes that run Python; its default is `python3.14`.
+If `just` is installed, run `just` to list the recipes. Use `PYTHON=python just install` to install dependencies, `just check` for static checks, `PYTHON=python just ci` to run static checks, the Python test suite, and usage examples, or `just bench` for synchronous benchmarks or `just bench-async` for the async harness. `PYTHON` selects the interpreter for recipes that run Python; its default is `python3.14`.
 
-Ruff and strict mypy settings live in `pyproject.toml`; the `dev` dependency group installs both tools. Python 3.14+ syntax is intentional. `py.typed` is included for type checkers. `Cargo.lock` pins the Rust dependencies. The [`deny.toml`](deny.toml) policy fails on security advisories, yanked releases, disallowed licenses, duplicate crate versions, wildcard requirements, and non-crates.io sources; install `cargo-deny` with `cargo install cargo-deny --locked` to run it locally. The [CI workflow](.github/workflows/tests.yml) runs tests, the quickstart, and synchronous/async benchmark smoke runs on Ubuntu with Python 3.14 and 3.15, plus free-threaded 3.14t and 3.15t source builds, and runs the same `cargo deny` dependency checks. Its packaging job builds the abi3 wheel and sdist on Ubuntu, macOS, and Windows with Python 3.14, verifies both artifact contents, then installs each artifact and runs the test suite, quickstart, and native-extension check against it; it also re-runs the abi3 wheel smoke test under Python 3.15 on Linux. CI also runs a non-publishing free-threaded packaging preflight for cp314t/cp315t on every supported platform; the publish workflow builds and smoke-tests those wheels for Linux x86_64/aarch64 glibc, macOS x86_64/arm64, and Windows x64. The [typing examples](examples/typing_checks.py) are checked by mypy.
+Ruff and strict mypy settings live in `pyproject.toml`. Mypy checks the [typing examples](examples/typing_checks.py), and `py.typed` is included for type checkers. Python 3.14+ syntax is intentional. `Cargo.lock` pins the Rust dependencies. The [`deny.toml`](deny.toml) policy fails on security advisories, yanked releases, disallowed licenses, duplicate crate versions, wildcard requirements, and non-crates.io sources. Install `cargo-deny` with `cargo install cargo-deny --locked` to run it locally.
+
+The Ubuntu matrix runs Rust formatting, Clippy, `cargo test`, the Python test suite, every `examples/*.py` script, both benchmark smoke runs, and the comparison harness's semantic preflight and worker smoke test on CPython 3.14 and 3.15. Separate jobs run Ruff, mypy, `cargo deny`, and the Rust 1.85 compatibility check. Free-threaded source jobs run the Python suite, examples, and both benchmark smoke runs on CPython 3.14t and 3.15t. See the [CI workflow](.github/workflows/tests.yml).
+
+The packaging job builds the abi3 wheel and sdist on Ubuntu, macOS, and Windows with Python 3.14, verifies both artifact contents, then installs each artifact and runs the test suite, quickstart, and native-extension check against it. It also re-runs the abi3 wheel smoke test under Python 3.15 on Linux. CI runs a non-publishing free-threaded packaging preflight for cp314t/cp315t on every supported platform. The publish workflow builds and smoke-tests those wheels for Linux x86_64/aarch64 glibc, macOS x86_64/arm64, and Windows x64.
 
 ### Benchmarks
 
@@ -732,7 +740,7 @@ maturin sdist --out dist
 python scripts/verify_dist.py dist
 ```
 
-Artifacts are written to `dist/`. `just dist` runs the two maturin build commands when maturin is already installed, and `just dist-check` also verifies the wheel layout, stable ABI tag, sdist contents, and version agreement. In a clean environment, install an artifact and run `python examples/verify_native.py` to confirm that the compiled extension, rather than a source fallback, is loaded.
+Artifacts are written to `dist/`. `just dist` runs the two maturin build commands when maturin is already installed, and `just dist-check` also verifies the wheel layout, stable ABI tag, sdist contents, and version agreement. In a clean environment, install an artifact and run `python examples/verify_native.py` to verify that the compiled Rust extension loads and can parse a value.
 
 ## Stability & Versioning
 
